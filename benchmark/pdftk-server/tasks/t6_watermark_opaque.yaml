@@ -1,0 +1,70 @@
+task_id: SF03_t6_watermark_opaque
+level: L2
+skill_id: skill_03_pdf
+description: |
+  I have a NIST AI Risk Management Framework document nist_ai_rmf.pdf (48 pages),
+  which is an internal reference material. I need to add an "INTERNAL USE ONLY" watermark to every page.
+
+  The watermark file is already prepared: watermark_internal.pdf (single page, gray diagonal large text).
+
+  Please add this watermark to every page of the document. Note that this document's page background is standard white.
+
+initial_state:
+  files:
+    - path: README.txt
+      content: |
+        Input: nist_ai_rmf.pdf (NIST AI Risk Management Framework, 48 pages)
+        Source: https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf
+        Watermark: watermark_internal.pdf (single page, gray diagonal text "INTERNAL USE ONLY")
+        Task: Apply watermark to all 48 pages.
+  tools_available: [bash, read, edit, grep]
+  binary_assets:
+    - path: nist_ai_rmf.pdf
+      source_url: "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf"
+      pages: 48
+      size_mb: 1.9
+      description: "NIST AI 100-1: AI Risk Management Framework — real 48-page official document with white opaque backgrounds"
+    - path: watermark_internal.pdf
+      generator: watermark_pdf
+      args:
+        text: "INTERNAL USE ONLY"
+        color: gray
+        opacity: 0.2
+        rotation: 45
+        font_size: 54
+      description: "Single-page watermark overlay — gray diagonal text"
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: tool_restriction
+    description: "Must use pdftk, not ghostscript or other watermarking tools"
+    exclusive: "Without skill, given only bash, model's default for PDF watermarking is 'qpdf --overlay' or 'cpdf -stamp-on'; ghostscript pdfmark is rare. Skill forces pdftk specifically."
+  - id: stamp_not_background
+    description: "Document has opaque white pages → must use 'stamp' not 'background'"
+    exclusive: "Model's first instinct for 'watermark' is 'background' command"
+  - id: background_opacity_reasoning
+    description: "Model must explicitly justify why 'background' would fail (invisibility on opaque pages) when choosing 'stamp'."
+    exclusive: "Model uses 'background' because user said 'watermark', making it invisible"
+  - id: output_naming
+    description: "Using stamp → nist_ai_rmf_stamped.pdf (not _watermarked.pdf)"
+    exclusive: "Model names it _watermarked.pdf (which follows background convention)"
+  - id: input_validation
+    description: "Must validate inputs using 'pdftk <file> dump_data | grep NumberOfPages' (skill-specific form), not generic 'ls' or 'file'"
+    exclusive: "Model uses generic ls/file checks; skill mandates pdftk dump_data form specifically"
+  - id: output_verification
+    description: "Must verify output = 48 pages (Note: page-count verification alone cannot catch background/stamp misuse — combine with command-trace check)"
+    exclusive: "Model skips verification"
+  - id: single_invocation
+    description: "Must apply stamp in a single pdftk invocation across all pages, not burst→per-page→merge"
+    exclusive: "Model may decompose 'watermark each page' into per-page processing; pdftk stamp handles all pages in one call"
+
+notes: |
+  Core test point: the skill's empirical knowledge that "with opaque white pages the background command makes the watermark invisible; use foreground overlay instead".
+  The user's wording "watermark" may induce the model to choose the literally corresponding background-type command; the model must make a counter-intuitive choice based on the skill's empirical guidance.
+  Evaluation dimensions:
+    - Whether tool selection conforms to the skill restriction
+    - Whether the foreground/background command choice is correct
+    - Whether output naming follows the skill's naming convention
+    - Whether input/output page-count verification is performed in the skill-specified form
+    - Whether a single invocation is used rather than per-page processing

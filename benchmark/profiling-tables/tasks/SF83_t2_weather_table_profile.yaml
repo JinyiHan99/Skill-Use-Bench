@@ -1,0 +1,51 @@
+task_id: SF83_t2_weather_table_profile
+level: L3
+skill_id: profiling-tables
+description: |
+  I need to hand over `seattle_weather` (registered as `analytics.seattle_weather` in the warehouse metadata) in `assets/SF83_t2_weather_table_profile/input/weather_warehouse.sqlite` to a colleague doing city operations analysis. Please produce a complete data profile that lets a newcomer quickly get up to speed and judge whether this table is suitable for direct daily analysis, and summarize the main quality risks, usage caveats, and common onboarding queries. Save the result as `output/SF83_t2_weather_table_profile.md`.
+
+initial_state:
+  assets:
+    - path: assets/SF83_t2_weather_table_profile/input/weather_warehouse.sqlite
+      source: "https://raw.githubusercontent.com/vega/vega-datasets/master/data/seattle-weather.csv and https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
+      real_state: "SQLite warehouse snapshot containing the full public Seattle weather table and a small secondary public passenger table; metadata tables are derived from the loaded CSV columns."
+      preparation: |
+        Download the public Seattle weather CSV from Vega datasets and the Titanic CSV from Data Science Dojo. Load Seattle weather rows into `seattle_weather` with warehouse metadata registering it as `analytics.seattle_weather`, and load a small passenger table into the same SQLite file; create metadata tables from the loaded schema. No synthetic data rows are added.
+    - path: assets/SF83_t2_weather_table_profile/input/seattle-weather.csv
+      source: "https://raw.githubusercontent.com/vega/vega-datasets/master/data/seattle-weather.csv"
+      real_state: "Original public Seattle weather CSV used to build the SQLite warehouse snapshot."
+      preparation: |
+        Download the public Seattle weather CSV from Vega datasets. This file is included as source material only; the task target remains the `seattle_weather` table inside `weather_warehouse.sqlite`.
+  tools_available: [bash, read, write]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: metadata_first_schema_profile
+    description: "The profile must begin with a dedicated schema/column-metadata section covering column names, data types, and comments/descriptions before row counts, samples, or column statistics."
+    exclusive: "A generic EDA model may inspect schema or include column types, but often mixes them with samples/statistics or starts from SELECT/sample rows rather than making metadata the first standalone profiling step."
+  - id: type_driven_column_statistics
+    description: "The profile must apply type-specific statistics: date columns include earliest/latest/date_range_days/null_count/freshness; numeric columns include min/max/avg/median/null/distinct-style statistics; categorical columns include frequency and percentage distributions."
+    exclusive: "A generic analysis may compute a few obvious facts such as min/max dates or counts, but will not consistently branch the profiling logic by column type using the skill's date, numeric, and categorical statistic families."
+  - id: explicit_quality_dimensions
+    description: "The data quality assessment must explicitly cover completeness, uniqueness, freshness, validity, and consistency rather than only giving general caveats."
+    exclusive: "A generic EDA report often summarizes risks in prose, but does not systematically evaluate the five quality dimensions required by the skill."
+  - id: structured_profile_summary
+    description: "The final report must include a structured profile summary with schema, key statistics, data quality score, potential issues, and recommended queries."
+    exclusive: "A generic model may write a useful narrative report, but is less likely to include the skill's full summary package, especially data quality scoring plus recommended queries."
+
+notes: |
+  - Core test point: the target table is registered as `analytics.seattle_weather` in the warehouse metadata, but the SQLite physical table name is `seattle_weather`; the model should locate it via metadata/table list and profile only this weather table.
+  - SQLite does not support some SQL dialect functions in skill.md examples (e.g. DATEDIFF, PERCENTILE_CONT, STDDEV, LEN); evaluation does not require verbatim use of these SQL, only equivalent profiling metrics and structure.
+  - `titanic_passengers` is a distractor table in the same SQLite file; the correct behavior is for the model to ignore it and analyze only `seattle_weather`.
+  - Expected correct behavior: the report should cover schema, 1461-row scale, the `date` range of 2012-01-01 to 2015-12-31, numeric statistics for `precipitation`/`temp_max`/`temp_min`/`wind`, categorical frequency and percentage for `weather`, sample rows, completeness/uniqueness/freshness/validity/consistency assessment, quality score, and practical query suggestions.
+  - Common model error behaviors: only plotting weather categories or only outputting value_counts for `weather`; treating `date` as an ordinary string column and only computing length, without giving earliest/latest/date_range_days; the report says "the latest data is very recent" without noticing the actual max date is 2015-12-31; not giving percentages for each `weather` category, making it impossible to identify distribution skew such as rain/sun.
+  - baseline_correctness_signals:
+      - `output/SF83_t2_weather_table_profile.md` exists and is non-empty.
+      - The report clearly corresponds to `analytics.seattle_weather`, including the real date span and row count.
+      - The report notes at least one actual data quality caveat, such as historical-data freshness or the range of precipitation/temperature fields.
+  - skill_following_signals:
+      - The first substantive analysis section of the report must be schema/column metadata (1-2 sentences of overview are allowed before it), and it must include column names, types, and descriptions/comments; only after that may it proceed to row counts, samples, or column-level statistics.
+      - The report reflects type-branched profiling: date columns give earliest/latest/date_range_days/null_count/freshness; numeric columns give min/max/avg/median/null/distinct and other statistics; categorical columns give frequency and percentage of top values.
+      - The quality assessment must explicitly cover completeness, uniqueness, freshness, validity, and consistency, not just generic risk caveats.
+      - The final report should include a data quality score and recommended queries; but the evaluation focus is on whether the corresponding profiling dimensions are completed, not on verbatim reproduction of the SQL dialect or heading text in skill.md.

@@ -1,0 +1,131 @@
+rules:
+  - id: g1_observable_implementation_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: '"(tool|name)"\s*:\s*"(Write|Edit)"[^\n]{0,500}"file_path"|"recipient_name"\s*:\s*"functions\.(Write|Edit)"[^\n]{0,500}"file_path"|<tool_use[^>]{0,200}\b(Write|Edit)\b'
+    spec: "[GATE] The trace contains real Write/Edit tool calls, indicating the model has an observable implementation modification attempt."
+
+  - id: r1_order_context_uses_local_identity_value_objects
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The order context should establish an independent bounded context; the order core can only hold lightweight identities/value objects from its own context, such as OrderId, CustomerId, BuyerId, CheckoutReference, and cannot directly depend on account.User, checkout.Checkout, Django ORM models, or a global shared/common entity.
+      Skill-exclusive rationale: the default modeling directly reuses the original Saleor User/Checkout/Django ForeignKey, or extracts a shared models layer for all areas to share; the skill requires avoiding sharing a single model across contexts, and the conflict point is whether the order core uses local language and identities to isolate external models.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: does the order core model/aggregate use order-context local identities or value objects to express the buyer and checkout reference, and does it not import or depend on account.User, checkout.Checkout, Django models/ForeignKey as field types, and does it not put these concepts into a global shared/common entity layer for core reuse? If both local value objects and external User/Checkout/ORM dependencies exist at the same time, judge NO. Only judge this one thing. Answer YES if order core has CustomerId/BuyerId/OrderId/CheckoutReference/CheckoutRef or equivalent local value objects. Answer NO if order core imports account_models/User/checkout_models/Checkout/Django ORM models or uses a shared User/Checkout entity as its field type.
+      acceptable: "orders/domain/order.py defines OrderId, CustomerId or BuyerId, CheckoutReference and Order aggregate with buyer: CustomerId."
+      unacceptable: "orders/domain/order.py imports from account.models import User or checkout.models import Checkout, or shared/models.py defines User used by orders."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_explicit_anti_corruption_boundary
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Collaboration between the order and account/checkout areas should be completed through explicit interfaces, gateways, translators, ACLs, or equivalent boundary objects; external concepts must be translated into order-context local concepts at the boundary.
+      Skill-exclusive rationale: the default implementation passes account or checkout objects directly into the order service/entity, or lets the order service query external ORM; the skill's DDD troubleshooting requires introducing an Anti-Corruption Layer, and the conflict point is whether cross-context collaboration has a translation boundary rather than object pass-through.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: is there an explicit interface, gateway, translator, anti-corruption layer, or equivalent boundary for account/checkout to order-context collaboration, and is that boundary actually injected/called by the order use case or application service, translating external user/checkout information into order-local CustomerId/BuyerId/CheckoutReference/command input? Only judge this one thing. Answer YES if order application code depends on an interface such as BuyerDirectory/CheckoutGateway/CheckoutTranslator and receives local values. Answer NO if the interface/translator is only defined but unused, order core/service directly accepts User or Checkout ORM objects, imports account/checkout models, or reaches into their tables without a boundary.
+      acceptable: "CheckoutGateway protocol returns CheckoutReference and CustomerId; order use case receives the gateway; DjangoCheckoutAdapter translates checkout_models.Checkout at the edge."
+      unacceptable: "OrderService.prepare(checkout: Checkout, user: User) reads checkout.user and stores the objects in Order, or defines CheckoutGateway but never uses it."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_order_aggregate_enforces_fulfillment_rule
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Core order rules should be expressed around the Order aggregate boundary; state transitions/invariants for the order entering the fulfillment-ready state should be maintained by the aggregate root method, or strictly delegated to that aggregate method by the use case, rather than scattered across anemic data classes or external scripts.
+      Skill-exclusive rationale: looking only at the task, a strong model may create several dataclasses and service functions to set status; the skill emphasizes Aggregates as consistency boundaries with only the aggregate root accessed from outside, and the conflict point is whether core state rules are maintained by the order aggregate boundary.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: is the rule for the order entering the fulfillment-ready state validated and the state transition executed by the Order aggregate root method itself, or strictly delegated to that aggregate method by the use case? Only judge this one thing. Answer YES if Order has behavior such as prepare_for_fulfillment/mark_ready_for_fulfillment that enforces allowed transitions/invariants and the use case invokes it. Answer NO if service/use case directly assigns order.status = READY, even with an external if-check, or if Order.prepare_for_fulfillment() is merely an unconditional assignment wrapper with no invariant.
+      acceptable: "Order.prepare_for_fulfillment() checks current state and records ReadyForFulfillment; the use case calls this aggregate method."
+      unacceptable: "prepare_order(order) checks a condition and then does order.status = 'READY' on a dataclass, or Order.prepare_for_fulfillment() only sets status with no invariant."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_domain_events_record_cross_system_notifications
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] After the order completes key steps, domain event objects should first be recorded in the domain, to be published/handled by the outer layer; the order core cannot directly call email, message queues, HTTP, notification services, or other infrastructure.
+      Skill-exclusive rationale: the default implementation directly calls notify/send/publish to external systems in state methods or services; the skill requires Domain Events to capture domain facts for cross-aggregate coordination, with infrastructure in the outer layer, and the conflict point is whether the core produces events or directly does external side effects.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: does the order's key state change append/return/collect domain event objects/list (e.g., OrderReadyForFulfillment, OrderPrepared, OrderStepCompleted) in the state-change path, to be published or read by outer processes, while the order core does not directly call email, message broker, HTTP client, notification service, or external systems? Merely defining event classes does not count. Only judge this one thing. Answer YES if aggregate/use case records domain events and tests assert events. Answer NO if entity/core method directly calls notifier.publish/send/email/http, only logs/prints without a domain event object, or defines event classes that are never emitted.
+      acceptable: "Order.prepare_for_fulfillment appends OrderReadyForFulfillment(order_id, customer_id) to order.events; application layer later dispatches events."
+      unacceptable: "Order.prepare_for_fulfillment calls send_email(), requests.post(), kafka_producer.send(), notification_service.notify(), or never appends/returns its event class."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_order_tests_are_context_local_with_in_memory_doubles
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK/DIAGNOSTIC — not counted toward SF] Whether the order core rule and cross-module collaboration tests are completed within the order context using pure unit tests and in-memory/fake boundary doubles, without starting account/checkout database tables, Django ORM, or a real database.
+    signal:
+      query: >
+        Based on the test file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: do the order rule and cross-module collaboration tests only instantiate the order aggregate/use case and inject fake/in-memory gateway/repository/translator, without using Django TestCase, pytest-django database marker, migrations, ORM models, account/checkout tables, or real database connections? This is a task/diagnostic check and is not counted toward the skill-following main score. Answer YES if tests create CustomerId/CheckoutReference and fake gateways/repositories to assert fulfillment state and events. Answer NO if tests import Saleor/Django account or checkout models, require database access, or build real User/Checkout rows.
+      acceptable: "tests/unit/test_order.py uses FakeCheckoutGateway and InMemoryOrderRepository; asserts state transition and domain event list."
+      unacceptable: "tests subclass django.test.TestCase, create account.User and checkout.Checkout ORM rows, then call order service."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_split_plan_names_bounded_contexts_and_context_map
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK/DIAGNOSTIC — not counted toward SF] Whether the split plan explicitly names bounded contexts such as order, account, checkout and their relationships/collaboration, rather than only giving a technical directory split or Django app split.
+    signal:
+      query: >
+        Based on the plan, README, code comments, documentation content, or code package structure/interface/adapter naming finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: does the deliverable explicitly name bounded contexts such as order, account, checkout, and explain that order collaborates with account/checkout through ACL/gateway/translator/events? This is a task/diagnostic check and is not counted toward the skill-following main score. Answer YES if the delivered plan, skeleton, package structure, interface names, or adapter names include context mapping language and boundaries. Answer NO if it only lists folders such as models/services/repositories without bounded context relationships.
+      acceptable: "A design note or code structure shows Order context owns Order/CustomerId, Account context owns User, Checkout context owns Checkout, and Order talks to Checkout through CheckoutGateway/ACL."
+      unacceptable: "A tree with app/models.py, app/services.py, app/repositories.py and no context boundary or mapping explanation."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the order-related split plan, minimal code skeleton, and core rule/collaboration test examples are complete."
+    signal:
+      query: >
+        Based on the final file content and actual Write/Edit tool calls, not the agent's self-description: is the task basically complete, i.e., the order-related split plan and minimal code skeleton were delivered, expressing that the order belongs to a buyer, can enter the fulfillment-ready state, and notifies other systems after key steps, with unit-test examples reflecting the core order rules and cross-module collaboration? Answer YES only if plan, code skeleton, and test examples are all actually written; Answer NO if only a verbal explanation is given, tests are missing, or one of the core order rules is missing.
+      acceptable: "Has Order/CustomerId, prepare_for_fulfillment, domain event, gateway/ACL and corresponding unit tests."
+      unacceptable: "Only copies the original Django models or only writes a directory tree, without inspectable minimal code and tests."

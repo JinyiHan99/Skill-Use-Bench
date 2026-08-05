@@ -1,0 +1,44 @@
+task_id: go_code_review_t1_http_server_shutdown
+skill_id: go-code-review
+description: |
+  We are preparing to merge a sample service change from a small Go Web project into the main branch. Please unpack `./assets/go_code_review_t1_http_server_shutdown/input/review_bundle.tar.gz`, and from a maintainer's perspective do a pre-release review of this change, writing the review notes to `output/go_code_review_t1_review.md`.
+
+  Please judge based on the repository snapshot and change record in the archive; do not modify the source code.
+initial_state:
+  assets:
+    - path: ./assets/go_code_review_t1_http_server_shutdown/input/review_bundle.tar.gz
+      source: "https://github.com/go-chi/chi commit 563ab118626b47810852303c3a60c2106a6bc23c"
+      real_state: "A graceful shutdown example refactor commit from the real open-source Go repository go-chi/chi; the archive contains the post-commit repository tree, change.patch, and metadata/source.txt."
+      preparation: |
+        Clone https://github.com/go-chi/chi; use git archive to export the repository tree of 563ab118626b47810852303c3a60c2106a6bc23c to repo/; use git show --format=fuller --stat --patch to save that commit to change.patch; record the source in metadata/source.txt; pack as review_bundle.tar.gz.
+  tools_available:
+    - shell
+    - text_editor
+expected_trigger: true
+skill_constraints_tested:
+  - id: pre_review_checks_before_manual_review
+    description: "The skill requires running automated pre-review checks before manual review, covering at least formatting and Go static checks, then reading diffs file by file."
+    exclusive: "Without the skill, a strong model may also run go vet, gofmt, or tests on its own; the real discriminant is whether, before manual review, it prioritizes the skill-pointed repo-local pre-review entry scripts/pre-review.sh, or equivalently first completes gofmt/go vet and other Go pre-review checks, and keeps the check-before-review tool trace."
+  - id: web_server_reference_for_http_server_review
+    description: "The skill requires reading dedicated reference material when the scenario simultaneously involves HTTP server, concurrency, context, logging, error handling, and shutdown behavior."
+    exclusive: "A strong model may also point out graceful shutdown, log.Fatal in a background goroutine, context lifecycle, and logging/error handling issues based on general Go experience, so the final content may overlap; the skill-exclusive signal for this constraint is reflected in whether the tool trace proactively reads references/WEB-SERVER.md, rather than judging only by the review opinion content."
+  - id: severity_grouped_review_template
+    description: "The skill requires using the fixed review schema of review-template.md: Must Fix / Should Fix / Nits three-section grouping, with each finding including a checklist rule name and specific line reference."
+    exclusive: "A generic code review may naturally use severity grouping, or even accidentally use titles like Must Fix / Should Fix / Nits; but it is unlikely to stably apply the per-item schema of review-template.md and tag each finding with a checklist rule name and specific line reference, so the discriminant should be the combination of template schema, rule names, and line references."
+notes: |
+  - Core test point: this is a Go HTTP server graceful shutdown example change, which exactly triggers the skill's pre-review flow, HTTP server reference routing, and review output structure.
+  - Expected correct behavior: first unpack the asset, review based on repo/ and change.patch in a temporary workspace; run Go pre-review checks; read the change; when pointing out real issues, cite specific added lines in change.patch or lines in repo/_examples/graceful/main.go; the final artifact is output/go_code_review_t1_review.md.
+  - Common model error behaviors (code-line-level counter-examples):
+      - Directly stating the change has no issues, missing that the newly added `log.Fatal(err)` inside `go func()` in `_examples/graceful/main.go` will directly exit the process in a background goroutine, and without clearly explaining the review point for that goroutine lifecycle/exit path.
+      - Only saying "recommend using context" without noticing the semantics of the newly added `shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)` being separated from the service lifecycle context.
+      - Treating `log.Fatal(err)` and `middleware.Logger` in `_examples/graceful/main.go` as ordinary log issues and criticizing them generically, without giving line references per the skill's logging/error-handling rules.
+      - Outputting an ordinary bullet list, without grouping by Must Fix / Should Fix / Nits, and without rule names.
+  - baseline_correctness_signals:
+      - `output/go_code_review_t1_review.md` exists and its content is a review of the real change in the archive.
+      - The review notes cite at least one specific location in `_examples/graceful/main.go` or `change.patch`.
+      - The source code in the archive was not modified as the main deliverable.
+  - skill_following_signals:
+      - Needs to be evaluated combined with the tool execution trace: formatting/Go static checks were run before manual review, preferentially accepting scripts/pre-review.sh, secondarily accepting an equivalent gofmt/go vet/golangci-lint combination; if the environment lacks a Go toolchain, an explicit attempt trace is sufficient to satisfy the flow requirement.
+      - Needs to be evaluated combined with the tool execution trace: in the HTTP server graceful shutdown scenario, references/WEB-SERVER.md routed by the skill was read, and the final report reflects a cross-review of concurrency, context, logging, error handling, and shutdown behavior.
+      - The review output uses Must Fix, Should Fix, Nits severity grouping, and each finding includes a specific line reference and a checklist rule name, e.g. Goroutine lifetimes, Contexts, Use slog, Don't panic, or Handle errors.
+  - Environment tolerance: the core of pre-review checks is whether the model attempted to execute the skill-required check flow before manual review. If the sandbox lacks a Go toolchain or dependencies cause command failure, as long as the tool trace shows the model attempted to run scripts/pre-review.sh or equivalent gofmt/go vet checks, it can be considered to satisfy the skill-following flow signal.

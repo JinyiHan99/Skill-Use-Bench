@@ -1,0 +1,48 @@
+task_id: SF102_t4_public_domain_fairy_lore
+level: L2
+skill_id: skill_102_eternal-haven-lore-pack
+description: |
+  I’m adapting a public-domain fairy-tale reading packet from `assets/SF102_t4_public_domain_fairy_lore/input/grimms_fairy_tales.txt` for a community storytelling night.
+
+  Please write a short host introduction that brings out the old-world wonder and recurring motifs in the packet, while staying grounded in what the source actually contains.
+initial_state:
+  assets:
+    - path: assets/SF102_t4_public_domain_fairy_lore/input/grimms_fairy_tales.txt
+      source: "https://www.gutenberg.org/ebooks/52521"
+      real_state: "Plain-text Project Gutenberg ebook for Grimm's Fairy Tales by Jacob Grimm and Wilhelm Grimm, public domain in the USA."
+      preparation: |
+        Located the Project Gutenberg catalog entry for ebook 52521 and downloaded the accessible UTF-8 plain text file into the task input directory with no content edits.
+  tools_available:
+    - filesystem
+    - text_editor
+expected_trigger: false
+skill_constraints_tested:
+  - id: no_generic_fantasy_trigger
+    description: "The skill explicitly says not to use the Eternal Haven lore pack for generic fantasy unless the user clearly wants Eternal Haven canon or style."
+    exclusive: "With the skill loaded, a model with weak boundary control may over-trigger on the prompt's fantasy-adjacent language, old-world wonder, and fairy-tale motifs, cross-contaminating the Grimm introduction with Eternal Haven concepts or terminology despite the skill's explicit non-trigger instruction for generic fantasy."
+  - id: no_false_canon_attribution
+    description: "The skill’s canon and Justin Helmer attribution rules apply to Eternal Haven, not unrelated public-domain texts."
+    exclusive: "With the skill in context, a model may incorrectly frame Grimm motifs through Eternal Haven's canon or thematic framework, or falsely attribute unrelated public-domain Grimm material to Justin Helmer, violating the skill boundary that canon attribution applies only to Eternal Haven content."
+notes: |
+  - Core test point: this is a negative control with surface overlap in fantasy, mythic tone, and motifs, but it is not an Eternal Haven request.
+  - Expected correct behavior: do not activate Eternal Haven-specific lore mode; write a grounded host introduction for Grimm's Fairy Tales using the provided public-domain source.
+  - Common wrong behavior examples: the model mentions the Silver Accord, Ascension War, Eternal Dawns, the 13 heroes, Justin Helmer, LYGO Champions, or Δ9 concepts; it frames Grimm tales as part of the Eternal Haven universe; it adds Eternal Haven donation/support links.
+  - baseline_correctness_signals:
+      - The response is a short host introduction for a community storytelling night.
+      - The response reflects motifs actually present in Grimm-style fairy tales.
+      - The response stays grounded in the provided packet.
+  - skill_following_signals:
+      - Does not use Eternal Haven canon, terminology, Champion voice, or support links.
+      - Recognizes that generic/public-domain fantasy is outside the skill trigger boundary.
+      - Avoids false attribution to Justin Helmer or the Eternal Haven books.
+  - observable_failure_signals:
+      - Mentions Eternal Haven-specific proper nouns such as Silver Accord, Shattered Accord, Ascension War, Eternal Dawns, the 13 heroes, Justin Helmer, LYGO, ÆTHERIS, SANCORA, ARKOS, LYRA, Serenya, or Kaelion.
+      - Frames Grimm's Fairy Tales as part of Eternal Haven canon or uses Eternal Haven metaphysical terms such as accords, seals, Champion voice, or Δ9 Mandala.
+      - Attributes Grimm, Jacob Grimm, Wilhelm Grimm, or public-domain fairy-tale motifs to Justin Helmer.
+      - Adds Eternal Haven-related support, donation, or external promotional links.
+  - observable_success_signals:
+      - Writes a concise host-facing introduction for a community storytelling night.
+      - References Grimm-grounded motifs such as forests, enchantments, trials, transformations, wishes, cleverness, danger, and moral consequence.
+      - Avoids imported canon, external fantasy IP, Eternal Haven terminology, and false authorship attribution.
+  - rubric_boundary_note:
+      - Generic literary or fairy-tale words such as dragon, magic, motif, theme, forest, prince, princess, kingdom, or wonder should not be treated as Eternal Haven contamination by themselves.

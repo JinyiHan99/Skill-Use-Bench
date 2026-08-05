@@ -1,0 +1,63 @@
+task_id: clean-ddd-hexagonal_t1_refactor_checkout
+skill_id: clean-ddd-hexagonal
+description: |
+  We are about to develop a Corporate Checkout API flow exclusive to enterprise customers for the sample mall. Enterprise customer checkout has the following specific business rules:
+  1. A Corporate ID (CorporateId) and a Purchase Order Number (PurchaseOrderNumber) must be provided.
+  2. Enterprise credit-limit validation is required: the system must verify whether the order total exceeds the enterprise's current credit limit (CreditLimit; e.g., enterprise 'CORP_001' has a credit limit of 5000.00, others default to 0). If the limit is exceeded, reject the checkout and return an appropriate error.
+  Please implement the corporate checkout API interface under `assets/clean-ddd-hexagonal_t1_refactor_checkout/input/`. Ensure the new code structure is clear, easy to test, and does not affect the existing normal checkout flow.
+  Briefly describe the main changes, the modules involved, and the verification method in `output/checkout-refactor-notes.md`.
+initial_state:
+  assets:
+    - path: assets/clean-ddd-hexagonal_t1_refactor_checkout/input/src/
+      source: "https://github.com/dotnet-architecture/eShopOnWeb/tree/main/src"
+      real_state: "Real open-source ASP.NET Core sample mall source code, containing ApplicationCore, Infrastructure, PublicApi, Web, and other projects; checkout logic lives in the application core service, with API endpoints and data-access implementation distributed across outer-layer projects."
+      preparation: |
+        Shallow-cloned from the dotnet-architecture/eShopOnWeb repository main branch, then copied the src/ directory into this task's input/; no business code content was generated.
+    - path: assets/clean-ddd-hexagonal_t1_refactor_checkout/input/tests/
+      source: "https://github.com/dotnet-architecture/eShopOnWeb/tree/main/tests"
+      real_state: "Real open-source test directory, containing unit-test, integration-test, and functional-test projects."
+      preparation: |
+        Copied the tests/ directory from the same repository into this task's input/, preserving the original directory structure.
+    - path: assets/clean-ddd-hexagonal_t1_refactor_checkout/input/eShopOnWeb.sln
+      source: "https://github.com/dotnet-architecture/eShopOnWeb/blob/main/eShopOnWeb.sln"
+      real_state: "Real solution file."
+      preparation: |
+        Copied the solution file from the same repository into this task's input/.
+  tools_available:
+    - filesystem
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: inward_dependency_rule
+    description: "The outer entry layer (PublicApi) and infrastructure may depend on the application/domain core, but the domain core (ApplicationCore) must not introduce HTTP, database, or framework-implementation dependencies."
+    exclusive: "This constraint mainly serves as a baseline gatekeeping check: `ApplicationCore` should not introduce HTTP, ORM, or database-implementation dependencies. Since the existing project already enforces this rule through separate projects and compile-time dependency restrictions, a strong model may satisfy it even without reading the skill; therefore this item should not serve as the core discriminating evidence, and the core discriminating power should come mainly from whether endpoints bypass the use-case layer and whether business rules are anemic."
+  - id: controllers_route_through_use_cases
+    description: "In the Clean/Hexagonal architectural style, entry-layer endpoints (Endpoints/Controllers) should coordinate business logic through application services or use cases, rather than directly injecting persistence contexts or directly calling repositories to write transactions in API endpoints."
+    exclusive: "Generic refactors or common patterns easily lead to directly calling `IRepository<Order>.AddAsync()` in `PublicApi` Endpoint methods, or even doing low-level data assembly and persistence directly, thereby bypassing the application-service/use-case boundary."
+  - id: domain_behavior_not_anemic
+    description: "Core business rules (such as credit-limit validation and order-invariant validation) should primarily live in domain-model entities, value objects, or domain services, with the application service acting only as a coordinator, avoiding reducing entities to pure data bags (anemic models)."
+    exclusive: "A strong model that does not read the skill will typically write all validation logic (e.g., credit-limit overage check, PO format validation) as a flat, procedural script and stuff it all into an outer service method, reducing entities to anemic objects containing only get/set."
+notes: |
+  - Core test point: whether, when implementing the enterprise-grade API checkout flow, the model cohesively places core business rules (credit validation, PO validation, invariant protection) inside the application core and domain model, and keeps dependency direction (outer depends on inner).
+  - Expected correct behavior:
+      - Create or extend a corporate checkout endpoint under `src/PublicApi/` (e.g., implement `IEndpoint`), responsible only for protocol parsing, request-body mapping, and calling application-layer services/use cases.
+      - Encapsulate corporate checkout business rules (e.g., enterprise credit-limit validation, order aggregate protection) in `src/ApplicationCore`, ensuring no external framework is introduced.
+      - All persistence behavior is coordinated through interfaces/use cases defined in `ApplicationCore`, with no outer framework library directly leaking into the core.
+  - baseline_correctness_signals:
+      - A corporate checkout API-related Endpoint/Controller (e.g., `CorporateCheckoutEndpoint.cs`) is successfully added under `PublicApi`, able to accept POST requests and handle corporate checkout parameters.
+      - The mall's existing solution still builds and compiles normally, and existing checkout logic is not broken.
+      - `output/checkout-refactor-notes.md` is produced, containing a brief description of the changed code structure, the division of each layer's boundaries, and the verification method.
+      - If tests are modified/added, they relate to corporate checkout or credit-validation unit/integration tests, with no placeholder or syntax errors.
+  - model_common_mistakes:
+      - **Imitating PublicApi's existing endpoints to call repositories directly**: when adding `CorporateCheckoutEndpoint` under `src/PublicApi/`, directly copying the pattern of CatalogItem endpoints, injecting `IRepository<Order>`, `IRepository<Basket>`, or `IReadRepository<Basket>` in the Endpoint generic or constructor parameters, and completing order assembly, credit-limit judgment, and persistence in `HandleAsync`.
+      - **Flattening enterprise rules inside the endpoint**: writing `CorporateId`, `PurchaseOrderNumber`, and `CreditLimit` validation and comparison logic directly in `CorporateCheckoutEndpoint.HandleAsync`, rather than delegating checkout orchestration to the application service/use case in `ApplicationCore`.
+      - **Anemic domain model**: writing only procedural `if-else` rules in the request handler or application service, with new domain objects or entities acting only as get/set data containers, carrying no corporate checkout invariants or credit-limit validation behavior.
+      - **Core layer depending on external frameworks**: new code under `src/ApplicationCore/**` references infrastructure or protocol-layer types such as `Microsoft.AspNetCore.*`, `Microsoft.EntityFrameworkCore.*`, `DbContext`, or `HttpContext`.
+  - skill_following_signals:
+      - **Dependency inversion and inward dependency**: new code under `src/ApplicationCore` absolutely does not reference any HTTP (e.g., `Microsoft.AspNetCore.*`), ORM framework implementation (e.g., `Microsoft.EntityFrameworkCore.*`), or database-related dependencies.
+      - **Endpoints do not cross the boundary to call repositories**: `PublicApi` endpoints do not directly write large amounts of core business process (aggregate assembly, PO format validation, credit-limit calculation) via repository objects (e.g., `IRepository<Order>`) inside the Handler/Controller.
+      - **Domain behavior is not anemic**: core rules such as credit-limit validation and invariant protection are encapsulated in domain entities (e.g., `Order`, `Buyer` aggregates) or standalone domain services, rather than being flattened as procedural scripts in outer service methods.
+      - **Core-layer dependency check**: new or modified code under `src/ApplicationCore/**` must not reference or use types such as `Microsoft.AspNetCore`, `Microsoft.EntityFrameworkCore`, `DbContext`, or `HttpContext`.
+      - **Endpoint responsibility check**: corporate-checkout-related PublicApi Endpoints/Controllers must not directly complete order aggregate assembly, credit-limit calculation, PO validation, and persistence transactions inside the Handler method body.
+      - **Repository-call boundary check**: corporate-checkout-related PublicApi Endpoints/Controllers should not directly call `IRepository<Order>.AddAsync()`, `IRepository<Basket>`, or the underlying DbContext to complete the checkout flow; they should call application-service/use-case interfaces in `ApplicationCore`.
+      - **Enterprise rule location check**: credit-limit comparison and CorporateId/PO business invariants should live in `ApplicationCore`'s domain objects, domain services, or application-service coordination logic, and must not be mainly scattered across the PublicApi layer.

@@ -1,0 +1,103 @@
+# Rubric for skill_97_football-data — football_data_t1_pl_current_snapshot
+
+rules:
+  - id: g1_observable_football_data_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable football-data/sports-skills real CLI or Python SDK query attempt."
+    signal:
+      pattern: '(?i)(sports-skills\s+football\s+get_\w+\b|from\s+sports_skills(?:\.football)?\s+import\s+\w+|from\s+sports_skills\s+import\s+football|football\.get_\w+\s*\()'
+
+  - id: r1_current_season_discovery_before_standings
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] For "current/present/no explicit season_id" Premier League standings requests, must first call get_current_season(competition_id="premier-league") or an equivalent SDK call, then query the standings.
+      skill-exclusive rationale: without reading the skill, a strong model will usually infer 2025-26 / current Premier League directly from the input schedule file name, system date, or web search; the skill requires not hard-coding or guessing season_id, and discovering the current season first. The conflict point is "infer year / query table directly" vs "current season discovery first".
+    signal:
+      query: |
+        Based only on actual tool-call evidence in serialized_steps, not on the agent's narration, did the agent call football-data get_current_season for competition_id="premier-league" before any football-data standings query?
+        Answer YES if the trace shows get_current_season("premier-league"), football.get_current_season(competition_id="premier-league"), or an imported get_current_season(competition_id="premier-league") call before get_season_standings.
+        Answer NO if it hardcodes a season_id, infers it from the file/date, uses web search instead, or queries standings first.
+      acceptable: "sports-skills football get_current_season --competition_id=premier-league, then sports-skills football get_season_standings --season_id=<returned id>; or from sports_skills.football import get_current_season; get_current_season(competition_id='premier-league') before standings"
+      unacceptable: "sports-skills football get_season_standings --season_id=premier-league-2025 with no prior get_current_season call"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps]
+
+  - id: r2_use_season_level_standings_with_discovered_id
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Standings should be obtained via get_season_standings(season_id=<id obtained from current-season discovery>), rather than inferred from schedule text or by calling non-existent generic standings/results commands.
+      skill-exclusive rationale: without reading the skill, a model may web-search, compute the table from openfootball schedule/scores, or guess get_standings/get_league_table; the skill explicitly states that football-data's valid command is get_season_standings and the season_id comes from the discovery step. The conflict point is "arbitrary standings source/command" vs "season-level standings capability".
+    signal:
+      query: |
+        Based only on actual tool-call evidence and command outputs in serialized_steps, did the agent call get_season_standings after current-season discovery, with a season_id that matches the get_current_season output or has an observable variable/data-flow from that output?
+        If exact data-flow cannot be proven from the trace, answer YES only when get_season_standings occurs after get_current_season and there is no earlier hardcoded standings query.
+        Answer NO if standings are derived from the schedule text, fetched only by generic web search, attempted through get_standings/get_table/get_league_table/get_results/get_live_score/get_match_results, or queried with a hardcoded season_id before discovery.
+      acceptable: "get_current_season returns premier-league-2025; later call uses get_season_standings --season_id=premier-league-2025"
+      unacceptable: "get_season_standings --season_id=premier-league-2025 appears before get_current_season, or python parses the schedule text and computes the table"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps]
+
+  - id: r3_empty_current_standings_fallback_order
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] If the current season has not yet started or standings are all 0, only after discovering and checking the current season can the agent fall back to the most recent Premier League season with complete standings as a reference.
+      skill-exclusive rationale: without reading the skill, a model will directly pick the previous season that seems to have data or fabricate the current situation; the skill requires first verifying the current season, then conditionally falling back. The conflict point is "direct fallback / fabrication" vs "fall back only after current-season data is empty".
+    signal:
+      query: |
+        Based only on actual tool calls and command outputs, not narration, if the agent used a previous Premier League season for analysis, did it first discover/query the current season standings and observe explicit command-output evidence that the current standings were unavailable, not started, or all-zero?
+        Answer YES if no fallback was needed, or if fallback occurred only after current standings were checked and found unusable from command output.
+        Answer NO if the agent skipped current season discovery and directly used a prior season, or fabricated current standings after all-zero data.
+      acceptable: "current season standings output has all played/points zero, then agent queries premier-league-2024"
+      unacceptable: "agent immediately queries premier-league-2024 because it has complete data, with no current-season check"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps]
+
+  - id: r4_no_hallucinated_football_commands
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] Must not call standings/results/live-score-style commands that the football-data skill explicitly lists as non-existent or unsupported.
+      skill-exclusive rationale: without reading the skill, a model is prone to guessing common API names like get_standings, get_table, get_league_table, get_results, get_live_score, get_live_scores, get_match_results; the skill gives the unique valid command list and calls these out as common hallucinations. The conflict point is "guess command names by intuition" vs "only use valid commands".
+    signal:
+      query: |
+        Based only on actual tool-call evidence, did the agent avoid executing nonexistent football-data commands such as get_standings, get_table, get_league_table, get_results, get_live_score, get_live_scores, get_team_roster, get_team_squad, get_transfers, get_match_results, get_match, or get_player_stats?
+        Answer YES if none of those commands were actually executed.
+        Answer NO if any such command was executed as a football-data/sports-skills CLI call, Python SDK call, or wrapper command.
+      acceptable: "Only get_current_season and get_season_standings are called."
+      unacceptable: "sports-skills football get_table --league=premier-league or football.get_live_score(...)"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps]
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the final answer completes the Premier League season background, standings top six, and situation summary requirements."
+    signal:
+      query: |
+        Based only on the final answer, did the response identify the season represented by assets/football_data_t1_pl_current_snapshot/input/premier_league_schedule_background.txt, provide a current or fallback Premier League standings top six with rank/team/played/goal-difference/points, and include brief situation notes for leader, 6th/7th area, and 17th/18th area with points or point gaps?
+        If the final answer uses a fallback season, it must explicitly explain that the current season standings were unavailable, not started, or all-zero.
+        Answer YES only if all these task-output elements are present; answer NO if the answer is missing the top six table, omits points/gaps, treats the schedule file as a standings source, or uses fallback standings without explaining the fallback reason.
+      acceptable: "Uses 2024-25 standings after stating current-season standings are all-zero/not started, and provides top six plus key gap notes."
+      unacceptable: "Shows 2024-25 top six with no note that current-season standings were unavailable/all-zero."
+      judge_expected: "YES"
+      judge_context_window: [final_answer]

@@ -1,0 +1,154 @@
+rules:
+  - id: r1_announced_skill_before_workflow
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] Before any Git/worktree/setup/test operation, must announce that the using-git-worktrees skill is being used to set up an isolated workspace.
+      skill-exclusive reason: without reading the skill, a strong model will directly create a worktree or inspect the directory; the skill requires a fixed announcement first.
+    signal:
+      query: >
+        Based on actual message order and tool call evidence, not post-hoc descriptions: did the model, before the first Git, worktree, setup, or test related tool call, output a skill startup announcement explicitly containing `using-git-worktrees`?
+        Answer YES if the statement contains `using-git-worktrees` and precedes the first relevant tool call.
+        Answer NO if missing, appears only after commands, or only generically says it will prepare an isolated environment.
+      acceptable: "First output `I'm using the using-git-worktrees skill to set up an isolated workspace.` then run git rev-parse."
+      unacceptable: "First run git worktree add or git status; or only say 'prepare isolated environment' but without using-git-worktrees."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_detected_existing_isolation_before_manual_fallback
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] Before manually creating any worktree, must first execute Step 0: compare git-dir/common-dir; branch query can use equivalent methods to record; superproject guard to rule out submodule is only needed when git-dir and git-common-dir differ.
+      skill-exclusive reason: without reading the skill, the model will directly `git worktree add` because the user explicitly requires "not affecting the current workspace"; the skill requires first avoiding nested worktree.
+    signal:
+      query: >
+        Based on actual Bash/tool call evidence, not self-report: before any `git worktree add` or EnterWorktree/native isolation operation, did the model first run `git rev-parse --git-dir` and `git rev-parse --git-common-dir` in the t4 repo, and query branch with `git branch --show-current` or equivalent? If detection results show git-dir and git-common-dir differ, did it then run `git rev-parse --show-superproject-working-tree` or equivalent superproject guard?
+        Answer YES if these required checks precede manual/native isolation creation, with superproject guard required only when git-dir/common-dir differ.
+        Answer NO if it jumps directly to worktree creation, omits git-dir/common-dir comparison, or omits superproject guard after detecting a difference.
+      acceptable: "First execute git-dir/common-dir/branch detection; if they differ, then execute show-superproject-working-tree; then create worktree."
+      unacceptable: "First step is `git worktree add .worktrees/...`; or git-dir/common-dir differ but no submodule guard."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_manual_fallback_only_after_no_native_mechanism
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] raw `git worktree add` fallback should only be used when no native worktree/isolated-workspace tool is available; this rule requires the judge to see the tool inventory/deferred tool context. If native tools are available, should first ToolSearch/call native; if the tool list confirms no native, manual fallback is not penalized.
+      skill-exclusive reason: without reading the skill, a strong model often treats `git worktree add` as the first choice; the skill specifies native-first to avoid phantom state that the harness cannot manage.
+    signal:
+      query: >
+        Based on actual tool call evidence and visible tool inventory/deferred tool context, not self-report: if the model used `git worktree add`, was it after the tool list showed no native worktree mechanism, or after first ToolSearch/trying EnterWorktree/WorktreeCreate and other native tools failed before falling back?
+        Answer YES if native tool was used when available, native attempt/search occurred before fallback, or tool inventory clearly shows no native worktree tool.
+        Answer NO if native tool availability is visible but it directly runs git worktree add without ToolSearch/native attempt. If tool inventory/deferred tool context is unavailable to the judge, this rule should be treated as not applicable rather than inferred from self-report.
+      acceptable: "First ToolSearch/try EnterWorktree, after failure use git worktree add; or tool list clearly has no native worktree tool."
+      unacceptable: "Tool list shows EnterWorktree, but without checking/trying native mechanism, directly raw `git worktree add`."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: low
+
+  - id: r4_chose_hidden_worktrees_directory_when_both_exist
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] In manual project-local fallback, if both `.worktrees/` and `worktrees/` exist, must choose a path equivalent to pointing under `.worktrees/`; not applicable when native tool is successfully used.
+      skill-exclusive reason: without reading the skill, the model may follow the more visible `worktrees/` directory; the skill explicitly specifies that hidden `.worktrees/` takes priority when both exist.
+    signal:
+      query: >
+        Based on actual tool call evidence, not agent self-report: if the model executes manual `git worktree add`, after relative path, absolute path, or variable expansion, is the target path equivalently under `assets/using_git_worktrees_t4_manual_fallback/input/repo/.worktrees/`, rather than under `.../input/repo/worktrees/`?
+        Answer YES if manual fallback path uses `.worktrees/`, or if native worktree tool was successfully used so no manual project-local directory was selected.
+        Answer NO if any manual worktree creation target uses the visible `worktrees/` directory.
+      acceptable: "`git worktree add .worktrees/parser-change -b parser-change`; or variable LOCATION=.worktrees then add `$LOCATION/branch`."
+      unacceptable: "`git worktree add worktrees/parser-change -b parser-change`."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_verified_chosen_directory_ignored_before_creation
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] Before creating a worktree in project-local manual fallback, must run Git ignore semantic verification on the chosen `.worktrees/`; acceptable precise `git check-ignore` forms include `.worktrees`, `.worktrees/`, `-- .worktrees/`, or target subpath; if not ignored, must first update .gitignore and commit.
+      skill-exclusive reason: without reading the skill, the model may create just because the directory exists; the skill requires first preventing worktree contents from being tracked.
+    signal:
+      query: >
+        Based on actual Bash/Edit/Write tool call evidence, not self-report: if the model manually creates a worktree under `.worktrees/`, did it run an equivalent precise form of `git check-ignore` to verify the chosen directory or target subpath (e.g., `.worktrees`, `.worktrees/`, `-- .worktrees/`, `.worktrees/<branch>`) before `git worktree add`, and when not ignored, add .gitignore rules and commit before continuing?
+        Answer YES if native tool was used, or if manual creation is preceded by Git ignore semantic verification/fix for the chosen directory.
+        Answer NO if manual git worktree add happens before `git check-ignore`; merely reading `.gitignore` is not enough for strong PASS.
+      acceptable: "First `git check-ignore -q -- .worktrees/` or `git check-ignore -- .worktrees/<branch>`, confirm success, then `git worktree add .worktrees/...`."
+      unacceptable: "Directly `git worktree add .worktrees/...` without check-ignore; or only checked the unselected worktrees."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_setup_and_baseline_after_workspace_creation
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] After the isolated workspace is created/entered, must attempt project setup/dependency detection and attempt baseline tests in that isolated workspace context; command failures still count as attempted, but running only in the original checkout does not pass.
+      skill-exclusive reason: without reading the skill, the model may think creating the workspace already satisfies "prepare environment"; the skill requires setup and baseline before the workspace is ready.
+    signal:
+      query: >
+        Based on actual tool call evidence, not self-report: after creating/entering the isolated workspace, did the model attempt both Python project setup/dependency detection commands AND baseline test commands in that workspace context? Command failures still count as executed.
+        Answer YES if both setup/dependency detection and baseline test are attempted after workspace creation/entry.
+        Answer NO if either setup/dependency detection or baseline test is absent after creation, or if setup/test occurs only in original checkout before creation.
+      acceptable: "After git worktree add, in .worktrees/<branch>, detect requirements/pyproject or run pip/poetry, and run pytest/tox, even if pytest fails it counts as attempted."
+      unacceptable: "After creating .worktrees/<branch>, directly say ready; or only run pytest in the original checkout."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: trace-and-output
+    judge_context_window: [serialized_steps, final_answer]
+    spec: "[TASK — not counted toward SF] Whether the final answer is supported by real tool calls: workspace creation/entry, baseline test execution, no business code modification, and the final answer is consistent with the trace."
+    signal:
+      query: >
+        Based on actual tool call evidence and final answer: does the trace have real workspace creation/entry or explicit legal fallback, baseline test execution, and no parser/business code modification; is the final answer consistent with these evidence, reporting environment and baseline status without claiming to have changed business code?
+        Answer YES if trace evidence supports the final readiness/baseline statement and no business implementation occurred.
+        Answer NO if final answer hallucinates readiness/tests, omits baseline, or claims parser code was changed.
+      acceptable: "In the trace, create .worktrees/... and run pytest; final reports baseline status, can start parser changes."
+      unacceptable: "Trace has no baseline but says tests passing; or parser changes have been completed."

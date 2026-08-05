@@ -1,0 +1,130 @@
+# Rubric for skill_67_swiftui_view_refactor — t2: account actions
+
+rules:
+  - id: g1_observable_output
+    type: required-tool
+    provenance: gate
+    verifier: state-diff
+    weight: 0
+    spec: "[GATE] AccountView output file exists and defines AccountView."
+    signal:
+      file: "assets/swiftui_view_refactor_t2_account_actions/output/AccountView.swift"
+      file_must_contain: 'struct\s+AccountView\s*:\s*View'
+
+  - id: r1_extract_nontrivial_side_effects_from_inline_actions
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Non-trivial side effects such as AppStore.sync(), passkey sign-in tasks, and sign-out calls should be triggered through small private methods or callbacks, not inline in Button/Alert closures.
+      skill-exclusive rationale: judging only from the task "clearer page structure while preserving behavior", a strong model often retains short `Task { try await AppStore.sync() }` or `accountStore.signOut()` in the alert; the skill explicitly requires body/Button/Alert to not embed side effects. The conflict point is that even short but non-trivial side effects must be extracted.
+    signal:
+      file: "assets/swiftui_view_refactor_t2_account_actions/output/AccountView.swift"
+      file_must_not_contain:
+        - 'Button\s*\(\s*"Restore missing purchases"[\s\S]{0,260}AppStore\.sync\s*\('
+        - 'Button\s*\(\s*"Sign In"[\s\S]{0,260}signIntoPasskeyAccount\s*\('
+        - 'Button\s*\(\s*"Sign In"[\s\S]{0,220}Task\s*\{[\s\S]{0,160}signIn\s*\('
+        - 'primaryButton\s*:\s*\.destructive[\s\S]{0,320}accountStore\.signOut\s*\('
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_use_dedicated_account_subviews_not_computed_fragments
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Major account regions such as account status, purchase support, and authentication actions should become dedicated View types with explicit minimal inputs/bindings/callbacks, not computed fragments.
+      skill-exclusive reason: generic SwiftUI refactoring often splits body into `private var accountSection: some View`, `purchaseSection`, `actionsSection`; the skill strongly prefers dedicated View types. The conflict is that semantic region boundaries should be types and explicit dependencies, not computed helpers.
+    signal:
+      query: |
+        In the final file assets/swiftui_view_refactor_t2_account_actions/output/AccountView.swift, did the actual code extract at least two major account UI regions (account status, purchase support, authentication actions) into dedicated SwiftUI View structs with explicit values, bindings, or callbacks? Base the answer only on final file content written by Write/Edit tools, not narration. Answer YES only if at least two major regions are represented by meaningful dedicated subview structs and the screen is not mainly decomposed into computed some View fragments. Answer NO if the refactor mainly uses private computed some View fragments, leaves the regions inline in AccountView body, or only extracts a single minor view.
+      acceptable: "Multiple dedicated private/internal structs for sections, e.g. private struct AccountStatusView: View { let username: String } and private struct PurchaseSupportView: View { let onRestorePurchases: () -> Void }; equivalent names are fine."
+      unacceptable: "Major sections are represented by computed properties like private var accountStatus: some View, private var purchaseSupport: some View, private var authActions: some View with no dedicated View structs, or only a single minor view is extracted."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_pass_minimal_inputs_and_callbacks_to_subviews
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Extracted account section/action subviews should not receive broad parent store/model/controller objects when simple values and callbacks are sufficient.
+      skill-exclusive reason: when extracting subviews by default, `accountStore`, `model`, or entire parent dependencies are often passed down directly for convenience; the skill requires small explicit inputs and callbacks. The conflict is that subview dependency boundaries must be minimized.
+    signal:
+      file: "assets/swiftui_view_refactor_t2_account_actions/output/AccountView.swift"
+      file_must_not_contain:
+        - '(?m)^\s*(?:private\s+)?struct\s+\w*(?:Account|Auth|Purchase|Support|Section|Actions)\w*\s*:\s*View[\s\S]{0,900}\b(?:let|var|@Binding\s+var)\s+\w+\s*:\s*(?:AccountStore|FoodTruckModel)\b'
+        - '(?m)^\s*(?:private\s+)?struct\s+\w*(?:Account|Auth|Purchase|Support|Section|Actions)\w*\s*:\s*View[\s\S]{0,900}\b(?:let|var|@Binding\s+var)\s+authorizationController\b'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_do_not_introduce_account_view_model
+    type: forbidden-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Do not introduce a view model merely to separate account UI actions; use existing environment/model plus small view methods/subviews.
+      skill-exclusive reason: facing "login, logout, restore purchases mixed together like a controller", the default architectural reaction may be to add an AccountViewModel or AccountVM; the skill defaults to MV rather than MVVM. The conflict is not to use a VM to wrap existing environment dependencies and local state.
+    signal:
+      file: "assets/swiftui_view_refactor_t2_account_actions/output/AccountView.swift"
+      file_must_not_contain:
+        - '\bAccountViewModel\b'
+        - '\bAccountVM\b'
+        - '\b(?:class|struct)\s+\w*(?:ViewModel|VM)\b'
+        - '@StateObject\s+(?:private\s+)?var\s+\w*(?:ViewModel|VM)\b'
+        - '@State\s+(?:private\s+)?var\s+\w*(?:ViewModel|VM)\b'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_order_account_view_members_by_skill_sequence
+    type: order
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] In the main AccountView, environment dependencies should appear before @State, and body should appear before private helper/action functions.
+      skill-exclusive reason: default local refactoring typically preserves existing ordering or inserts methods for editing convenience; the skill explicitly specifies SwiftUI view top-to-bottom ordering. The conflict is that member organization order itself is a skill-following signal. This deterministic signal only checks the high-confidence coarse ordering.
+    signal:
+      file: "assets/swiftui_view_refactor_t2_account_actions/output/AccountView.swift"
+      file_must_not_contain:
+        - '@State[\s\S]{0,900}@Environment(?:Object)?'
+        - '(?m)^\s*private\s+func\s+[\s\S]{0,1200}var\s+body\s*:\s*some\s+View'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] AccountView output preserves sign-in, sign-up sheet, sign-out confirmation, purchase support/restore, and platform-specific navigation/frame behavior."
+    signal:
+      file: "assets/swiftui_view_refactor_t2_account_actions/output/AccountView.swift"
+      file_must_contain:
+        - '\.navigationTitle\s*\(\s*"Account"\s*\)'
+        - 'SignUpView\s*\(\s*model\s*:\s*model\s*\)'
+        - '\.alert\s*\(\s*isPresented\s*:\s*\$isSignOutAlertPresented'
+        - 'accountStore\.signIntoPasskeyAccount\s*\(\s*authorizationController\s*:'
+        - 'accountStore\.signOut\s*\('
+        - 'AppStore\.sync\s*\('
+        - '#if\s+os\s*\(\s*iOS\s*\)'
+        - 'StoreSupportView\s*\(\s*\)'

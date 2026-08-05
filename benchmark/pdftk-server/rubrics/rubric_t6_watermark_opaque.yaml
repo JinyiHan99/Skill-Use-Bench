@@ -1,0 +1,170 @@
+# Rubric for skill_03 (pdftk) — t6_watermark_opaque
+#
+# Scoring boundary: provenance=skill enters the skill-following score; provenance=task
+# only records task completion rate (0/1) and does not enter the skill-following score.
+
+# ── GATE: evaluability ────────────────────────────────────────────────
+rules:
+  - id: g1_observable_watermark_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The trajectory should contain a PDF-watermark/overlay-related Bash command invocation.
+    signal:
+      command_pattern: '\bpdftk\b|\b(watermark|stamp|background)\b.*\.pdf'
+      pattern: '\bpdftk\b|\b(watermark|stamp|background)\b.*\.pdf'
+
+  # ── COMPLIANCE: skill-derived behavior ────────────────────────────────
+  - id: r1_uses_pdftk_for_stamp_or_watermark
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — tool boundary] PDF watermark/foreground-overlay operations should use pdftk.
+    signal:
+      command_pattern: '\bpdftk\b.*\b(stamp|multistamp|background|multibackground)\b'
+      pattern: '\bpdftk\b.*\b(stamp|multistamp|background|multibackground)\b'
+
+  - id: r2_uses_stamp_for_opaque_or_uncertain_background
+    type: lesson
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 3.0
+    spec: |
+      [SKILL — empirical lesson] background places the watermark behind the page; when the page background is opaque
+      or uncertain, stamp/multistamp should be used to ensure visibility. This is the most core skill-empirical-compliance signal for this task.
+    signal:
+      command_pattern: '\bpdftk\b.*\b(stamp|multistamp)\b.*\boutput\b'
+      pattern: '\bpdftk\b.*\b(stamp|multistamp)\b.*\boutput\b'
+
+  - id: r3_validates_source_and_overlay_inputs
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — input validation] Before operations, dump_data should be run on both the source PDF and the overlay/watermark PDF.
+      Weight reduced from 1.0 to 0.5 (overlaps with r1). Switched to a tool-call verifier.
+    signal:
+      pattern: '\bpdftk\b'
+      command_all_patterns:
+        - '\bpdftk\b.*nist_ai_rmf\.pdf.*\bdump_data\b'
+        - '\bpdftk\b.*watermark_internal\.pdf.*\bdump_data\b'
+
+  - id: r4_verifies_output_after_stamp
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — output verification] After the stamp operation, dump_data should be run on the output PDF.
+      Weight reduced from 1.0 to 0.5. Switched to a tool-call verifier.
+    signal:
+      command_pattern: '\bpdftk\b.*stamped\S*\.pdf\s+dump_data\b'
+      pattern: '\bpdftk\b.*stamped\S*\.pdf\s+dump_data\b'
+
+  - id: r5_default_stamp_output_naming
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — default naming] When using the stamp/multistamp path, the default output name should use
+      <stem>_stamped.pdf. Weight raised from 0.3 to 0.5 (strong but conservative discriminative power).
+    signal:
+      command_pattern: 'nist_ai_rmf_stamped\.pdf'
+      pattern: 'nist_ai_rmf_stamped\.pdf'
+
+  # ── BOUNDARY ─────────────────────────────────────────────────────────
+  - id: b1_no_background_for_opaque_pages
+    type: forbidden-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — empirical boundary] Using background/multibackground on opaque/white-background pages makes
+      the watermark invisible. Weight reduced from 2.5 to 1.5 to reduce double-scoring of the same decision as r2.
+    signal:
+      command_must_not_match: '\bpdftk\b.*\b(background|multibackground)\b\s+\S+\.pdf\s+\boutput\b'
+      must_not_match: '\bpdftk\b.*\b(background|multibackground)\b\s+\S+\.pdf\s+\boutput\b'
+      pattern: '[\s\S]*'
+
+  - id: b2_no_forbidden_pdf_tools
+    type: forbidden-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL — forbidden tools] Using Python PDF libraries, ghostscript, or alternative CLI tools to bypass pdftk is forbidden.
+    signal:
+      command_must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b'
+      must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b'
+      pattern: '[\s\S]*'
+
+  - id: b3_does_not_overwrite_input
+    type: boundary
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: false
+    weight: 0.2
+    spec: |
+      [SKILL — output boundary] The input PDF must not be overwritten. Weight reduced from 1.0 to 0.2.
+    signal:
+      command_must_not_match: '\boutput\s+(\./)?nist_ai_rmf\.pdf\b|\boutput\s+(\./)?watermark_internal\.pdf\b'
+      must_not_match: '\boutput\s+(\./)?nist_ai_rmf\.pdf\b|\boutput\s+(\./)?watermark_internal\.pdf\b'
+      pattern: '[\s\S]*'
+
+  # ── TASK COMPLETION: only records 0/1, not scored ────────────────────
+  - id: task_completion_binary
+    type: task-completion
+    provenance: task
+    locus: final-output
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Deterministic verification of whether the watermark-overlay output is correct.
+    signal:
+      judge_question: |
+        Based ONLY on concrete tool calls, command outputs, and observable results in the trace
+        (not the agent's self-claims or plans):
+        1. Was a pdftk stamp (or multistamp) command successfully executed — NOT background or
+           multibackground — applying the watermark overlay to the 48-page source document?
+        2. Was the output PDF file successfully created?
+        3. Did the command complete without errors? (no "Error", "failed", "Exception" in output)
+        Answer YES only if ALL three conditions are met with evidence in the trace. Answer NO if any
+        condition fails or lacks evidence.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - final_answer
+        - tool_results_first_n: 10

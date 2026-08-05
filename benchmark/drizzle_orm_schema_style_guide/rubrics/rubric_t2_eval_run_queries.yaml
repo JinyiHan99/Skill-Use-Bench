@@ -1,0 +1,106 @@
+# Rubric for skill_72_drizzle_orm_schema_style_guide — drizzle_t2_eval_run_queries
+# Scoring boundary: skill is scored; task only records completion rate; gate only judges evaluability.
+
+task_id: drizzle_t2_eval_run_queries
+skill_id: drizzle
+rules:
+  - id: g1_repository_edit_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an actual Write/Edit edit or rewrite attempt on the target repository file.
+    signal:
+      pattern: '(?is)\b(?:Write|Edit)\b[\s\S]{0,1000}?\bfile_path\b["''\s:]*[^"''\n]*packages/database/src/repositories/agentEvalRepository\.ts\b'
+
+  - id: r1_no_relational_query_api
+    type: forbidden-tool
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — exclusive] The fixed repository read logic must not use the Drizzle relational API: db.query.*, findFirst, findMany, or with: { ... } relational reads.
+      skill-exclusive rationale: looking only at the task description, a strong model will likely keep this.db.query.agentEvalRuns.findFirst({ with: ... }),
+      only adjusting where/orderBy/relations; the skill explicitly states "Always use db.select() builder API. Never use db.query.* relational API".
+      The conflict point is "continuing to use the relational API to fix the bug" vs "completely switching to the select builder".
+    signal:
+      file: "assets/drizzle_t2_eval_run_queries/input/packages/database/src/repositories/agentEvalRepository.ts"
+      file_must_not_contain: '\b(?:this\.)?db\.query\.|\bfindFirst\s*\(|\bfindMany\s*\(|\bwith\s*:\s*\{'
+
+  - id: r2_get_run_uses_select_left_join_dataset
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — exclusive] getRun(id) should use the db.select() builder, starting from agentEvalRuns and explicitly leftJoin agentEvalDatasets to return run and dataset information.
+      skill-exclusive rationale: looking only at the task description, a strong model may still use findFirst({ with: { dataset: true } }) or raw SQL; the skill requires related reads to use
+      select + leftJoin, and to list the return structure in the select object. The conflict point is "relational include/with or raw SQL" vs "schema-bound explicit builder join".
+    signal:
+      file: "assets/drizzle_t2_eval_run_queries/input/packages/database/src/repositories/agentEvalRepository.ts"
+      judge_question: |
+        Based strictly on the final contents of assets/drizzle_t2_eval_run_queries/input/packages/database/src/repositories/agentEvalRepository.ts,
+        answer YES iff getRun(id) uses the Drizzle select builder from agentEvalRuns and explicitly leftJoin agentEvalDatasets to include dataset information.
+        Do not count db.query.* relational API, findFirst({ with: ... }), or raw SQL execute(sql`select ...`) as satisfying this rule.
+        Answer YES if getRun has this.db.select(...).from(agentEvalRuns).leftJoin(agentEvalDatasets, ...) with a where on agentEvalRuns.id and a single-row limit, destructuring, or equivalent rows[0] return.
+        Answer NO if dataset is loaded via with:, findFirst, findMany, ordinary join raw SQL, or anything other than a builder leftJoin.
+        Acceptable: const rows = await this.db.select({ run: agentEvalRuns, dataset: agentEvalDatasets }).from(agentEvalRuns).leftJoin(agentEvalDatasets, eq(...)).where(eq(agentEvalRuns.id, id)).limit(1); return rows[0].
+        Unacceptable: return this.db.query.agentEvalRuns.findFirst({ where: ..., with: { dataset: true } }).
+      judge_expected: "YES"
+
+  - id: r3_list_run_topics_uses_explicit_joins
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — exclusive] listRunTopics(runId) should use the select builder, starting from agentEvalRunTopics and explicitly leftJoin agentEvalTestCases and topics,
+      organizing the runTopic, testCase, and topic return structure in the select object.
+      skill-exclusive rationale: looking only at the task description, a strong model will often fix the original findMany({ with: { testCase: true, topic: true } }) into another relational query;
+      the skill requires select + leftJoin. The conflict point is "nested with aggregating related rows" vs "explicit join and explicit projection".
+    signal:
+      file: "assets/drizzle_t2_eval_run_queries/input/packages/database/src/repositories/agentEvalRepository.ts"
+      judge_question: |
+        Based strictly on the final contents of assets/drizzle_t2_eval_run_queries/input/packages/database/src/repositories/agentEvalRepository.ts,
+        answer YES iff listRunTopics(runId) uses this.db.select(...).from(agentEvalRunTopics) with explicit leftJoin or join calls to both agentEvalTestCases and topics.
+        Do not count relational with:, findMany, or raw SQL as satisfying this rule.
+        Answer YES if the method filters by agentEvalRunTopics.runId and joins both related tables through builder API.
+        Answer NO if either testCase or topic is still loaded through with: or if the method uses db.execute(sql`select ...`) for this ordinary join.
+        Acceptable: select({ runTopic: agentEvalRunTopics, testCase: agentEvalTestCases, topic: topics }).from(agentEvalRunTopics).leftJoin(agentEvalTestCases,...).leftJoin(topics,...).
+        Unacceptable: this.db.query.agentEvalRunTopics.findMany({ with: { testCase: true, topic: true } }).
+      judge_expected: "YES"
+
+  - id: r4_no_raw_sql_for_ordinary_joins
+    type: forbidden-tool
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — exclusive] Ordinary related reads such as run details and run topics should not be rewritten as db.execute(...) raw SQL; Drizzle builder schema binding should be preserved.
+      skill-exclusive rationale: looking only at the task description, a strong model may directly write hand-crafted SQL joins to "reliably return related information"; the skill explicitly states that when ordinary select/join/groupBy
+      can clearly express it, Drizzle builders are preferred. The conflict point is "raw SQL quick fix" vs "builder references tables/columns so schema changes surface as TS errors".
+    signal:
+      file: "assets/drizzle_t2_eval_run_queries/input/packages/database/src/repositories/agentEvalRepository.ts"
+      file_must_not_contain: '\b(?:this\.)?db\.execute\s*(?:<[^>]+>)?\s*\('
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Setting aside whether the skill was followed, whether the run-details read logic can return run, dataset, testCase, and topic while preserving stable ordering.
+    signal:
+      file: "assets/drizzle_t2_eval_run_queries/input/packages/database/src/repositories/agentEvalRepository.ts"
+      judge_question: |
+        Based strictly on the final contents of assets/drizzle_t2_eval_run_queries/input/packages/database/src/repositories/agentEvalRepository.ts,
+        answer YES iff getRun can retrieve the requested run with dataset information, listRunTopics can retrieve rows for a runId with associated testCase and topic information, and listRunTopics preserves ordering by agentEvalRunTopics.createdAt.
+        Answer NO if either method is missing, drops dataset/testCase/topic information, or removes the run topic ordering.
+        Acceptable: getRun returns a run plus dataset; listRunTopics returns run topic rows with testCase and topic, ordered by createdAt.
+        Unacceptable: only getRun is fixed, or listRunTopics returns bare runTopic rows without testCase/topic.
+      judge_expected: "YES"

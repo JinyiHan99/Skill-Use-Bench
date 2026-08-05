@@ -1,0 +1,44 @@
+task_id: SF102_t1_series_companion
+level: L2
+skill_id: skill_102_eternal-haven-lore-pack
+description: |
+  I’m preparing a short companion note for readers who just found the Eternal Haven series page at `./assets/SF102_t1_series_companion/input/eternalhaven_homepage.html`.
+
+  Please write a spoiler-light book-club handout that helps a new reader understand how the four books build on each other as one connected reading journey, without turning the page’s promotional or tagline language into hard plot claims. Clearly separate page-grounded statements from your own reflective reading.
+initial_state:
+  assets:
+    - path: ./assets/SF102_t1_series_companion/input/eternalhaven_homepage.html
+      source: "https://eternalhaven.ca/"
+      real_state: "HTML captured from the public Eternal Haven series homepage. It names Justin Helmer, the four books, brief book blurbs, audiobook links, and related Champion hub material."
+      preparation: |
+        Created the task input directory and downloaded the homepage with an HTTP client using the public URL shown in the skill documentation. The downloaded HTML was saved unchanged as eternalhaven_homepage.html.
+  tools_available:
+    - filesystem
+    - text_editor
+expected_trigger: true
+skill_constraints_tested:
+  - id: tagline_vs_canon_discipline
+    description: "The skill requires not treating poetic homepage taglines or promotional phrasing as established in-universe canon."
+    exclusive: "Without the skill, a model may assert decorative homepage language such as dragons guarding time itself as hard Eternal Haven plot canon."
+
+  - id: canon_grounding_vs_reader_reflection
+    description: "The skill requires clearly separating source-grounded canon/page facts from reflective thematic interpretation."
+    exclusive: "Without the skill, a model will often blend marketing language, metaphor, and reader interpretation into an undifferentiated summary."
+
+  - id: connected_saga_with_later_book_discipline
+    description: "The skill requires treating Books I-IV as one connected saga while avoiding claims that would overstate or contradict later-book canon."
+    exclusive: "Without the skill, a model may produce a fluent four-book arc from homepage blurbs but lack discipline about what is canon-grounded versus inferred."
+notes: |
+  - Core test point: a natural Eternal Haven reader-facing task should activate the lore pack and produce a grounded but mythic orientation.
+  - Expected correct behavior: produce a concise book-club orientation that treats the four books as connected, avoids turning homepage taglines into hard plot facts, clearly distinguishes page-grounded statements from reader reflection, and attributes the Eternal Haven universe to Justin Helmer.
+  - Common wrong behavior examples: the model writes four disconnected ad-copy paragraphs copied from the homepage; it treats decorative homepage taglines such as "dragons guard time itself" as established plot canon; it invents exact plot events or character fates not supported by the available source/skill; it offers reflective interpretation without labeling it as interpretation.
+  - baseline_correctness_signals:
+      - The response is a concise companion note suitable for a book-club handout.
+      - The response uses the provided homepage path as context and references all four books.
+      - The response is not an empty refusal and does not require unavailable assets.
+  - skill_following_signals:
+      - Contains explicit markers separating source-grounded framing from interpretation, such as "From the series page..." versus "As a readerly reflection..."
+      - Frames Books I-IV with connective language showing cross-book continuity, not merely four isolated homepage-blurb summaries.
+      - Does not convert poetic homepage taglines or promotional copy into asserted plot canon.
+      - Names Justin Helmer as the creator or canonical authority for the Eternal Haven universe.
+      - Avoids unsupported concrete plot claims not grounded in the provided page or the skill's canon sources.

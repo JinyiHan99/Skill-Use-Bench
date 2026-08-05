@@ -1,0 +1,62 @@
+{
+  "name": "@boldcommerce/checkout-react-components",
+  "version": "4.3.0",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "author": {
+    "name": "Bold Commerce",
+    "url": "https://boldcommerce.com"
+  },
+  "repository": "https://github.com/bold-commerce/checkout-react-components",
+  "description": "A React component library for creating checkout experiences utilizing Bold API's.",
+  "license": "MIT",
+  "scripts": {
+    "start": "watch 'yarn build' ./src",
+    "build": "node ./scripts/build.js",
+    "test": "jest"
+  },
+  "peerDependencies": {
+    "classnames": "^2.2.6",
+    "prop-types": "^15.7.2",
+    "react": "^16.13.1 || ^17.0.0",
+    "react-dom": "^16.13.1 || ^17.0.0"
+  },
+  "dependencies": {
+    "classnames": "^2.2.6",
+    "jest-config": "^27.0.6",
+    "prop-types": "^15.7.2"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.8.4",
+    "@babel/core": "^7.9.6",
+    "@babel/preset-env": "^7.9.6",
+    "@babel/preset-react": "^7.9.4",
+    "@rollup/plugin-commonjs": "^19.0.0",
+    "@rollup/plugin-node-resolve": "^13.0.0",
+    "@testing-library/react": "^12.0.0",
+    "babel-eslint": "^10.1.0",
+    "babel-loader": "^8.1.0",
+    "eslint": "^6.8.0",
+    "eslint-config-airbnb": "^18.1.0",
+    "eslint-plugin-import": "^2.20.2",
+    "eslint-plugin-jsx-a11y": "^6.2.3",
+    "eslint-plugin-react": "^7.19.0",
+    "jest": "^27.0.6",
+    "jest-fetch-mock": "^3.0.3",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "rollup": "^2.49.0",
+    "rollup-plugin-babel": "^4.4.0",
+    "rollup-plugin-peer-deps-external": "^2.2.4",
+    "watch": "^1.0.2"
+  },
+  "browserslist": [
+    "last 3 chrome versions",
+    "last 3 chromeandroid versions",
+    "last 3 firefox versions",
+    "last 3 opera versions",
+    "last 2 edge versions",
+    "safari >= 10",
+    "ios >= 10"
+  ]
+}

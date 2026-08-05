@@ -1,0 +1,44 @@
+task_id: airflow_2_to_3_t2_context_operator
+skill_id: migrating-airflow-2-to-3
+description: |
+  The DAG code at `assets/airflow_2_to_3_t2_context_operator/input/dags/example_python_operator.py` was copied from an older example collection and needs to be made ready for our next major Airflow runtime. Keep the sample's behavior intact: it should still log the rendered query, print the runtime context, and run the same Python callables where possible.
+
+initial_state:
+  assets:
+    - path: assets/airflow_2_to_3_t2_context_operator/input/dags/example_python_operator.py
+      source: "https://raw.githubusercontent.com/apache/airflow/2.10.5/airflow/example_dags/example_python_operator.py"
+      real_state: "Apache Airflow 2.10.5 public example DAG using classic Python operators and a context access pattern that reads templates_dict from kwargs."
+      preparation: |
+        Downloaded the file unchanged from the Apache Airflow 2.10.5 repository into the task input DAG folder.
+  tools_available:
+    - filesystem
+    - shell
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: templates_dict_reader_replacement
+    description: "Removed `templates_dict` reads inside the Python callable are replaced with `context['params']` or `kwargs['params']` access."
+    exclusive: "This requires the skill's removed-context-key mapping; generic migration often updates imports but misses runtime context key removals inside callables."
+  - id: templates_dict_writer_replacement
+    description: "The task definition stops using the removed `templates_dict` argument and passes the query through `params`, while preserving SQL template rendering."
+    exclusive: "A generic refactor may hard-code the SQL path, switch to `op_kwargs`, or remove templating; the skill-specific migration keeps Airflow 3-compatible params/context behavior."
+
+notes: |
+  - Positive task.
+  - Core test point: combine automated-style import modernization with manual context-key migration on real Apache Airflow example code.
+  - Expected correct behavior includes moving `PythonOperator` from `airflow.operators.python` to the Airflow 3 standard provider location. Other objects from the same import block may be moved accordingly where supported, but they should not be the primary skill-following signal.
+  - The classic DAG class import (`from airflow.models.dag import DAG`) should not be used as a skill-following signal because the skill does not define a direct replacement for this classic DAG import.
+  - Expected correct behavior includes changing `kwargs["templates_dict"]["query"]` at line 68 to an Airflow 3-compatible params/context access pattern, such as `kwargs["params"]["query"]` or `context["params"]["query"]`, and replacing `templates_dict={"query": "sql/sample.sql"}` around lines 70-74 with `params={"query": "sql/sample.sql"}` while preserving `templates_exts=[".sql"]`.
+  - Common incorrect behavior: the model changes imports but leaves `log.info(... kwargs["templates_dict"]["query"])` at line 68, which tests generic import migration rather than skill-following on context keys.
+  - Common incorrect behavior: the model deletes `log_sql`, hard-codes the SQL filename, switches to `op_kwargs`, or removes `templates_exts`, instead of preserving the rendered-query behavior through Airflow context parameters.
+  - Common incorrect behavior: the model rewrites all callables to TaskFlow decorators and accidentally removes the virtualenv/external Python examples, exceeding the requested behavior preservation.
+  - baseline_correctness_signals:
+      - The DAG file remains syntactically plausible Python.
+      - The `print_context`, `log_sql`, sleeping, virtualenv, and external Python example tasks remain represented.
+      - Classic Python operator imports are updated to Airflow 3-compatible locations where supported.
+      - The logged query value remains configurable from the operator/task definition.
+      - SQL file rendering behavior is preserved, including keeping `templates_exts=[".sql"]` or equivalent behavior.
+  - skill_following_signals:
+      - Removed `templates_dict` reads in `log_sql` are replaced with `context['params']` or `kwargs['params']` access.
+      - The `log_the_sql` operator wiring replaces `templates_dict={...}` with `params={...}` while preserving `.sql` template rendering.

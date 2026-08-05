@@ -1,0 +1,102 @@
+task_id: vercel_ai_sdk_v6_t1_migrate_chat
+skill_id: vercel-ai-sdk
+rules:
+  - id: g1_observable_chat_edit
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains a real Write/Edit tool call modifying the chat page or chat API route."
+    signal:
+      pattern: "(?:Write|Edit).{0,500}(?:legacy-chat/app/(?:page\\.tsx|api/chat/route\\.ts))"
+
+  - id: r1_use_v6_send_message_flow
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The useChat client must use the v6 sendMessage sending flow and manage input with local React state.
+      skill-exclusive reason: without reading the skill, a strong model will naturally retain the old example's useChat({ input, handleInputChange, append/isLoading }) or append({ role, content }); the skill requires changing to sendMessage({ text }) + useState. The essential conflict is old v5 hook helper fields vs v6 explicit send/local state.
+    signal:
+      file: "assets/vercel_ai_sdk_v6_t1_migrate_chat/input/legacy-chat/app/page.tsx"
+      file_must_contain:
+        - "\\buseState\\s*\\("
+        - "\\bsendMessage\\s*\\(\\s*\\{\\s*text\\s*:"
+      file_must_not_contain: "\\bappend\\s*\\(|\\bhandleInputChange\\b|const\\s*\\{[^}]*\\b(?:input|setInput)\\b[^}]*\\}\\s*=\\s*useChat"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_render_parts_not_content
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] UIMessage text must be rendered from message.parts by part.type, not from the flat message.content field.
+      skill-exclusive reason: looking only at the task, the model tends to continue using the intuitive message.content from the legacy fixture or add a compatibility fallback; the skill explicitly specifies v6 is parts-based messages. The conflict is old flat content field vs v6 parts array.
+    signal:
+      file: "assets/vercel_ai_sdk_v6_t1_migrate_chat/input/legacy-chat/app/page.tsx"
+      file_must_contain:
+        - "\\.parts\\.map\\s*\\("
+        - "\\btype\\s*={2,3}\\s*['\"]text['\"]"
+        - "\\btext\\b"
+      file_must_not_contain: "\\b\\w+\\??\\.content\\b"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_convert_ui_messages_for_model
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The API route must convert the UIMessage[] passed by useChat to streamText using convertToModelMessages(messages).
+      skill-exclusive reason: without reading the skill, a strong model will retain the seemingly reasonable approach in the legacy route of passing messages directly to streamText; the skill requires explicit UI message conversion. The conflict is direct passthrough of UI messages vs v6 model message conversion.
+    signal:
+      file: "assets/vercel_ai_sdk_v6_t1_migrate_chat/input/legacy-chat/app/api/chat/route.ts"
+      file_must_contain: "messages\\s*:\\s*convertToModelMessages\\s*\\(\\s*\\w+\\s*\\)|(?:const|let)\\s+(\\w+)\\s*=\\s*convertToModelMessages\\s*\\(\\s*\\w+\\s*\\)[\\s\\S]{0,1000}?streamText\\s*\\([\\s\\S]{0,1000}?messages\\s*:\\s*\\1\\b"
+      file_must_not_contain: "streamText\\s*\\(\\s*\\{[\\s\\S]{0,1500}?\\bmessages\\s*(?:,|:\\s*messages\\b)"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_return_ui_message_stream_response
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The chat streaming route must return result.toUIMessageStreamResponse(), and must not retain the old toDataStreamResponse() or switch to JSON.
+      skill-exclusive reason: the task only says to keep streaming, the model may retain the old data stream helper or change to Response.json; the skill explicitly specifies v6 useChat corresponds to UI message stream response. The conflict is old data stream/JSON vs v6 UI message stream.
+    signal:
+      file: "assets/vercel_ai_sdk_v6_t1_migrate_chat/input/legacy-chat/app/api/chat/route.ts"
+      file_must_contain: "\\.toUIMessageStreamResponse\\s*\\(\\s*\\)"
+      file_must_not_contain: "\\.toDataStreamResponse\\s*\\(|Response\\.json\\s*\\("
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] The chat page and API route have completed migration: users can send messages, see streaming replies, correctly render the returned conversation, and the endpoint has not been changed to one-shot JSON.
+    signal:
+      query: |
+        Inspect only the final contents of assets/vercel_ai_sdk_v6_t1_migrate_chat/input/legacy-chat/app/page.tsx and assets/vercel_ai_sdk_v6_t1_migrate_chat/input/legacy-chat/app/api/chat/route.ts. Are both files updated so the client sends user input through the chat hook, renders returned assistant/user text, and the server still streams chat responses rather than returning one-shot JSON?
+        Judgment basis: look only at the final file contents, not at the agent's self-report. Answer YES if the core chat migration is functional. Answer NO if either file is missing, messages cannot be sent/rendered, or the route returns only JSON/non-streaming output.
+      acceptable: "page.tsx sends input via chat hook and renders text parts; route uses streamText and returns a streaming response."
+      unacceptable: "route returns Response.json({ text }) only, or page still renders blank messages because it ignores returned message text."

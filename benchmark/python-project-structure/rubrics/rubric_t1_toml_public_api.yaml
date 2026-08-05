@@ -1,0 +1,109 @@
+# Rubric for skill_82_python_project_structure_module — t1_toml_public_api
+# Skill: Python Project Structure & Module Architecture
+
+rules:
+  # ── SKILL-FOLLOWING (scored) ────────────
+  - id: r1_package_entrypoint_exports_only_stable_api
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The package entry point output/tomllib/__init__.py must serve as a clean public interface for consumers, explicitly exposing only stable call capabilities such as load, loads, TOMLDecodeError, and must not promote internal helpers from _parser.py, _re.py, _types.py to package-level public API.
+      Skill-exclusive rationale: looking only at the task description, strong models may continue to batch re-export many convenient names from _parser/_re/_types "so callers can get the capabilities"; the skill requires using __init__.py and __all__ to provide a narrow, explicit consumer interface, and the conflict point is "conveniently expose more implementation details" vs. "expose only the stable public surface and preserve internal boundaries".
+    signal:
+      query: >
+        Based only on the final content actually written to output/tomllib/__init__.py, answer YES
+        only if both conditions are satisfied: (1) the package initializer provides package-level
+        consumer access to load, loads, and TOMLDecodeError as the stable API, and (2) it does not
+        make parser/regex/type implementation helpers part of the package public API. Metadata such
+        as __version__ outside __all__ is acceptable. Do not rely on the agent's prose or plans.
+        Answer NO if the package entrypoint exports many internal helpers, exports private modules
+        as the user-facing API, tells users to import from tomllib._parser instead of the package
+        root, lacks package-level consumer access to load/loads/TOMLDecodeError, or includes helper
+        names such as Output, Flags, NestedDict, key_value_rule, RE_NUMBER, RE_DATETIME,
+        match_to_number, ParseFloat, Key, or Pos in the package-level public API.
+      acceptable: '__all__ = ["load", "loads", "TOMLDecodeError"] with explicit imports from private implementation modules'
+      unacceptable: '__all__ includes Output, Flags, NestedDict, RE_NUMBER, ParseFloat, or tells users to import from tomllib._parser instead'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_init_defines_explicit_all
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] output/tomllib/__init__.py should define a machine-visible explicit __all__.
+      Skill-exclusive rationale: looking only at the task description, the model may only fix import availability or explain the public entry point in prose in structure_notes.md; the skill explicitly requires using __all__ to define the public API, and the conflict point is "documentation/implicit imports" vs. "explicit interface in code".
+    signal:
+      file: "output/tomllib/__init__.py"
+      file_must_contain: '(?m)^\s*__all__\s*(?::\s*[^=]+)?='
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_no_wildcard_reexports
+    type: forbidden-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The package entry point should not continue to use wildcard imports to form an opaque public namespace from private implementation modules.
+      Skill-exclusive rationale: the task input file itself uses wildcard imports such as from ._parser import *, and strong models may minimally change and keep this default entry; the skill requires an explicit interface, and the conflict point is "the convenience of retaining wildcard imports" vs. "explicitly listing the public API".
+    signal:
+      file: "output/tomllib/__init__.py"
+      file_must_not_contain: '(?m)^\s*(?:from\s+\.\w+\s+import\s+\*|import\s+\*)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_notes_explain_public_vs_internal_boundary
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] structure_notes.md should explain that the package entry point serves as the consumer interface, and that private implementation modules are not part of the stable public API.
+      Skill-exclusive rationale: looking only at the task description, the model may only list "which files were changed" or give functional explanations; the skill emphasizes public interface and internal boundaries, and the conflict point is "generic change description" vs. "explaining __init__.py / __all__ and private module boundaries". This rule is a weak skill-following auxiliary signal.
+    signal:
+      query: >
+        Based only on final output/structure_notes.md content actually written, does the note
+        explain that consumers should use the package entrypoint/public API and that underscore
+        implementation modules or helpers are internal details? Do not rely on the agent's final
+        chat summary. Answer YES if the note clearly separates public package imports from private
+        implementation modules. Answer NO if it only says files were copied/changed without
+        explaining the public API versus internal boundary.
+      acceptable: 'Notes say callers import load/loads/TOMLDecodeError from tomllib and _parser/_re/_types remain internal'
+      unacceptable: 'Notes only say “copied files to output” or recommend importing helpers from tomllib._parser'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  # ── TASK COMPLETION (bypass, not counted toward SF) ──
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The output/tomllib/ package has been generated, the core parsing entry points are available from the package entry point, and output/structure_notes.md exists and is relevant to the structural trade-offs.
+    signal:
+      query: >
+        Based only on final files actually written under output/, did the model create all four
+        package files output/tomllib/__init__.py, output/tomllib/_parser.py, output/tomllib/_re.py,
+        and output/tomllib/_types.py, make load, loads, and TOMLDecodeError available from
+        output/tomllib/__init__.py, and create output/structure_notes.md with a relevant explanation
+        of the package structure or API boundary? Answer YES only if all of these task deliverables
+        are present. Answer NO otherwise.
+      acceptable: 'output/tomllib/__init__.py, _parser.py, _re.py, _types.py exist; __init__.py exposes load/loads/TOMLDecodeError; output/structure_notes.md is relevant'
+      unacceptable: 'Only a prose answer was given, output/tomllib/__init__.py or structure_notes.md is missing, or __init__.py does not provide load/loads/TOMLDecodeError'

@@ -1,0 +1,59 @@
+task_id: app_builder_t3_mobile_task_app
+skill_id: app-builder
+rules:
+  - id: g1_observable_mobile_build_attempt
+    type: required-tool
+    provenance: gate
+    locus: trace
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable new-project write/edit or mobile scaffold generation attempt. The gate only judges whether there is an evaluable build attempt, not whether the artifact is correct or is a mobile app.
+    signal:
+      pattern: >-
+        (?i)("tool"\s*:\s*"(?:functions\.)?(?:Write|Edit)"|"recipient_name"\s*:\s*"functions\.(?:Write|Edit)"|"tool"\s*:\s*"Bash"[^}]{0,1200}"command"\s*:\s*"[^"]*(?:create-expo-app|expo\s+init|npx\s+expo|pnpm\s+create\s+expo|npm\s+create\s+expo))
+
+  - id: r1_map_mobile_project_to_react_native_template_with_zustand
+    type: lesson
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] A new mobile app project should be mapped to the react-native-app entry in the app-builder template table via project-type detection, with a default stack of Expo + Zustand; selecting Expo alone is not enough to prove adherence, because the input asset already hints at Expo/React Native.
+      Skill-exclusive rationale: without reading the skill, a strong model will naturally choose Expo/React Native based on the task and brief, and commonly use useState, Context, or Redux for state; the skill's additional requirement is to prefer Zustand per the react-native-app template. The conflict point is "Expo + any/local state" vs "the react-native-app template's Expo + Zustand."
+    signal:
+      query: |
+        Based on the file contents and command output actually written by Write/Edit tool calls, rather than the agent's self-description, does the final mobile/Expo project actually use Zustand as the main task state layer? It is not required to verbally mention the react-native-app template name; there must be artifact evidence: package.json or install command includes zustand, the source code imports/uses create from zustand to build a task store (e.g., useTaskStore = create(...)), and components actually consume that store to manage the task list, add/complete/edit or delete. Answer YES only if Zustand dependency/store usage and component consumption are evidenced. Answer NO if it only uses useState/Context/Redux/local arrays, or if Zustand is only mentioned but not implemented/used.
+      acceptable: "package.json contains zustand; source has import { create } from 'zustand' or equivalent create store; components call useTaskStore(...) to manage task CRUD."
+      unacceptable: "All task state in the Expo project is only in component useState; or README says Zustand can be used but there is no dependency, store, or component consumption."
+      judge_context_window: [serialized_steps]
+
+  - id: b1_no_web_extension_or_desktop_template_mixing
+    type: forbidden-arg
+    provenance: task
+    locus: trace
+    verifier: regex
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/SANITY — not counted toward SF] The mobile task app should not mix in Next.js full-stack, Chrome extension, Flutter, Electron, or CLI template structures. This rule only serves as a sanity observation and is not a skill-following bonus.
+    signal:
+      must_not_match: >-
+        (?i)("file_path"\s*:\s*"[^"]*(?:app/page\.[tj]sx|app/layout\.[tj]sx|pages/[^"/]+\.[tj]sx|pages/api/|prisma/schema\.prisma|manifest\.json|background\.[tj]s|content\.[tj]s|pubspec\.yaml|lib/main\.dart|electron/main\.[tj]s|bin/[^"/]+|next\.config\.[^"/]+)"|manifest_version"?\s*[:=]\s*3|default_popup|PrismaClient|@prisma/client)
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: trace
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Whether a mobile task-management app prototype was completed: has mobile project configuration/entry, covers task list, add, complete, edit or delete, and explains the mobile preview run method.
+    signal:
+      query: |
+        Based on the actual written code and final answer, rather than only the plan, did the final deliverable produce a mobile task-management app prototype with three types of evidence: 1) mobile project configuration/entry (e.g., Expo package/app config and App.tsx/screens); 2) actual code flows for task list, add, complete/toggle, and either edit or delete; 3) local mobile preview, simulator, or real-device run instructions? Answer YES if all three task outputs are present. Answer NO if it is only intro text/web code, has no task-flow code, or has no run instructions.
+      acceptable: "Expo package/app config + App.tsx or screens/components; code has add + toggle/complete + edit or delete task; final notes mention npx expo start or simulator/real-device preview."
+      unacceptable: "Only intro text or web code; or only a static task list without add/complete/edit/delete flows; or no run instructions."
+      judge_context_window: [serialized_steps, final_answer]

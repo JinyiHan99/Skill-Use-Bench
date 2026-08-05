@@ -1,0 +1,39 @@
+task_id: SF57_t1_pr_ready_locallibrary
+level: L2
+skill_id: skill_57_django-verification
+description: |
+  I am preparing to send this library lending site project to a colleague for code review. The project is archived at `assets/SF57_t1_pr_ready_locallibrary/input/django-locallibrary-tutorial-main.tar.gz`.
+
+  Please unpack it locally first, go through it thoroughly against pre-PR standards, and help me decide whether it is now ready for review. Do not just check whether it superficially runs; if there are points that would block review or subsequent release, state the risks and recommended next steps clearly, then give me a check report with an unambiguous conclusion.
+
+initial_state:
+  assets:
+    - path: assets/SF57_t1_pr_ready_locallibrary/input/django-locallibrary-tutorial-main.tar.gz
+      source: "https://github.com/mdn/django-locallibrary-tutorial/archive/refs/heads/main.tar.gz"
+      real_state: "Real public Django tutorial project archive from mdn/django-locallibrary-tutorial main branch; 58,245 bytes at preparation time, 111 tar entries, 45 Python files, 28 migration files."
+      preparation: |
+        Downloaded the GitHub archive for the repository's main branch with redirects followed.
+        Verified the gzip tar archive can be opened and counted entries with Python tarfile.
+  tools_available: [bash, read, edit, grep]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: full_verification_sequence
+    description: "Skill requires a staged Django PR verification covering environment sanity, Django framework/deploy checks, migration safety, tests with coverage, and a structured go/no-go report. The model should adapt commands and coverage targets to the actual project structure rather than blindly using placeholder app paths."
+    exclusive: "Without the skill, a model may run tests and a few basic Django checks, but is less likely to perform a staged PR-readiness verification that combines migration safety, coverage-based test reporting, deploy-oriented checks, and a clear go/no-go recommendation."
+  - id: migration_safety_check
+    description: "Skill requires verifying Django migration safety before PR approval, such as checking migration status, missing migrations, and a dry-run or planned migration application where feasible."
+    exclusive: "Without the skill, a model may stop after basic tests or a simple Django check and omit a deliberate migration-safety step from the PR-readiness decision."
+  - id: coverage_reporting_threshold
+    description: "Skill requires running tests with coverage for the actual Django app structure and using the skill's 80% overall coverage target as part of the PR-readiness judgment."
+    exclusive: "A model may report test pass/fail status or a raw coverage number without applying the skill's coverage gate to the final PR-readiness recommendation."
+  - id: deployment_security_gate
+    description: "Skill requires Django deployment-oriented checks and review of key production settings such as DEBUG, SECRET_KEY, ALLOWED_HOSTS, HTTPS/HSTS, and cookie security before recommending PR approval."
+    exclusive: "A generic verifier may ignore deploy-readiness and security configuration for a tutorial-sized app."
+
+notes: |
+  Core test point: real Django project archive + pre-PR gating context, expected to trigger django-verification's staged verification thinking, rather than just running a single test or simple framework check.
+  Expected correct behavior: unpack assets; identify the Django project; perform environment/framework checks, migration safety confirmation, tests with coverage, deployment-oriented config checks based on the project's real structure; output a structured go/no-go report with a clear recommendation.
+  During evaluation, look at target-level behavior; do not hard-match placeholder paths or commands from skill examples that do not apply to this project; for example, adapt to the actual app structure rather than mechanically using a nonexistent apps directory.
+  Common mistakes: only running a single test; not checking migration status; not generating or explaining coverage; treating missing dependencies or environment issues as pass; no deploy/security gate; rigidly applying example commands that do not apply to the project.

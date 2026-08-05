@@ -1,0 +1,55 @@
+task_id: SF85_t3_order_state_races
+skill_id: csharp-concurrency-patterns
+level: L3
+description: |
+  In a high-performance microservice scenario, the order service starts receiving callbacks for inventory confirmation, payment, and shipping concurrently (see `OrderCallbackHandler.cs`). Because these callbacks arrive concurrently and out of order, directly modifying the same order's state concurrently in the event handler leads to serious transition-order conflicts or database concurrency conflicts.
+
+  The material is under `assets/SF85_t3_order_state_races/input/`, containing:
+  - `Order.cs` (order domain aggregate root)
+  - `OrderCallbackHandler.cs` (concurrent callback entry handler)
+
+  Please focus on refactoring the concurrency boundary of "how callbacks are dispatched by order and single-order sequential processing is guaranteed after a callback enters"; if needed, you may keep `Order.cs`'s state-transition methods largely unchanged and only add minimal necessary interfaces.
+
+  Requirements:
+  1. Do not stack temporary critical-section synchronization patches inside the domain object to mask races;
+  2. Ensure all callback messages for the same order are fully serialized, so state changes advance in an orderly manner per business rules;
+  3. Different orders must be able to be processed in high-concurrency parallel, without introducing any global synchronization bottleneck.
+
+  Please provide the callback dispatch structure, the creation/lookup logic for the single-order processing unit, and the core code skeleton for state advancement in detail.
+initial_state:
+  assets:
+    - path: assets/SF85_t3_order_state_races/input/Order.cs
+      source: "dotnet/eShop public repository: src/Ordering.Domain/AggregatesModel/OrderAggregate/Order.cs, https://github.com/dotnet/eShop/blob/main/src/Ordering.Domain/AggregatesModel/OrderAggregate/Order.cs"
+      real_state: "A real eShop ordering domain aggregate with status transition methods such as SetAwaitingValidationStatus, SetStockConfirmedStatus, SetPaidStatus, SetShippedStatus, and SetCancelledStatus."
+      preparation: |
+        Downloaded the public Order.cs file content from dotnet/eShop and saved the source excerpt as the task input. No reference implementation or evaluator answer is included.
+    - path: assets/SF85_t3_order_state_races/input/OrderCallbackHandler.cs
+      source: "Self-crafted typical eShop integration event handler mimicking concurrent status transition callbacks."
+      real_state: "An API-level OrderCallbackHandler with HandleStockConfirmedAsync, HandlePaymentPaidAsync, and HandleOrderShippedAsync. Currently runs concurrently without synchronization."
+      preparation: |
+        Created a realistic OrderCallbackHandler that handles various order status callback requests concurrently and triggers Domain status transitions.
+  tools_available: [read_file, write_file, edit_file, bash]
+expected_trigger: true
+skill_constraints_tested:
+  - id: entity_per_actor_state_isolation
+    description: "For managing state across many independent entities, the skill requires actor-style entity isolation so each entity serializes its own messages while different entities run independently."
+    exclusive: "Without the skill, a strong model may still implement correct per-order serialization using keyed locks, keyed executors, per-order Channels, or a simple mailbox dispatcher. The skill-specific distinction is whether the solution escalates from ad hoc serialization to an entity-per-actor/state-machine model for long-lived order lifecycle management, rather than treating serialization as a local synchronization patch."
+  - id: state_machine_actor_for_complex_transitions
+    description: "For state machines with complex transitions, the skill points to Akka.NET Actors and the Become pattern rather than ad hoc locks."
+    exclusive: "Without the skill, a model may design a generic keyed queue, per-order Channel, or validation-heavy dispatcher that preserves ordering but does not model each order as an isolated stateful entity with explicit lifecycle behavior transitions. The skill points the solution toward actor/entity-per-actor state management for complex transitions."
+notes: |
+  - Core test point: the same entity needs message serialization, while different entities need parallelism; this is the overlapping scenario of "many independent entities" and "state machines with complex transitions" in the skill.
+  - Expected correct behavior: the plan or patch should route each order's callbacks to that order's own serial processing unit, and let different orders have independent processing units; state transitions can be expressed via actor state/behavior switching.
+  - Common model mistakes (code-level counter-examples):
+      - Adding the same `lock` around the outer layer of methods like `SetAwaitingValidationStatus()` in `Order.cs`, making all orders share one critical section.
+      - Using `ConcurrentDictionary<int, Order>` to hold instances and then directly calling `Order.cs` from multiple callback threads, only protecting the collection without protecting each order's state transitions.
+      - Using ad-hoc `ConcurrentDictionary<int, SemaphoreSlim>` to lock each order instance, rather than using message passing or Actor isolation and other future-oriented concurrency architectures.
+      - Only adding more if-checks in `Order.cs`, without ensuring that at the ingress routing/event-dispatch layer the same order's callbacks are processed in order.
+  - baseline_correctness_signals:
+      - The output clearly explains how to route callbacks by order identifier and save/restore order state.
+      - The stock, payment, shipping, and cancel events of the same order will not interleave and corrupt the state order.
+  - skill_following_signals:
+      - Top tier satisfied: adopts an actor/entity-per-actor model to isolate each order's state, and expresses order lifecycle transitions via explicit state/behavior switching.
+      - Partially satisfied: uses per-order Channel, keyed mailbox, keyed executor, etc. to achieve single-order serialization, but does not explicitly model entity lifecycle behavior switching.
+      - Not skill-following: uses a global lock, per-order SemaphoreSlim/keyed lock, a ConcurrentDictionary that only protects the collection, or only adds if/lock inside `Order.cs` without refactoring the callback-entry concurrency boundary.
+      - Explicitly guarantees parallel processing between different orders (no global lock, global BlockingCollection, or global single-thread bottleneck).

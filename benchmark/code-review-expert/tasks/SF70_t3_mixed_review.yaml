@@ -1,0 +1,43 @@
+task_id: SF70_t3_mixed_review
+level: L3
+skill_id: code-review-expert
+description: |
+  A group of context-teardown-related changes involving source, tests, and docs has just been merged into `assets/SF70_t3_mixed_review/input/repo`. I want to do a pre-merge gatekeeping pass before handing it to maintainers. Please provide a professional pre-merge review opinion and a judgment on whether it affects release confidence.
+initial_state:
+  assets:
+    - path: assets/SF70_t3_mixed_review/input/repo
+      source: "https://github.com/pallets/flask.git commits 7b0088693ece1bd3a9238a6fdf56ed8df7a4d43b..fbb6f0bc4c60a0bada0e03c3480d0ccf30a3c1df"
+      real_state: "A complete real copy of the Flask repository, recursively containing repo source, tests, docs, examples, and the .git directory; HEAD is at 7b0088693ece1bd3a9238a6fdf56ed8df7a4d43b, and the worktree contains uncommitted changes from fbb6f0bc4c60a0bada0e03c3480d0ccf30a3c1df; the git diff stat is 10 files, 274 lines changed."
+      preparation: |
+        Cloned the repository from https://github.com/pallets/flask.git; checked out 7b0088693ece1bd3a9238a6fdf56ed8df7a4d43b; applied fbb6f0bc4c60a0bada0e03c3480d0ccf30a3c1df to the worktree without committing; preserved the .git directory and the uncommitted diff.
+  tools_available: [shell, git, file_read]
+expected_trigger: true
+skill_constraints_tested:
+  - id: mixed_concerns_grouping
+    description: "The skill requires cross-file cross-review of the same logical behavior change involving source, tests, and docs, rather than simply listing them in diff-file order."
+    exclusive: "Without reading the skill, a model may only comment on source, tests, and docs separately in file order; this task observes whether it stably treats the same context-teardown behavior change as a unified concern, cross-analyzing implementation, call paths, test coverage, and doc synchronization."
+  - id: reliability_race_error_scan
+    description: "The skill's security-reliability and code-quality scan requirements cover error-propagation semantics after aggregation, context reset and deferred-throw order, signal-receiver exceptions, async teardown, and nested push/pop residual risks."
+    exclusive: "Without reading the skill, a model may only state that the exception-aggregation logic is superficially correct; driven by the skill, it should further explain exception-propagation boundaries, exploitability/impact, and reliability risks not covered by existing tests."
+  - id: removal_iteration_plan
+    description: "The skill requires proactively identifying deletable, redundant, or defer-handling code, distinguishing safe delete now from defer with plan, and providing an iteration plan with verification checkpoints."
+    exclusive: "Without reading the skill, a model in a pre-merge review without an explicit cleanup request usually only gives a risk or bug list, and will not stably output deletion candidates, redundant-code judgments, and phased cleanup plans separately."
+notes: |
+  - Core test point: real Flask behavior changes spanning source, tests, and docs, requiring review organized by logical feature, and covering reliability and cleanup plans.
+  - Expected correct behavior: first confirm the current diff of about 10 files, 274 lines; treat teardown error collection, context pop, signal sending, and doc/test coverage as the same feature review; even if there are no blocking items, state residual risks and uncovered verifications.
+  - Common model mistakes:
+      - Listing in `CHANGES.rst`, `docs/appcontext.rst`, `src/flask/app.py` file order, without connecting the `_CollectErrors` usage at `src/flask/app.py:1440` and `src/flask/ctx.py:486` for analysis.
+      - Only praising that `src/flask/app.py:1445` will continue executing callbacks, missing the need to explain the boundary impact of `src/flask/ctx.py:498` resetting the context first and then throwing at `src/flask/ctx.py:504`.
+      - Directly assuming no risk after finding new coverage in `tests/test_appctx.py`, without explaining whether async teardown, signal-receiver exceptions, nested push/pop, and other residual risks are covered.
+      - Directly editing the `_CollectErrors` implementation in `src/flask/helpers.py`, violating review-first and next-step-confirmation requirements.
+  - baseline_correctness_signals:
+      - Output targets the current uncommitted changes in `assets/SF70_t3_mixed_review/input/repo`.
+      - Mentions that source, test, and doc files are all within review scope.
+      - Gives an overall judgment on whether it is acceptable before release.
+  - skill_following_signals:
+      - Observable first obtaining current change status, stats, and diff.
+      - Findings are grouped by logical concerns such as teardown/error-collection, not a file-name rundown.
+      - Explicit coverage of reliability, error handling, boundary conditions, and residual test risks.
+      - Includes a deletion/iteration plan, distinguishing immediately cleanable items from follow-up verification items.
+      - Uses the skill's structured review format and severity levels.
+      - Maintains review-only output, without implementing any code modifications.

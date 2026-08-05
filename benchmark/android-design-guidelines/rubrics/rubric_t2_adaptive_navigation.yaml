@@ -1,0 +1,142 @@
+# Rubric for skill_66_android_design_guidelines_material — t2_adaptive_navigation
+
+rules:
+  # ── GATE ────────────────────────────
+  - id: g1_observable_reply_output
+    type: required-tool
+    provenance: gate
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [GATE] The final artifacts should contain an evaluable output/ReplyApp.kt entry implementation.
+    signal:
+      file: "output/ReplyApp.kt"
+      file_must_contain: 'fun\s+ReplyApp\s*\('
+
+  # ── SKILL-FOLLOWING ─────────────────
+  - id: r1_use_window_size_class_not_fixed_breakpoints
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    severity: hard
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/DESIGN QUALITY — not counted toward SF] Responsive layout and navigation decisions should be based on Material WindowSizeClass, not fixed width thresholds or hand-written dp/px breakpoints.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/ReplyApp.kt, ignoring the agent's self-description: do navigation/content layout decisions use WindowSizeClass/WindowWidthSizeClass without introducing hand-written breakpoints such as width >= 600, 840.dp, screenWidthDp, or pixel-width comparisons? Answer YES or NO.
+      acceptable: "when (windowSize.widthSizeClass) { Compact -> ..., Medium -> ..., Expanded -> ... }"
+      unacceptable: "Layout driven by fixed thresholds such as if (widthDp > 600) or LocalConfiguration.current.screenWidthDp >= 840."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: low
+
+  - id: r2_navigation_component_matches_size_and_destination_count
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] With about 4 top-level destinations, compact screens should use a Navigation Bar, medium and expanded screens should both use a Navigation Rail; expanded should only use a Permanent Drawer when there are 5+ or complex destinations.
+      Skill-exclusive rationale: looking only at the task description, a model may follow the product suggestion to "unify on one large-screen navigation style" or default to Drawer on large screens; the skill provides a table for selecting components by destination count and window size,
+      and the conflict point is that Reply's 4 top-level destinations should not switch to Drawer under Expanded.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/ReplyApp.kt, ignoring the agent's self-description: does the code select Compact -> Navigation Bar, Medium -> Navigation Rail, Expanded -> Navigation Rail (or equivalent ReplyNavigationType) for about 4 top-level destinations based on window size, and does not map Expanded to Permanent Drawer? Answer YES or NO.
+      acceptable: "Compact -> BOTTOM_NAVIGATION; Medium -> NAVIGATION_RAIL; Expanded -> NAVIGATION_RAIL."
+      unacceptable: "Compact=Bar, Medium=Rail, Expanded=Permanent Drawer, or all size classes map to Drawer/a single large-screen navigation style."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_preserve_foldable_hinge_avoidance
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] output/ReplyApp.kt should preserve the foldable adaptation chain displayFeatures -> FoldingFeature -> DevicePosture/posture -> content layout parameters; do not delete FoldingFeature/DevicePosture handling.
+      Skill-exclusive rationale: a task member suggests removing foldable-specific handling, and without reading the skill a model may delete it for simplification; the skill requires detecting fold position and avoiding it,
+      and the conflict point is that the chain from displayFeatures to folding posture/content layout must be preserved.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/ReplyApp.kt, ignoring the agent's self-description: does the code still preserve the chain that reads FoldingFeature from displayFeatures, derives DevicePosture/posture, and passes displayFeatures or posture information to content layout parameters? Answer YES or NO.
+      acceptable: "filterIsInstance<FoldingFeature>(), DevicePosture.BookPosture/Separating, and passing displayFeatures or posture to ReplyInboxScreen/content layout."
+      unacceptable: "Deleting FoldingFeature/DevicePosture/displayFeatures handling, or foldable devices sharing the exact same path as regular tablets with no hinge/posture information passed."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_single_pane_detail_system_back_closes_detail
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] In single-pane detail state, system back should first close the detail / return to the list, rather than unconditionally exiting the app, resetting the top-level destination, or relying on default back behavior that causes hierarchy confusion.
+      Skill-exclusive rationale: without reading the skill, a model may only fix the undefined navSuiteType variable or rely on default NavController behavior; the skill distinguishes system Back from hierarchical Up and requires preserving back-stack context,
+      and the conflict point is that context switches like single-pane detail need explicit back behavior.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/ReplyApp.kt, ignoring the agent's self-description: when contentType is SINGLE_PANE and the detail is open/selected, is there explicit system back handling that calls closeDetailScreen or equivalent logic to close the detail, rather than exiting the app or switching the top-level destination? Answer YES or NO.
+      acceptable: "BackHandler(enabled = contentType == SINGLE_PANE && detailOpen) { closeDetailScreen() } or passing the equivalent condition to the detail screen handler."
+      unacceptable: "No single-pane detail back handling, or BackHandler directly navigates to Route.Inbox/exits/clears the nav stack."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_navigation_labels_and_selected_context_preserved
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    severity: medium
+    exclusive: false
+    weight: 0
+    spec: |
+      [DESIGN QUALITY — not counted toward SF] Preserve currentDestination/top-level destination state and pass it to ReplyNavigationWrapper, as a proxy for rendering navigation labels and selected state.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/ReplyApp.kt, ignoring the agent's self-description: does the code preserve currentDestination/top-level destination information and pass it to the navigation wrapper so the wrapper has enough state to render labels and selected state, rather than dropping the current destination context? Answer YES or NO.
+      acceptable: "currentBackStackEntryAsState/currentDestination passed to ReplyNavigationWrapper, and navigating via navigateToTopLevelDestination."
+      unacceptable: "Deleting currentDestination or wrapper state so the navigation wrapper cannot know the currently selected destination."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  # ── TASK COMPLETION (bypass, not counted toward skill-following) ────
+  - id: tc1_replyapp_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/ReplyApp.kt exists, contains the ReplyApp implementation, and no longer references the undefined navSuiteType.
+    signal:
+      file: "output/ReplyApp.kt"
+      file_must_contain: 'fun\s+ReplyApp\s*\('
+      file_must_not_contain: '\bnavSuiteType\b'
+
+  - id: tc2_notes_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/navigation_notes.md explains navigation trade-offs or verification scenarios for phones, foldables, and tablets.
+    signal:
+      query: |
+        Judge based only on the final file contents: does output/navigation_notes.md exist and explain compact/phone, foldable/hinge, tablet/expanded navigation trade-offs or verification scenarios? Answer YES or NO.
+      acceptable: "notes mention phone bottom bar, foldable hinge/displayFeatures, tablet/expanded rail, etc. as verification or design trade-offs."
+      unacceptable: "notes missing, or only generically saying it was fixed without phone/foldable/tablet scenarios."

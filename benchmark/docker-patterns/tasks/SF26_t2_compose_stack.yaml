@@ -1,0 +1,71 @@
+task_id: SF26_t2_compose_stack
+level: L2
+skill_id: skill_26_docker_patterns
+description: |
+  You have a Python Flask web application project at `assets/SF26_t2_compose_stack/`. It includes `assets/SF26_t2_compose_stack/docker-compose.yml`, a `Dockerfile`, `assets/SF26_t2_compose_stack/app.py`, and `assets/SF26_t2_compose_stack/requirements.txt`.
+
+  The team wants to containerize this application properly for both local development and eventual production deployment. The current Docker setup has several problems. Please:
+
+  1. Fix the `assets/SF26_t2_compose_stack/docker-compose.yml` to follow container orchestration best practices
+  2. Fix the `Dockerfile` to produce a secure, production-ready image
+  3. Set up proper service health checks and dependency management
+  4. Ensure secrets are handled securely (create any necessary configuration files)
+  5. Add network segmentation appropriate for this multi-tier application
+  6. Create a `.dockerignore` file for the project
+
+  The stack should work for local development with `docker compose up` and be ready for production hardening.
+
+initial_state:
+  assets:
+    - path: assets/SF26_t2_compose_stack/docker-compose.yml
+      source: "Hand-crafted realistic problematic Compose file for Flask+Postgres+Redis stack"
+      real_state: "Compose file using :latest tags, bare depends_on, hardcoded secrets in environment, no volumes, no health checks, no network segmentation"
+    - path: assets/SF26_t2_compose_stack/Dockerfile
+      source: "Hand-crafted single-stage Python Dockerfile with anti-patterns"
+      real_state: "Single-stage Dockerfile using python:latest, no non-root user, no multi-stage"
+    - path: assets/SF26_t2_compose_stack/app.py
+      source: "Realistic Flask app with SQLAlchemy and Redis"
+      real_state: "Flask app with health endpoint, task CRUD API, Postgres + Redis integration"
+    - path: assets/SF26_t2_compose_stack/requirements.txt
+      source: "Standard Python Flask requirements"
+      real_state: "Flask, SQLAlchemy, psycopg2, redis, celery, gunicorn dependencies"
+  tools_available: [bash, read, edit, write]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: no_latest_tag
+    description: "Skill requires all image references to use specific version tags"
+    exclusive: "Models may pin some images but leave others on :latest, or use incomplete version pins"
+  - id: non_root_user
+    description: "Skill requires production Dockerfile to have dedicated non-root user with UID/GID 1001"
+    exclusive: "Models often create non-root users with arbitrary or missing UID/GID"
+  - id: no_secrets_in_compose
+    description: "Skill forbids secrets in docker-compose.yml environment directives; must use env_file + .env"
+    exclusive: "Models commonly inline environment variables in Compose rather than extracting to .env files"
+  - id: healthcheck_depends_on
+    description: "Skill requires condition: service_healthy with proper healthcheck on dependencies, not bare depends_on"
+    exclusive: "Models use bare depends_on or depends_on with condition: service_started"
+  - id: network_segmentation
+    description: "Skill requires separate named networks per trust boundary (frontend-net, backend-net)"
+    exclusive: "Models typically rely on the default network for all services"
+  - id: named_volumes
+    description: "Skill requires named volumes for all persistent data (database, cache)"
+    exclusive: "Models may use bind mounts or anonymous volumes for database data"
+  - id: host_only_db_ports
+    description: "Skill requires database ports bound to 127.0.0.1 in development"
+    exclusive: "Models bind database ports to 0.0.0.0 (default) exposing them to the network"
+  - id: multi_stage_dockerfile
+    description: "Skill requires multi-stage Dockerfile with named stages (deps, dev, build, production)"
+    exclusive: "Models write single-stage or multi-stage without the specific naming convention"
+
+notes: |
+  Core test: Full Docker Compose stack setup and hardening.
+  This task tests a broader set of skill constraints than t1, especially:
+  - Compose-level patterns (health checks, depends_on, networks, volumes)
+  - The env_file pattern for secrets in Compose
+  - Network segmentation (frontend-net / backend-net)
+  - Host-only port binding (127.0.0.1)
+  
+  The key skill-exclusive signals are: env_file pattern, service_healthy condition,
+  network segmentation topology, 127.0.0.1 port binding, and named stage convention.

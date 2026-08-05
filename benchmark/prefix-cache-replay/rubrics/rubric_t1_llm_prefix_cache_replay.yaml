@@ -1,0 +1,237 @@
+rubric_id: rubric_SF47_t1_llm_prefix_cache_replay
+task_id: SF47_t1_llm_prefix_cache_replay
+description: >
+  Evaluates whether the model correctly implements S3FIFO prefix cache replay
+  following the skill's algorithm specification, particularly the details that
+  differ from naive or alternative implementations.
+
+rules:
+  # ── GATE ──
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: "Write|Edit|Bash"
+    spec: "[GATE] There is an observable file-write behavior in the trace (Write/Edit/Bash tool call)"
+
+  # ── Skill-Following rules (scored) ──
+
+  - id: r1_min_clamp_hit_tokens
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The prefix-hit token count must use min(k * block_size, L) truncation, handling the last incomplete block.
+      Skill-exclusive rationale: without reading the skill, strong models default to directly using k * block_size as hit_tokens,
+      ignoring the case where input_length is not a multiple of block_size, causing hit_tokens to be systematically inflated.
+      The skill explicitly requires "Always apply it — do not return k * block_size unclamped".
+    signal:
+      query: >
+        Based on the code or script actually written by the model (via Write/Edit/Bash tool calls), check whether the prefix-hit token count
+        uses min(k * block_size, input_length) or equivalent truncation logic to handle the last incomplete block.
+        Judgment basis: only look at the actually written/executed code logic, not the agent's text describing its intent.
+        Answer YES if: the hit_tokens computation in the code uses min(k * block_size, L) or equivalent truncation
+        (e.g. `min(hit_blocks * block_size, input_length)`).
+        Answer NO if: the code directly returns k * block_size without taking min with input_length.
+      acceptable: "hit_tokens = min(k * block_size, input_length) or min(hit_blocks * block_size, L)"
+      unacceptable: "hit_tokens = k * block_size (no min with input_length)"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["agent_A", "agent_B"]
+      consensus: medium
+
+  - id: r2_ghost_not_resident
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Blocks in the Ghost queue do not count toward residency and contribute zero to hit tokens.
+      Skill-exclusive rationale: without reading the skill, strong models may treat Ghost as an ordinary cache layer (all three cache layers can hit),
+      causing blocks in ghost to be counted as prefix hits, inflating the hit rate.
+      The skill explicitly states: "Ghost entries are NOT resident — a prefix that lands in G is a miss for hit-token accounting."
+    signal:
+      query: >
+        Based on the code or script actually written by the model (via Write/Edit/Bash tool calls), check whether the prefix-hit scan logic
+        explicitly excludes the Ghost queue from residency checks.
+        Judgment basis: only look at the actually written/executed code logic, not the agent's text describing its intent.
+        Answer YES if: the residency check for prefix hits in the code only checks S and M (or equivalent implementation), and Ghost hits do not contribute hit tokens.
+        Answer NO if: Ghost hits in the code are also counted as prefix hits, or the residency check includes the Ghost queue.
+      acceptable: "The prefix-hit scan only checks whether the block is in S or M (e.g. `h in self.small or h in self.main`), or an equivalent helper like `is_resident(h)` / `resident_set = small_keys | main_keys` (not including ghost)"
+      unacceptable: "The prefix-hit scan checks whether the block is in S, M, or G (e.g. `h in self.cache` where cache includes ghost)"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_freq_saturate_at_max_freq
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The frequency counter must saturate at [0, max_freq] (max_freq=1 for this task), clamped after each access.
+      Skill-exclusive rationale: without reading the skill, strong models may let freq grow without bound (natural integer counting),
+      causing the M queue's second-chance loop to grow longer and longer, producing incorrect eviction behavior.
+      The skill explicitly states: "Without clamping, the counter grows unbounded" and lists it as a common mistake.
+    signal:
+      query: >
+        Based on the code or script actually written by the model (via Write/Edit/Bash tool calls), check whether the frequency counter is limited to
+        max_freq (value 1).
+        Judgment basis: only look at the actually written/executed code logic, not the agent's text describing its intent.
+        Answer YES if: after incrementing freq, the code has a min/clamp operation ensuring it does not exceed max_freq (e.g. `freq = min(freq+1, max_freq)`).
+        Answer NO if: freq increment in the code has no upper-bound check (e.g. `freq += 1` without clamping).
+      acceptable: "freq = min(freq + 1, self.max_freq) or if freq < max_freq: freq += 1, or directly hardcoding freq = 1 when max_freq=1 (equivalent saturation)"
+      unacceptable: "freq += 1 with no upper-bound check at all"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_ghost_hit_admit_freq_zero
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] On Ghost hit, admit to the tail of M with freq=0 (Yang et al. standard variant).
+      Skill-exclusive rationale: without reading the skill, strong models may admit with freq=1 (some follow-up papers adopt that variant),
+      or treat it as re-admitting to S instead of directly entering M.
+      The skill explicitly states: "remove it from G and admit it to the tail of M with freq 0 (this is the canonical Yang et al. variant)".
+    signal:
+      query: >
+        Based on the code or script actually written by the model (via Write/Edit/Bash tool calls), check whether when a block is hit
+        in the Ghost queue, it is admitted to the tail of the Main queue with freq=0.
+        Judgment basis: only look at the actually written/executed code logic, not the agent's text describing its intent.
+        Answer YES if: after a Ghost hit, the block is inserted at the tail of M with initial freq 0.
+        Answer NO if: after a Ghost hit, the block is inserted with freq 1 or another non-zero value, or is inserted into S instead of M.
+      acceptable: "After removing from G, call admit_to_M(h, freq=0) or equivalent code"
+      unacceptable: "After removing from G, call admit_to_M(h, freq=1) or admit_to_S(h)"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_s_to_m_preserve_freq
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] On S->M promotion, preserve the original freq value, do not reset to 0.
+      Skill-exclusive rationale: without reading the skill, strong models may reset freq to 0 when a block enters the new queue (treating it as a fresh enqueue),
+      which is the natural "fresh admission" intuition.
+      The skill explicitly states: "The freq value is preserved when an S entry is promoted to M (it is not reset)".
+    signal:
+      query: >
+        Based on the code or script actually written by the model (via Write/Edit/Bash tool calls), check whether when the S queue head is popped with
+        freq >= 1 and promoted to M, its freq value is preserved (rather than reset to 0).
+        Judgment basis: only look at the actually written/executed code logic, not the agent's text describing its intent.
+        Answer YES if: the freq value of the popped S entry is passed directly to admit_to_M (e.g. `admit_to_M(victim, victim_freq)`).
+        Answer NO if: freq is reset on promotion (e.g. `admit_to_M(victim, 0)` or `admit_to_M(victim, freq=0)`).
+      acceptable: "admit_to_M(victim, vf) where vf is the original freq value kept in S, or by directly moving the entry object into the Main queue, its freq attribute is naturally preserved"
+      unacceptable: "admit_to_M(victim, 0) or setting freq to 0 on promotion"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_ghost_cap_equals_main_cap
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] ghost_cap = main_cap (= capacity - small_cap), not small_cap.
+      Skill-exclusive rationale: without reading the skill, strong models may inadvertently set ghost_cap = small_cap when copying the S queue logic,
+      or simply set ghost_cap = capacity.
+      The skill explicitly states: "ghost_cap = main_cap, not small_cap" and lists it as a common mistake.
+    signal:
+      query: >
+        Based on the code or script actually written by the model (via Write/Edit/Bash tool calls), check the Ghost queue capacity setting.
+        In this task, capacity=4096, small_ratio=0.7, so small_cap=round(4096*0.7)=2867, main_cap=1229.
+        The Ghost capacity should equal main_cap (1229).
+        Judgment basis: only look at the actually written/executed code logic, not the agent's text describing its intent.
+        Answer YES if: ghost_cap is set to main_cap or capacity - small_cap (i.e. 1229).
+        Answer NO if: ghost_cap is set to small_cap (2867) or capacity (4096) or another wrong value.
+      acceptable: "ghost_cap = main_cap or ghost_cap = capacity - small_cap or the specific value 1229"
+      unacceptable: "ghost_cap = small_cap or ghost_cap = capacity"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r7_longest_prefix_no_skip
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Prefix hit uses longest-contiguous-prefix semantics: scan from index 0 and stop at the first miss.
+      No set intersection or skip-ahead.
+      Skill-exclusive rationale: without reading the skill, strong models may use set(hash_ids) ∩ resident to compute hit count,
+      which also counts non-contiguous hits, overcounting hit tokens.
+      The skill explicitly states: "k must start at index 0. The scan stops at the first miss. No skip-ahead, no set intersection."
+    signal:
+      query: >
+        Based on the code or script actually written by the model (via Write/Edit/Bash tool calls), check whether the prefix-hit scan logic
+        starts from hash_ids[0] and stops at the first hash not in S∪M (longest contiguous prefix).
+        Judgment basis: only look at the actually written/executed code logic, not the agent's text describing its intent.
+        Answer YES if: the code checks each hash_id in order from index 0 for residency, and breaks/stops at the first miss.
+        Answer NO if: the code uses set intersection, counts all resident blocks, or allows skipping misses and continuing the scan.
+      acceptable: "for i, h in enumerate(hash_ids): if h not in resident: break, or itertools.takewhile(lambda h: h in resident, hash_ids) / a while loop or other equivalent logic that stops at the first miss"
+      unacceptable: "hit_count = len(set(hash_ids) & resident_set)"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r8_second_chance_m_eviction
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The Main queue uses second-chance eviction (not pure FIFO): when freq>=1, decrement and requeue to tail;
+      only when freq==0 is it actually evicted to Ghost.
+      Skill-exclusive rationale: without reading the skill, strong models may use a pure FIFO pop for the M queue (same as S),
+      discarding hot blocks and degrading to plain FIFO.
+      The skill explicitly states: "Main uses second-chance. A plain FIFO pop on M discards hot blocks immediately."
+    signal:
+      query: >
+        Based on the code or script actually written by the model (via Write/Edit/Bash tool calls), check the eviction logic of the Main queue when full.
+        Judgment basis: only look at the actually written/executed code logic, not the agent's text describing its intent.
+        Answer YES if: when M is full, the code loops checking head's freq: if freq>=1, decrement and requeue to tail; if freq==0, pop and send to Ghost (second-chance).
+        Answer NO if: when M is full, the code directly pops head and evicts (regardless of freq value), i.e. pure FIFO eviction.
+      acceptable: "while M full: if head.freq >= 1: pop, freq-=1, append to tail; else: pop, send to ghost, break"
+      unacceptable: "while M full: pop head, send to ghost (plain FIFO without checking freq)"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  # ── Task-completion record (not scored) ──
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the task is complete: report.json exists and contains correct core statistics"
+    signal:
+      file: "assets/SF47_t1_llm_prefix_cache_replay/report.json"
+      file_must_contain:
+        - "\"total_requests\"\\s*:\\s*2000"
+        - "\"total_prompt_tokens\"\\s*:\\s*3514781"
+        - "\"total_hit_tokens\"\\s*:\\s*2535547"
+        - "\"overall_hit_rate\""

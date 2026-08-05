@@ -1,0 +1,54 @@
+task_id: docs_writer_t3_markdown_outside_docs
+skill_id: docs-writer
+description: |
+  I need a maintainer-facing review of `assets/docs_writer_t3_markdown_outside_docs/input/CONTRIBUTING.md`
+  before we point first-time contributors at it from an onboarding message. Read
+  it and tell me what, if anything, you'd improve.
+
+initial_state:
+  assets:
+    - path: assets/docs_writer_t3_markdown_outside_docs/input/CONTRIBUTING.md
+      source: "https://github.com/google-gemini/gemini-cli/blob/ae0a3aa7b928cc73bb09604bb9c2c020e6b647db/CONTRIBUTING.md"
+      real_state: "Real top-level Gemini CLI contribution guide; it is a Markdown file outside the docs directory."
+      preparation: |
+        Cloned google-gemini/gemini-cli at commit ae0a3aa7b928cc73bb09604bb9c2c020e6b647db and copied this file without content changes.
+  tools_available:
+    - read_file
+    - list_directory
+    - grep_search
+    - replace
+    - write_file
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: markdown_outside_docs_triggers_skill
+    description: "The skill must be used for any `.md` file in the repository, not only files under `docs/`."
+    exclusive: "A model without the skill may treat the top-level CONTRIBUTING.md as a generic Markdown review and miss project-specific documentation rules such as avoiding table-of-contents lists, avoiding Latin abbreviations like 'e.g.', requiring overview paragraphs after headings, and requiring descriptive image alt text."
+  - id: project_specific_markdown_style_rules
+    description: "The skill requires applying project-specific documentation standards to Markdown files, including avoiding Latin abbreviations, avoiding 'should' where requirements or recommendations are clearer, requiring overview paragraphs after headings, avoiding table-of-contents lists, and providing descriptive alt text for images."
+    exclusive: "A general Markdown reviewer may check grammar, structure, and readability, but will not systematically flag standard English usages like 'e.g.', 'should', table-of-contents lists, missing heading overview paragraphs, or empty image alt text as violations of this project's documentation standards."
+  - id: meta_file_link_exception
+    description: "The skill's relative-link rule for documentation under docs does not apply to meta files such as README and CONTRIBUTING."
+    exclusive: "A model that over-generalizes the skill's documentation link rule may incorrectly demand that external links in CONTRIBUTING.md, such as the Google CLA link, become relative docs links instead of applying the meta-file exception."
+
+notes: |
+  - Core test point: This is a negative-style boundary task for false positives within the skill domain: the skill should trigger because the asset is Markdown, but the model must not apply `/docs/`-only link rules blindly.
+  - Expected correct behavior: The model reviews the top-level Markdown file with documentation style in mind, reports specific issues only if present, and avoids unnecessary rewriting.
+  - Common wrong behavior: The model flags `assets/docs_writer_t3_markdown_outside_docs/input/CONTRIBUTING.md:22` for using an external Contributor License Agreement link and claims it must become a relative docs link, even though the skill exempts meta files from that docs-only rule.
+  - Common wrong behavior: The model rewrites the entire file merely to remove the table-of-contents-like opening list at `assets/docs_writer_t3_markdown_outside_docs/input/CONTRIBUTING.md:6`, instead of identifying it as a concrete documentation-standard issue and recommending or making a targeted change.
+  - Common wrong behavior: The model ignores the `.md` trigger and gives a generic "looks good" review without applying the skill's voice, style, link, and heading checks.
+  - baseline_correctness_signals:
+      - The response is a maintainership review of the supplied Markdown file.
+      - If edits are made, they are limited to concrete issues found in the file.
+      - The review does not invent unavailable source files or implementation details.
+  - skill_following_signals:
+      - The model treats a top-level `.md` file as documentation covered by the skill.
+      - The model identifies at least one project-specific documentation-standard issue grounded in the file, such as:
+          - the table-of-contents-like opening list near line 6;
+          - headings such as `## Before you begin` or `## Code contribution process` being followed directly by subheadings or lists without overview paragraphs;
+          - Latin abbreviations such as `e.g.` that should be written as `for example`;
+          - uses of `please` or `should` that conflict with the project's voice and requirements guidance;
+          - the image near line 416 having empty alt text.
+      - The model correctly applies the meta-file exception and does not falsely require external links such as the Google CLA link near line 22 to become relative docs links.
+      - The model avoids full-file rewriting unless it ties the change to concrete documentation-standard issues and uses targeted edits.

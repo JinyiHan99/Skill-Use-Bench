@@ -1,0 +1,55 @@
+task_id: SF101_t1_recover_deleted_branch
+level: L2
+skill_id: skill_101_git-workflows
+description: |
+  While cleaning up a small example repository, I accidentally deleted a local branch. The on-site note is at `./assets/SF101_t1_recover_deleted_branch/input/incident_note.txt`; the repository is at `./assets/SF101_t1_recover_deleted_branch/input/repo/`.
+
+  Please restore the lost local branch to its original branch name, and in `output/recovery_report.md` briefly explain which local history record you used to confirm this change, and which local modification was recovered. After completion, the repository should remain clean.
+
+initial_state:
+  assets:
+    - path: ./assets/SF101_t1_recover_deleted_branch/input/repo/
+      source: "https://github.com/octocat/Hello-World.git"
+      real_state: "A real public Git repository cloned locally; a local branch named docs-refresh was created with one local README documentation commit and then deleted. The repository includes unrelated local history noise and similar README changes, while the target commit is recoverable through local history records and not exposed in model-visible task text."
+      preparation: |
+        Clone octocat/Hello-World without tags; configure local author.
+        Create at least one unrelated short-lived local branch with a README-only change and delete it.
+        Create docs-refresh; append one local README documentation note; commit it with a natural local draft message that is not exposed in model-visible files.
+        Perform several unrelated checkout/reset/branch movement operations so local history contains noise before deleting docs-refresh.
+        Switch back to master and delete docs-refresh.
+        Repack repository objects so the target commit is not trivially exposed as a loose-object path, while keeping it recoverable through local history records.
+        Do not expose the recovered commit hash or exact commit title in model-visible files.
+    - path: ./assets/SF101_t1_recover_deleted_branch/input/incident_note.txt
+      source: "Prepared incident note based on the local repository state derived from https://github.com/octocat/Hello-World.git"
+      real_state: "Text note describing the accidentally deleted branch and broad README documentation work without giving the lost commit hash or exact commit title."
+      preparation: |
+        Written after the branch deletion to align the user scenario with the repository state.
+        Mention the deleted branch name and that it contained local README documentation work.
+        Do not include the exact commit hash or exact commit message/title.
+  tools_available: [bash, read, edit, grep, git]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: local_history_recovery_deleted_branch
+    description: "Identify the deleted branch's last local-only README commit from local history/movement records when visible refs, remotes, and ordinary branch history do not point to it."
+    exclusive: "Without the skill, a model may stop after inspecting visible branches/remotes or choose a similar visible branch; the skill-relevant behavior is to use local history records to reconstruct the deleted branch at the correct local-only commit."
+
+  - id: disambiguate_noisy_local_history
+    description: "Disambiguate the target docs-refresh commit from unrelated local-history noise and similarly described README changes."
+    exclusive: "Without the skill, a model may rely on visible history, a surfaced commit title, or the most recent README-looking change; the revised task requires interpreting local history records rather than answer matching."
+
+notes: |
+  Core test point: recover a deleted local branch via local history / branch-movement records. The correct result should make docs-refresh reappear in ./assets/SF101_t1_recover_deleted_branch/input/repo/, pointing to the README documentation commit that existed only in local history before deletion, with the working tree kept clean.
+
+  Common error behaviors: only inspect visible branches, remote branches, or ordinary reachable history; restore to a similar but wrong branch; only restore to a dangling state without rebuilding docs-refresh; leave uncommitted changes or stay in detached HEAD.
+
+  baseline_correctness_signals:
+    - output/recovery_report.md exists and states that docs-refresh was restored.
+    - The docs-refresh branch exists in the repository and the README contains the locally appended documentation note.
+    - The current working tree has no uncommitted changes.
+
+  skill_following_signals:
+    - The report explains that local history / branch-movement records were used to confirm the target commit.
+    - What was restored is the local README documentation change before deletion, not a remote branch or other similar README change.
+    - The final restoration is the named branch docs-refresh, not staying in detached HEAD.

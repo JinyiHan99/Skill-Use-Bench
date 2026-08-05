@@ -1,0 +1,71 @@
+# Rubric for skill_16_azure_bgp — SF16_t1_bgp_diagnosis
+
+rules:
+  # ── SKILL-derived (main scoring battlefield) ────────────
+  - id: r1_policy_not_topology
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL — core invariant] When evaluating candidate fix solutions, the agent must mark topology-destruction solutions as invalid (oscillation_resolved=false, route_leak_resolved=false).
+      Skill-exclusive rationale: without reading the skill, a model may treat disconnecting or shutting down peering as a direct stopgap; but the skill explicitly requires fixing via routing policy, without destroying topology or removing connections.
+    signal:
+      file: output/oscillation_report.json
+      file_must_contain: '(?is)"disable hub peering between vhubvnet1 and vhubvnet2"\s*:\s*\{(?=[^}]*"oscillation_resolved"\s*:\s*false)(?=[^}]*"route_leak_resolved"\s*:\s*false)[^}]*\}'
+
+  - id: r3_timer_dampening_invalid
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — solution classification] Timer tuning (keepalive/hold timer) and route dampening only mitigate symptoms and cannot fundamentally resolve oscillation or leak; they must be marked as oscillation_resolved=false and route_leak_resolved=false.
+      Skill-exclusive rationale: without reading the skill, a model may treat common BGP stability measures as fixes; but the skill explicitly states that timer/dampening cannot break the preference cycle, nor can it fix route leak.
+    signal:
+      file: output/oscillation_report.json
+      file_must_contain: '(?is)(?=.*"Enable route dampening on vhubvnet1 S2S VPN Gateway with penalty threshold 1000 and suppress limit 2000"\s*:\s*\{(?=[^}]*"oscillation_resolved"\s*:\s*false)(?=[^}]*"route_leak_resolved"\s*:\s*false)[^}]*\})(?=.*"Change BGP keepalive timer of vhubvnet1 to 30 seconds and holdtime to 90 seconds"\s*:\s*\{(?=[^}]*"oscillation_resolved"\s*:\s*false)(?=[^}]*"route_leak_resolved"\s*:\s*false)[^}]*\})'
+
+  - id: r4_routing_intent_dual
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — solution classification] Virtual WAN routing intent can resolve both oscillation and leak simultaneously, and should be marked as oscillation_resolved=true and route_leak_resolved=true.
+      Skill-exclusive rationale: the skill explicitly states that routing intent provides deterministic policy forwarding above BGP, which both stabilizes the effect of the preference cycle and prevents leaked routes from being used as transit.
+    signal:
+      file: output/oscillation_report.json
+      file_must_contain: '(?is)"Enable Virtual WAN hub routing intent to enforce all hub-to-hub routes go through Virtual WAN (ASN 65001) only"\s*:\s*\{(?=[^}]*"oscillation_resolved"\s*:\s*true)(?=[^}]*"route_leak_resolved"\s*:\s*true)[^}]*\}'
+
+  - id: r4b_udr_dual
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — solution classification] UDR (user-defined route) override can resolve both oscillation and leak simultaneously via data-plane override, and should be marked as oscillation_resolved=true and route_leak_resolved=true.
+      Skill-exclusive rationale: the skill explicitly states that UDR overrides BGP-learned routes with a deterministic data-plane next-hop, which can neutralize both the oscillation effect and leaked-route forwarding.
+    signal:
+      file: output/oscillation_report.json
+      file_must_contain: '(?is)"Configure user defined route override on vhubvnet1 defaultRouteTable to prefer specific next-hop"\s*:\s*\{(?=[^}]*"oscillation_resolved"\s*:\s*true)(?=[^}]*"route_leak_resolved"\s*:\s*true)[^}]*\}'
+
+  # ── TASK COMPLETION (bypass) ────────────
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Whether the task is complete: ./output/oscillation_report.json exists, oscillation and route leak are detected, and the report contains the oscillation cycle, affected ASes, route leaks, and a non-empty solution_results.
+    signal:
+      file: output/oscillation_report.json
+      file_must_contain: '(?s)(?=.*"oscillation_detected"\s*:\s*true)(?=.*"route_leak_detected"\s*:\s*true)(?=.*"oscillation_cycle"\s*:)(?=.*"affected_ases"\s*:\s*\[[^\]]+\])(?=.*"route_leaks"\s*:\s*\[[^\]]+\])(?=.*"solution_results"\s*:\s*\{[^}]+\})'

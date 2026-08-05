@@ -1,0 +1,127 @@
+rubric_id: skill_98_soul_memory_t3_cli_integration
+objective: Evaluate whether the model follows the soul-memory skill's requirements for CLI as an external integration interface: pure JSON, stable field contract, and consistency across success/empty/failure paths; task completion is only recorded with weight=0.
+rules:
+  - id: r1_cli_stdout_is_pure_machines_json
+    type: lesson
+    provenance: skill
+    locus: output-file
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    exclusive: false
+    weight: 0.5
+    spec: |
+      [SKILL] When the CLI serves as the OpenClaw/external process integration interface, the main stdout must be directly parseable machine JSON; initialization information, debug logs, banners, tracebacks, and explanatory chatter must not pollute the main return.
+      Skill-exclusive reason: without reading the skill, the task's "external process stably consumes returned results" can also partially derive machine-parseable output, so this item is down-weighted; the skill explicitly states "Pure JSON output for external integration". The conflict is "human-readable CLI output/debug information" vs "pure JSON stdout that external callers can stably parse".
+    signal:
+      query: |
+        Based on the final file assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/cli.py and output/ validation records, ignoring the agent's self-report, plan, or trace text:
+        Is the main stdout of the CLI search command designed as pure JSON, i.e., without mixing in any initialization, diagnostic, debug log, text banner, or raw traceback text from unhandled exceptions?
+        Answer YES if the command suppresses internal prints (e.g., via redirect_stdout or avoiding prints entirely) and the main stdout can be parsed directly by json.loads.
+        Answer NO if raw traceback, initialization banners (like "Initializing Soul Memory"), debug prints, or descriptive human text can still pollute stdout before or after the JSON.
+      acceptable: |
+        search_command wraps initialization/search with redirect_stdout or otherwise prevents internal prints, then prints only json.dumps(...) to stdout.
+      unacceptable: |
+        Output begins with "Initializing Soul Memory..." then JSON, or exceptions print raw traceback/human text to stdout.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_success_empty_failure_same_json_contract
+    type: lesson
+    provenance: skill
+    locus: output-file
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Normal query, empty result, and failure scenarios should maintain the same machine-consumable main return; external callers should not need to parse by branching on human text/traceback/different formats.
+      Skill-exclusive reason: without reading the skill, the model often only fixes the success path, returns [] for empty results, and directly sys.exit or prints a string for failures; the skill requires the CLI to be a stable external interface. The conflict is "only guarantee happy path" vs "success/empty/failure path contract consistent and machine-consumable".
+    signal:
+      query: |
+        Based on the final cli.py and assets/soul_memory_t3_cli_integration/output/ validation records, ignoring the agent's self-report, plan, or trace text:
+        Do normal query, empty result, and failure/exception scenarios all follow the same top-level JSON structure contract?
+        Answer YES only if all paths share the same top-level JSON type: if using an object envelope, the envelope keys/shape are consistent across success/empty/failure; if using an array contract, failure is also represented as the same kind of machine-consumable array contract rather than switching to plain text or an unrelated object.
+        Answer NO if success is a JSON list but failure is a plain text string, a raw traceback, a sys.exit-only path, or a JSON object with unrelated top-level structure that forces caller-specific parsing branches.
+      acceptable: |
+        Normal, empty, and failure stdout all use a shared envelope such as {"ok": bool, "results": [...], "error": ...}, or all use a documented array-compatible contract with no traceback text.
+      unacceptable: |
+        Success returns JSON, but failure prints "Error: database missing" as plain text, emits a traceback, or returns a one-off structure unrelated to the normal/empty contract.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_external_result_fields_hide_internal_names
+    type: lesson
+    provenance: skill
+    locus: output-file
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] CLI external result items should be normalized to the stable fields that external integration depends on, especially path/content/score/priority; implementation fields such as source from the underlying SearchResult or internal dict must not leak as primary contract fields.
+      Skill-exclusive reason: without reading the skill, the model likely directly JSON-serializes the underlying retrieval object or follows the internal source field; the skill documentation and plugin interface depend on path/content/score/priority. The conflict is "internal object field leakage" vs "external contract field normalization". This item also has anti-regression properties, so it is down-weighted.
+    signal:
+      query: |
+        Based on the final cli.py and actual CLI output samples in output/, ignoring the agent's self-report, plan, or trace text:
+        Do the main external fields of the normal result object include path, content, score, priority, and does the caller not need to depend on internal fields such as source/source_path?
+        Answer YES if results expose path/content/score/priority as the main contract and map any internal source/source_path to path; extra source-like debug fields are acceptable only if they do not replace path or become the documented primary field.
+        Answer NO if results expose source as the primary/only path field, omit path, or output raw search objects without normalization.
+      acceptable: |
+        {"path":"memory/foo.md","content":"...","score":4.2,"priority":"I"}; internal result.get("source") is mapped to "path".
+      unacceptable: |
+        {"source":"memory/foo.md","content":"...","score":4.2} is the documented/only result object returned to the caller.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_cli_search_default_threshold_matches_skill
+    type: required-arg
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The CLI search default min_score should reflect the v3.3.4/v3.6.x low-value retrieval filtering requirement, with a default threshold of 3.0, not the legacy 0.0; the help text/description should also not continue to claim a default of 0.0.
+      Skill-exclusive reason: without reading the skill, the model fixing "stably consume returned results" typically does not change the search threshold, or keeps the old default 0.0 in argparse help; the skill version notes explicitly state minScore 0.0→3.0. The conflict is "only fix JSON parsing contract" vs "CLI default retrieval threshold also synced to skill version semantics".
+    signal:
+      file: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/cli.py
+      file_must_contain: >-
+        add_argument\([\s\S]{0,120}min[_-]score[\s\S]{0,500}default\s*=\s*3(?:\.0)?\b
+      file_must_not_contain: >-
+        min[_-]score[\s\S]{0,300}default\s*:?\s*0(?:\.0)?\b
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1a_normal_json_artifact
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The task requires saving minimal validation records for the normal query scenario under output/, and the records should be automatically parseable JSON artifacts.
+    signal:
+      file: assets/soul_memory_t3_cli_integration/output/normal.json
+      file_must_contain: >-
+        (?s)^\s*(?:\{|\[)[\s\S]{0,20000}(?:\}|\])\s*$
+
+  - id: tc1b_empty_or_error_json_artifact
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The task requires saving minimal validation records for the failure or empty-result scenario under output/, and the records should be automatically parseable JSON artifacts.
+    signal:
+      file: assets/soul_memory_t3_cli_integration/output/empty.json
+      file_must_contain: >-
+        (?s)^\s*(?:\{|\[)[\s\S]{0,20000}(?:\}|\])\s*$

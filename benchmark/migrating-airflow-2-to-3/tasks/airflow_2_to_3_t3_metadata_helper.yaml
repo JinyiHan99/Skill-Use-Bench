@@ -1,0 +1,49 @@
+task_id: airflow_2_to_3_t3_metadata_helper
+skill_id: migrating-airflow-2-to-3
+description: |
+  The helper at `assets/airflow_2_to_3_t3_metadata_helper/input/plugins/dagrun_failure_guard.py` was copied into a plugin spike for run-health reporting. We need it refactored for our next Airflow runtime upgrade while preserving its ability to inspect recent DAG run history and report pause decisions in a supported way. We’ve also seen inconsistent temporal ordering/filtering in newer run scenarios, so ensure the recent-run semantics remain correct.
+
+initial_state:
+  assets:
+    - path: assets/airflow_2_to_3_t3_metadata_helper/input/plugins/dagrun_failure_guard.py
+      source: "https://raw.githubusercontent.com/apache/airflow/2.10.5/airflow/models/dagrun.py"
+      real_state: "Full Apache Airflow 2.10.5 DagRun model source containing session helpers, direct metadata queries, and DagModel/Log writes."
+      preparation: |
+        Downloaded the Apache Airflow 2.10.5 DagRun model source unchanged and saved it under the plugin spike filename.
+  tools_available:
+    - filesystem
+    - shell
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: no_direct_metadata_db_access
+    description: "Task/plugin code migrated for Airflow 3 must not use ORM sessions, `provide_session`, `create_session`, settings Session/engine, or direct model queries to access the metadata database."
+    exclusive: "A generic refactor may modernize SQLAlchemy syntax from `session.query` to `select()` while still using the metadata DB; the skill states that direct ORM metadata access from task code fails in Airflow 3 and must be replaced."
+  - id: airflow_client_or_rest_replacement
+    description: "Metadata access that remains necessary should be moved to the Airflow Python client or direct REST API calls against the Airflow API server."
+    exclusive: "Without the skill, a model may keep DB access inside helpers because it appears to be official Airflow model code; the skill gives the API-server/client replacement path."
+  - id: logical_date_execution_date_review
+    description: "Migration should review Airflow 2 `execution_date` usage in run ordering/filtering logic. Any remaining recent-run sorting or filtering logic must not blindly rely on `DagRun.execution_date` comparisons; it must either use an Airflow 3-compatible logical-date replacement or include an inline migration note at the exact use site explaining why the remaining field is safe there."
+    exclusive: "A generic DB refactor may retain `DagRun.execution_date` comparisons; the skill specifically flags context/logical date changes and warns that asset-triggered runs can have no logical date."
+
+notes: |
+  - Positive task.
+  - Core test point: a direct-metadata-access anti-prior. The input is official-looking Airflow 2 source, so a model must follow the skill instead of preserving or merely modernizing ORM code.
+  - Expected correct behavior includes removing or isolating the session-helper import at `assets/airflow_2_to_3_t3_metadata_helper/input/plugins/dagrun_failure_guard.py:70`, not simply changing `session.query(DagRun)` at line 572 to `session.scalars(select(DagRun))`.
+  - Expected correct behavior includes replacing the DagRun lookup around lines 572-575 and DagModel update/Log insert around lines 584-606 with API-server/client interactions or a clear API-boundary abstraction suitable for Airflow 3 workers.
+  - Expected correct behavior includes reviewing `DagRun.execution_date` sorting and filtering at lines 574, 703, 727, 1525, and related uses rather than blindly preserving Airflow 2 execution-date assumptions.
+  - Evaluation focus should remain on the helper behavior tied to recent DAG-run inspection and pause-decision reporting, especially the logic around the DagRun lookup and DagModel/Log update path. The model should not need to rewrite unrelated Airflow model internals merely to remove every historical symbol.
+  - Do not count a solution as correct if it removes the pause decision or recent-run inspection behavior instead of preserving it through an Airflow 3-compatible boundary.
+  - For `execution_date`, do not require every textual occurrence in the copied source to disappear. The required signal is that ordering/filtering logic used for recent-run decisions is reviewed, migrated, abstracted behind an API boundary, or justified with an inline migration note at the exact use site.
+  - Common incorrect behavior: the model keeps `@provide_session` decorators at lines 352, 366, 439, 499, 532, and later because it treats them as official source-code style.
+  - Common incorrect behavior: the model says "SQLAlchemy 2 select API is Airflow 3 compatible" and leaves direct metadata DB access in task/plugin code, which the skill says will raise a runtime error in Airflow 3 workers.
+  - Common incorrect behavior: the model removes the pause decision entirely instead of preserving the business behavior through the API server/client path.
+  - baseline_correctness_signals:
+      - The helper remains a coherent Python module or refactor patch that still represents recent DAG-run inspection and pause-decision reporting.
+      - The refactor preserves the ability to identify consecutive failed runs in some form.
+      - The output includes enough notes or code structure for the release owner to see how the runtime boundary changed.
+  - skill_following_signals:
+      - ORM session helpers and direct metadata DB query/write patterns are removed from worker-side helper code.
+      - Required metadata access is routed through the Airflow API server via Python client or REST-style boundary.
+      - Airflow 2 `execution_date` usage in recent-run ordering/filtering logic is reviewed against Airflow 3 logical-date semantics instead of being left untouched.

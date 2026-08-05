@@ -1,0 +1,48 @@
+task_id: software_architecture_t2_api_boundary
+skill_id: software-architecture
+description: |
+  Our admin backend snapshot in `./assets/software_architecture_t2_api_boundary/input/` needs a small account-management change: staff should be able to suspend a user account as a distinct account-management action and later see that state reflected in normal user data. Keep the implementation focused.
+initial_state:
+  assets:
+    - path: ./assets/software_architecture_t2_api_boundary/input/user.controller.js
+      source: "https://github.com/hagopj13/node-express-boilerplate/blob/master/src/controllers/user.controller.js"
+      real_state: "Real controller file from node-express-boilerplate. It delegates user operations to `userService` and exports create/list/read/update/delete handlers."
+      preparation: |
+        Downloaded the raw file from the public GitHub repository without content changes.
+    - path: ./assets/software_architecture_t2_api_boundary/input/user.service.js
+      source: "https://github.com/hagopj13/node-express-boilerplate/blob/master/src/services/user.service.js"
+      real_state: "Real service file from the same repository. It contains user creation, query, read, update, and delete functions, with persistence access through the User model."
+      preparation: |
+        Downloaded the raw file from the public GitHub repository without content changes.
+    - path: ./assets/software_architecture_t2_api_boundary/input/user.model.js
+      source: "https://github.com/hagopj13/node-express-boilerplate/blob/master/src/models/user.model.js"
+      real_state: "Real Mongoose user model file from the same repository snapshot."
+      preparation: |
+        Downloaded the raw file from the public GitHub repository without content changes.
+  tools_available:
+    - filesystem
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: keep_database_queries_out_of_controllers
+    description: "The skill requires database queries to stay out of controllers and responsibilities to remain separated."
+    exclusive: "Without the skill, a model may still keep database calls out of the controller because the existing code already demonstrates that pattern; this constraint is retained only as a secondary signal, not as the primary skill-exclusive distinction."
+  - id: isolated_use_case_business_logic
+    description: "The skill requires use cases to be defined clearly and kept isolated, with business logic independent of frameworks."
+    exclusive: "Without the skill, a model may treat suspension as a generic user update by reusing updateUserById with a suspended/status field, rather than modeling suspension as a distinct account-management operation."
+  - id: dedicated_suspension_domain_operation
+    description: "The skill requires clear use-case boundaries and domain-specific operations rather than absorbing distinct account state transitions into generic CRUD updates."
+    exclusive: "Without the skill, a model may simply broaden the existing generic update flow to accept a suspended/status field, while a skill-following solution should expose suspension as a dedicated account-management operation with explicit suspend/suspension naming."
+notes: |
+  - Core test point: the request creates pressure between modeling suspension as a distinct account-management operation and simply broadening the generic user update flow. Judge whether suspension is represented as an explicit account state transition, not merely whether a suspended/status value can be written somewhere.
+  - Expected correct behavior: controller remains a thin HTTP adapter; suspension behavior is represented through a domain-specific service/use-case function such as a user/account suspension operation; persistence remains behind the service/model boundary.
+  - Common wrong behavior: the model adds `const { User } = require('../models')` to `user.controller.js:1-5` and calls `User.findByIdAndUpdate(req.params.userId, ...)` inside a new controller method.
+  - Common wrong behavior: the model modifies `updateUser` at `user.controller.js:27-30` to branch on `req.body.suspended`, mixing account-management rules with request handling.
+  - baseline_correctness_signals:
+      - The input backend code exposes a staff/admin-facing suspension entry point, not only a model field.
+      - Normal user reads return the resulting suspension state.
+      - The existing create/list/read/update/delete functionality is not removed from the exports.
+  - skill_following_signals:
+      - `user.controller.js` does not import or call the User model directly.
+      - Suspension is exposed through a dedicated controller handler and domain-specific service/use-case function, rather than being handled inside the generic `updateUser` / `updateUserById` path.
+      - New names use explicit account-suspension language such as `suspend`, `suspension`, or `accountStatus`; no new generic `utils`, `helpers`, `common`, or `shared` module is introduced.

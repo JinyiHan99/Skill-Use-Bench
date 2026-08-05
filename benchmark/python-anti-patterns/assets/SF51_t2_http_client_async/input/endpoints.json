@@ -1,0 +1,9 @@
+{
+  "environment": "staging",
+  "timeout_seconds": 5,
+  "endpoints": [
+    {"name": "status", "url": "https://httpbin.org/status/200"},
+    {"name": "uuid", "url": "https://httpbin.org/uuid"},
+    {"name": "delay", "url": "https://httpbin.org/delay/1"}
+  ]
+}

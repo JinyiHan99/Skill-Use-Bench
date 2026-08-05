@@ -1,0 +1,124 @@
+# Rubric for skill_63_frontend_code_review — frontend_code_review_t1_overlay
+# Scoring boundary: skill is scored; task only records completion rate; gate only judges evaluability.
+
+rules:
+  # ── GATE ────────────────────────────
+  - id: g1_overlay_review_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable attempt to read or analyze the target TSX component.
+    signal:
+      pattern: '(?is)\b(?:Read|Grep)\b.{0,4000}?(?:file_path|path)["''\s:]+[^"''\n]*(?:assets/frontend_code_review_t1_overlay/input/)?web/app/components/main-nav/components/web-apps-section\.tsx\b'
+
+  # ── Skill-Following rules (scored) ──
+  - id: r1_required_overlay_local_contracts
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The sidebar component contains an AlertDialog delete-confirmation dialog; before finalizing the review, the agent must actually Read four local overlay / Dify UI contracts: web/AGENTS.md, web/docs/overlay.md, packages/dify-ui/README.md, and packages/dify-ui/AGENTS.md.
+      skill-exclusive rationale: without reading the skill, a strong model usually only reads the user-named component and reviews with generic React/a11y experience; the skill requires additionally reading the Dify repo-local overlay and primitive contracts. Default practice X = only look at the component, skill requires Y = first supplement the four local contracts, conflict point Z = whether to treat Dify overlay/primitive rules as required context.
+    signal:
+      pattern: '(?is)(?=.*?\bRead\b.{0,4000}?(?:file_path|path)["''\s:]+[^"''\n]*(?:assets/frontend_code_review_t1_overlay/input/)?web/AGENTS\.md\b)(?=.*?\bRead\b.{0,4000}?(?:file_path|path)["''\s:]+[^"''\n]*(?:assets/frontend_code_review_t1_overlay/input/)?web/docs/overlay\.md\b)(?=.*?\bRead\b.{0,4000}?(?:file_path|path)["''\s:]+[^"''\n]*(?:assets/frontend_code_review_t1_overlay/input/)?packages/dify-ui/README\.md\b)(?=.*?\bRead\b.{0,4000}?(?:file_path|path)["''\s:]+[^"''\n]*(?:assets/frontend_code_review_t1_overlay/input/)?packages/dify-ui/AGENTS\.md\b)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_fetch_latest_web_interface_guidelines
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] This is a UI/UX/a11y review; before final findings, the latest Web Interface Guidelines URL must be fetched via an actual WebFetch tool call.
+      skill-exclusive rationale: without reading the skill, a strong model will rely on built-in accessibility knowledge; the skill requires treating the live external Web Interface Guidelines as a required baseline. Default practice X = review by experience, skill requires Y = actually WebFetch the specified URL, conflict point Z = whether to obtain the current external baseline.
+    signal:
+      pattern: '(?is)\bWebFetch\b.{0,2000}?\burl["''\s:]+["'']https://raw\.githubusercontent\.com/vercel-labs/web-interface-guidelines/main/command\.md["'']'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_overlay_contract_grounded_findings
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Conclusions about AlertDialog / floating UI must cross-check component behavior against Dify overlay + Dify UI primitive contracts, e.g. destructive actions should use alert-dialog, controlled open/onOpenChange, primitive-owned portal, z-50/z-60 layering, no call-site z-index/manual portal, etc.
+      skill-exclusive rationale: without reading the skill, a strong model may give generic a11y or React state suggestions; the skill requires using Dify local overlay/primitive contracts to constrain conclusions. Default practice X = generalized check of dialog interaction, skill requires Y = judge with Dify contracts, conflict point Z = whether findings are explicitly based on this repo's overlay/primitive contract.
+    signal:
+      judge_question: |
+        Look only at the final answer content and actual local-contract evidence read, not the agent's self-description of intent. Does the final review have at least one conclusion or residual risk that explicitly combines the current WebAppsSection AlertDialog/delete confirmation implementation and judges based on Dify overlay / dify-ui primitive contracts?
+        Answer YES if it discusses this component's AlertDialog/delete confirmation against concrete local contract points such as alert-dialog for destructive confirmation, controlled open/onOpenChange cleanup, Dify UI primitive-owned portal/layering, z-50/z-60, or avoiding manual portals/z-index overrides.
+        Answer NO if it only mentions document names or terms, or gives generic statements like "add aria labels", "handle loading", or "refactor state" without tying the component implementation to Dify overlay/dify-ui contracts.
+      acceptable: "Mentions that AlertDialog is the correct destructive primitive per web/docs/overlay.md and checks this component's controlled open/onOpenChange plus Dify portal/layering contract."
+      unacceptable: "Only says the modal should be accessible or the code should be cleaner, with no Dify overlay or dify-ui contract grounding."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_no_style_refactor_or_praise_noise
+    type: boundary
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK AUX — not counted toward SF] User-visible risk and review quality are not the skill main score; this only side-records whether the final answer avoids treating pure style preferences, generic refactors, unsupported performance guesses, or a default praise section as findings.
+    signal:
+      judge_question: |
+        Look only at the final answer, not the agent's self-description. Does the final review avoid treating pure style preferences, broad refactors, unsupported performance guesses, or a default praise section as findings? Answer YES or NO.
+      acceptable: "Findings are concrete risks, or no issues found with residual risk/test gaps."
+      unacceptable: "Main findings are naming/style cleanup, broad refactors, or a praise section."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_skill_review_output_format
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The final output should be findings-first; when there are findings, use P0/P1/P2/P3 severity, include File: `path:line`, impact description, and Suggested fix; when there are no findings, say `No issues found.` and explain test gaps or residual risks.
+      skill-exclusive rationale: the task only requires a review, and a strong model will naturally use any free-form list or summary; the skill prescribes a fixed review structure and severity/file-line discipline. Default practice X = free-form, skill requires Y = findings-first and severity/file-line/Suggested fix discipline, conflict point Z = whether the output format follows the skill.
+    signal:
+      judge_question: |
+        Look only at the final answer text. Does the final review follow the core code-review format: when there are findings, findings come first, using P0/P1/P2/P3, and locatable findings have `File: path:line`, impact description, and Suggested fix; when there are no findings, explicitly write `No issues found.` and explain test gaps or residual risks?
+        Answer YES if these core format constraints are satisfied. Do not require empty Open Questions or Summary headings.
+        Answer NO if it is a generic unordered paragraph/list, lacks severity for findings, lacks available file-line references, or omits residual risk/test gaps for a no-issue review.
+      acceptable: "## Findings\n- [P1] ...\n  File: `assets/.../web-apps-section.tsx:293`\n  Why it matters...\n  Suggested fix: ..."
+      unacceptable: "A generic list of suggestions with no severity, no file:line, and a praise/overview section before findings."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  # ── Task completion record (not scored) ──
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Whether the model completed the review of the target sidebar app-list component, covering the delete-confirmation dialog, accessibility, interaction states, and user-visible risks; and whether it states residual risks when there are no explicit issues.
+    signal:
+      judge_question: |
+        Based on the final answer and actual tool evidence rather than self-description, did the model complete the user-requested review: read the target web-apps-section.tsx, and give at least concrete review conclusions; or explicitly `No issues found.` with residual risk/test gaps explained? Answer YES or NO.
+      acceptable: "Final answer reviews the target component and gives a concrete finding, or states no issues with residual risk/test gaps."
+      unacceptable: "Final answer does not review the target component, only says it will review later, or gives only a shallow generic summary."
+      judge_expected: "YES"

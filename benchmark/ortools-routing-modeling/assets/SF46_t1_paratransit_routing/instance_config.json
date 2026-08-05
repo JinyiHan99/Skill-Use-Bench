@@ -1,0 +1,17 @@
+{
+  "instance_id": "reduced_instance_40p",
+  "description": "Reduced paratransit benchmark: 40 passengers, 84 trips, 8 vehicles. Derived from public_instance_001 by taking first 40 passengers.",
+  "source_references": [
+    {
+      "title": "Paratransit Optimization with Constraint Programming: A Case Study in Savannah, Georgia",
+      "venue": "arXiv:2508.00241",
+      "url": "https://arxiv.org/abs/2508.00241"
+    }
+  ],
+  "provenance_note": "Subset of public_instance_001: first 40 passengers (84 trips). Matrix re-indexed accordingly.",
+  "nb_passengers": 40,
+  "nb_trips": 84,
+  "nb_vehicles": 8,
+  "vehicle_capacity": 3,
+  "time_window_width": 30
+}

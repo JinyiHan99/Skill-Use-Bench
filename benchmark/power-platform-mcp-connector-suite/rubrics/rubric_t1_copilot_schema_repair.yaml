@@ -1,0 +1,118 @@
+rubric_id: skill_75_power_platform_mcp_connector_suite_t1_copilot_schema_repair
+objective: Evaluate whether the model follows the Power Platform MCP Connector Suite skill to repair Copilot Studio discoverability and schema compatibility, rather than only doing generic Swagger repairs.
+rules:
+  - id: g1_observable_connector_package_write
+    type: required-arg
+    provenance: gate
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [GATE] output/salesforce_agent_connector/apiDefinition.swagger.json should actually exist and be non-empty, indicating an evaluable connector-definition artifact.
+    signal:
+      file: output/salesforce_agent_connector/apiDefinition.swagger.json
+      file_must_contain: >-
+        (?s)\S
+
+  - id: r1_mcp_endpoint_has_agentic_protocol_marker
+    type: required-arg
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The POST operation of the /mcp agent communication endpoint must carry Power Platform's x-ms-agentic-protocol: mcp-streamable-1.0 marker.
+      Skill-exclusive rationale: without reading the skill, strong models tend to only fix Swagger syntax, copy missing files, or keep standard OpenAPI fields; the skill requires adding Power Platform/Copilot Studio-specific discovery markers. Default behavior X = generate a valid Swagger, skill requires Y = add the agentic protocol marker to the POST operation of the agent endpoint, conflict point Z = the standard Swagger can be imported but Copilot Studio may still fail to discover the MCP endpoint.
+    signal:
+      file: output/salesforce_agent_connector/apiDefinition.swagger.json
+      file_must_contain: >-
+        "/mcp"\s*:\s*\{[\s\S]{0,20000}"post"\s*:\s*\{[\s\S]{0,20000}"x-ms-agentic-protocol"\s*:\s*"mcp-streamable-1\.0"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_agent_request_response_schemas_are_inlined
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The request body and 200 response schema of the /mcp endpoint must not retain $ref; if they reference definitions such as McpResponse/McpParams, they must also be recursively inlined into the agent-facing schema.
+      Skill-exclusive rationale: without reading the skill, strong models retain $ref as legal Swagger 2.0, because this is a general OpenAPI best practice; the skill requires sacrificing conventional reuse for Copilot Studio filtering rules, inlining the agent-facing request/response schema. Default behavior X = retain $ref to reuse definitions, skill requires Y = recursively inline agent-facing schemas, conflict point Z = the generic Swagger is legal but Copilot Studio will filter or reject agent schemas that contain references.
+    signal:
+      query: |
+        Based on the actual content of the finally written output/salesforce_agent_connector/apiDefinition.swagger.json, not the agent's self-statements: is the entire reachable subtree of the /mcp POST request body schema and 200 response schema free of $ref? The scope includes properties, items, additionalProperties, as well as agent-facing subtrees such as params/result/error.
+        Answer YES if the /mcp request and response schemas are fully inlined with concrete object/properties/items/additionalProperties schemas and no $ref is reachable anywhere under those schema trees.
+        Answer NO if the /mcp response is still {"$ref":"#/definitions/McpResponse"}, the request params still references McpParams, or any nested agent-facing properties/items/additionalProperties/result/params/error schema remains reference-based.
+      acceptable: |
+        /mcp parameters[body].schema and responses[200].schema directly define type: object with jsonrpc/id/method/params/result/error properties and no $ref under any reachable child schema.
+      unacceptable: |
+        responses[200].schema contains "$ref": "#/definitions/McpResponse" or any nested params/result/items/additionalProperties contains a $ref.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_agent_schema_types_are_single_values
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] All type fields in the /mcp agent-facing request/response schema must be a single primitive/object/array string; union type arrays must not be used, and oneOf/anyOf must not be used to indirectly express agent-facing unions.
+      Skill-exclusive rationale: without reading the skill, strong models may retain the natural JSON Schema/OpenAPI ["string", "integer"] union for the JSON-RPC id; the skill explicitly requires Copilot Studio-compatible single type values. Default behavior X = use a union to precisely express the JSON-RPC id, skill requires Y = change to a single type and handle it via description/validation logic, conflict point Z = a semantically more precise schema will be filtered out by the Copilot Studio agent.
+    signal:
+      query: |
+        Based on the actual content of the finally written output/salesforce_agent_connector/apiDefinition.swagger.json, not the agent's self-statements: does the entire reachable tree of the /mcp POST request/response schema avoid array-form type values, and does it avoid using oneOf/anyOf to indirectly express a union in params/result/error, nested properties, or items?
+        Answer YES if every type reachable from /mcp request and response schemas is a single string such as "string", "integer", "number", "boolean", "array", or "object", and agent-facing fields do not use oneOf/anyOf for union typing.
+        Answer NO if any agent-facing field, including nested properties/items/params/result/error, has type: ["string", "integer"] or any other array-valued type, or uses oneOf/anyOf to represent a union.
+      acceptable: |
+        "id": { "type": "string", "description": "JSON-RPC request id; stringify numeric ids if needed" } and nested params/result fields use single string type values.
+      unacceptable: |
+        "id": { "type": ["string", "integer"] } or params/result contains oneOf/anyOf alternatives for primitive unions.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_preserve_business_api_surface_while_repairing_agent_endpoint
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] When repairing /mcp, the Salesforce business API coverage should be preserved, rather than replacing the entire package with a toy MCP connector.
+    signal:
+      file: output/salesforce_agent_connector/apiDefinition.swagger.json
+      file_must_contain: >-
+        (?is)(?=.*\b(Query|query)\b)(?=.*\b(Search|search)\b)(?=.*\b(CreateRecord|UpdateRecord|Composite|Reports|Knowledge|Chatter|sObjects?)\b)
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/salesforce_agent_connector/ should contain an importable complete connector package and handoff instructions, and the core JSON content should be valid.
+    signal:
+      query: |
+        Based on the final filesystem artifacts and actually written content, not the agent's self-statements: does output/salesforce_agent_connector/ contain apiDefinition.swagger.json, apiProperties.json, script.csx, readme.md, and handoff_note.md (or equivalent handoff instructions), and are both apiDefinition.swagger.json and apiProperties.json parseable, non-empty JSON?
+        Answer YES if all core package files plus both readme and handoff documentation are present with substantive connector content and the JSON files are parseable.
+        Answer NO if any required core file is missing, readme or handoff documentation is absent, JSON is empty/unparseable, or only a prose answer was produced.
+      acceptable: |
+        output/salesforce_agent_connector/apiDefinition.swagger.json, apiProperties.json, script.csx, readme.md, and handoff_note.md exist; apiDefinition.swagger.json and apiProperties.json parse as JSON and contain substantive Salesforce connector content.
+      unacceptable: |
+        Only a final chat summary exists; apiDefinition.swagger.json is missing/empty/unparseable; or readme.md exists but no handoff note/equivalent handoff instructions are provided.

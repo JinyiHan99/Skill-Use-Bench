@@ -1,0 +1,28 @@
+task_id: k8s_security_policies_t1_harden_nginx
+skill_id: k8s-security-policies
+description: |
+  We are about to turn this sample web service manifest into a version ready for production review. Based on `assets/k8s_security_policies_t1_harden_nginx/input/nginx-deployment.yaml`, output a complete production-grade Kubernetes manifest that integrates all the companion configurations required by the platform's restricted security baseline before the application can go live in production. The cluster has strict security admission and a zero-trust network model; using the official sample directly will not pass the launch review. Ensure the output manifest remains deployable and runnable. Save the output to `output/nginx-production.yaml`.
+initial_state:
+  assets:
+    - path: assets/k8s_security_policies_t1_harden_nginx/input/nginx-deployment.yaml
+      source: "https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/application/deployment.yaml"
+      real_state: "The nginx Deployment example from the Kubernetes website repository, with only basic replicas, labels, image, and port fields, and no production security hardening configuration."
+      preparation: |
+        Save the YAML content from the public repository directly, without rewriting business fields.
+  tools_available: [read, write, edit]
+expected_trigger: true
+skill_constraints_tested:
+  - id: restricted_pod_security_context
+    description: "All Pod templates must explicitly set a non-root run user, runAsNonRoot, and RuntimeDefault seccomp."
+    exclusive: "Without reading the skill, the model usually only keeps the original Deployment or adds only a small amount of securityContext, easily missing runAsNonRoot or seccomp."
+  - id: container_hardening
+    description: "Each container must drop all Linux capabilities, forbid privilege escalation, use a read-only root filesystem, and configure emptyDir mounts for the writable paths Nginx needs to run, while also declaring CPU/memory requests and limits."
+    exclusive: "Without reading the skill, the model may only add resource limits or partial securityContext; even if readOnlyRootFilesystem is set, it easily misses the writable emptyDir mounts Nginx needs for /var/cache/nginx, /var/run, or /tmp, making the manifest non-runnable."
+  - id: namespace_network_rbac_bundle
+    description: "Production workloads need a companion Namespace with restricted Pod Security enforce/audit/warn labels, a default deny-both NetworkPolicy, a dedicated ServiceAccount that does not auto-mount its token, and a least-privilege Role and RoleBinding."
+    exclusive: "Without the description explicitly naming resource categories, the model needs the skill to fully derive the complete set of Namespace, NetworkPolicy, ServiceAccount, Role, and RoleBinding companion resources and satisfy the restricted labels, default-deny network policy, and least-privilege access control details; otherwise it often adds only partial resources or incomplete configuration."
+notes: |
+  - Positive example: the user asks to turn a Kubernetes sample manifest into a submission that passes production security review, which should trigger the skill.
+  - Observable signals: the output file contains Deployment, Namespace, NetworkPolicy, ServiceAccount, Role, RoleBinding; the Deployment pod template and container-level security fields are complete; the Namespace has restricted enforce/audit/warn labels; the NetworkPolicy reflects default deny-both; the ServiceAccount disables automountServiceAccountToken.
+  - Runnability signals: if the container enables readOnlyRootFilesystem, emptyDir mounts should be configured for the writable paths Nginx needs; if a non-root container still listens on port 80, it should be handled compliantly by switching to a non-privileged port or only adding NET_BIND_SERVICE.
+  - Common errors: using the default ServiceAccount, missing writable temporary directories required by the read-only root filesystem, the NetworkPolicy not being default-deny-first, only denying Ingress without denying Egress.

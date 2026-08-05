@@ -1,0 +1,73 @@
+task_id: SF33_t1_lab_unit_harmonization
+level: L2
+skill_id: skill_33_lab_unit_harmonization
+description: |
+  I have clinical lab data collected from multiple healthcare systems. Since each system may use different units for the same blood test, I need you to harmonize everything into a consistent unit system.
+
+  The input data is `assets/SF33_t1_lab_unit_harmonization/data/ckd_lab_data.csv` with 62 lab features. Some patient records may be incomplete. A feature description file is at `assets/SF33_t1_lab_unit_harmonization/data/ckd_feature_descriptions.csv` for reference.
+
+  ## Problem
+
+  The raw data has several quality issues:
+
+  - incomplete records: some rows have missing values
+  - scientific notation: values like `1.23e2` need to be converted to normal numeric format
+  - decimal format: commas used as decimal separators (e.g., `12,34` means `12.34`)
+  - mixed units: many values are reported in alternative units (e.g., µmol/L instead of mg/dL for creatinine, g/L instead of g/dL for hemoglobin)
+
+  ## Your Task
+
+  Please harmonize this dataset so that all lab values use US conventional units, with clean numeric formatting.
+
+  ## Output
+
+  Save the harmonized data to: `output/ckd_lab_data_harmonized.csv`
+
+  Requirements:
+
+  - output should have the same columns as the input
+  - numeric values formatted to 2 decimal places: `X.XX`
+  - all values in US conventional units within expected physiological ranges
+  - no scientific notation, commas, or inconsistent decimals in output
+initial_state:
+  assets:
+  - path: assets/SF33_t1_lab_unit_harmonization/data/ckd_lab_data.csv
+    source: skillsbench/tasks/lab-unit-harmonization/environment/data/ckd_lab_data.csv
+    description: 'CKD lab data with 62 features from multiple healthcare systems, containing mixed units and format issues'
+  - path: assets/SF33_t1_lab_unit_harmonization/data/ckd_feature_descriptions.csv
+    source: skillsbench/tasks/lab-unit-harmonization/environment/data/ckd_feature_descriptions.csv
+    description: 'Feature description file mapping short names to full descriptions for 62 CKD lab features'
+  tools_available:
+  - bash
+  - read
+  - edit
+  - grep
+expected_trigger: true
+skill_constraints_tested:
+- id: c1
+  description: Strict complete-record filtering — any one of the 60+ numeric columns with a missing value causes the entire row to be dropped; no imputation, not just checking key columns
+  exclusive: The model may only drop rows with heavy missing values, only check missing values in key feature columns, or attempt mean/median imputation
+- id: c2
+  description: Range detection + sequential factor trial — when a value is outside the expected range, try multiplication conversion factors one by one in the order defined by the skill, and adopt the first factor whose result falls within range (first-match-wins)
+  exclusive: The model may use an explicit unit column to decide, apply the same factor uniformly to all values, or choose the conversion direction by intuition rather than sequential trial
+- id: c3
+  description: Use 5% tolerance for converted values slightly outside the range boundary — values beyond the boundary but within 5% of the boundary value are treated as floating-point precision error and may be clamped to the boundary; beyond 5% the factor does not hit
+  exclusive: The model may use exact boundary checks (no tolerance), use a different tolerance percentage, or clamp all out-of-range values unconditionally
+- id: c4
+  description: When all conversion factors fail, return the original value; clamping to the valid range is strictly forbidden
+  exclusive: Clamping unconvertible values to the clinically valid range as a safe fallback
+notes: |
+  Source: skillsbench/lab-unit-harmonization
+  Domain: Medical/Biology
+  Phase1 score: 0.515
+  Confidence: 0.85
+  Known limitations:
+  - BUN_Creatinine_Ratio is a derived feature computed independently, not a direct lab measurement
+  - The patient_id column must be retained in the output; it must not be dropped or modified
+  - The skill describes 60 features vs the data actually has 62 columns (including patient_id and BUN_Creatinine_Ratio); the discrepancy is normal
+  Known eval issues (outside the scope of this YAML modification):
+  - c1 evaluation does not verify the post-filter row count
+  - c3 evaluation has no tolerance check
+  - c4 following the skill and returning the original value may instead be penalized
+  - patient_id retention lacks a check
+  - Lactate/Prealbumin conversion factor direction is uncertain

@@ -1,0 +1,101 @@
+task_id: app_builder_t2_reading_list_extension
+skill_id: app-builder
+rules:
+  - id: g1_observable_extension_build_attempt
+    type: required-tool
+    provenance: gate
+    locus: trace
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable browser-extension engineering write/edit attempt. The gate only judges whether there is a real tool write/edit action, not whether the extension is correct.
+    signal:
+      pattern: >-
+        (?i)("tool"\s*:\s*"(?:functions\.)?(?:Write|Edit)"|"recipient_name"\s*:\s*"functions\.(?:Write|Edit)")
+
+  - id: r1_detect_browser_extension_and_choose_chrome_mv3
+    type: lesson
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Starting a new project should first perform project-type detection, mapping the browser reading-list experience to the chrome-extension / Chrome MV3 branch in the app-builder template table, and keeping a single extension prototype direction.
+      Skill-exclusive rationale: without reading the skill, a strong model may also build a Chrome extension based on the brief, so "manifest.json appears" itself is not skill-exclusive; the real conflict point is that the default may directly fill files following the sample or build a normal web page, while the skill requires doing project-type detection before writing files, selecting the single chrome-extension template/branch, and anchoring that choice with subsequent MV3 writes.
+    signal:
+      query: |
+        Based on the evidence in serialized_steps before the first Write/Edit, and anchored by subsequent actual MV3 structure writes, does the model first summarize/identify this as a browser extension project and accordingly select the chrome-extension / Chrome MV3 single template branch? Answer YES only if the project-type detection and chrome-extension/MV3 template choice occur before the first file write/edit, and later files anchor that choice with MV3 extension structure. Answer NO if it merely creates manifest/popup files without prior type/template choice, or treats the task as a normal web/full-stack app.
+      acceptable: "Before the first Write/Edit, it explains the Browser extension / chrome-extension / Chrome MV3 branch, and later creates an MV3 manifest and popup/action pages."
+      unacceptable: "Directly writes manifest.json or index.html first, only saying it is a Chrome extension afterward; or only creates a normal web/full-stack project."
+      judge_context_window: [serialized_steps]
+
+  - id: r2_follow_orchestrator_sequence_before_implementation
+    type: order
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] app-builder is an application-building orchestrator and should reflect the behavior chain of "read/summarize brief constraints -> judge project type -> plan engineering structure -> implement and verify."
+      Skill-exclusive rationale: without reading the skill, a strong model can directly create extension files and complete the task; the skill requires analyzing the request, determining the tech stack and structure, and then coordinating the build. The conflict point is "directly write extension code" vs "first do app-builder-style analysis and planning before implementing."
+    signal:
+      query: |
+        Looking only at serialized_steps before the first Write/Edit, are there three types of concrete evidence: 1) reading or summarizing the product constraints of the reading-list/source brief; 2) judging the project type as browser extension/chrome-extension/Chrome MV3; 3) planning the engineering structure of manifest, popup/page, JS, CSS/storage? It is forbidden to infer backward from the final answer or after-the-fact narration. Answer YES only if all three pre-write planning elements are present before implementation. Answer NO if the trace jumps directly to writing files, or only supplements type/structure notes after writing files.
+      acceptable: "Before the first write, it extracts the reading-list requirements, judges chrome-extension/MV3, and then plans the manifest + popup HTML/JS/CSS/storage structure."
+      unacceptable: "The first step directly writes manifest/popup files; or only describes the planning chain in the final answer."
+      judge_context_window: [serialized_steps]
+
+  - id: b1_no_unrelated_fullstack_mobile_cli_scaffold
+    type: forbidden-arg
+    provenance: skill
+    locus: trace
+    verifier: regex
+    exclusive: false
+    weight: 0.25
+    spec: |
+      [SKILL — weak auxiliary] After matching chrome-extension, the single template should be isolated, without mixing in unrelated engineering structures such as full-stack, mobile, CLI, or Electron. This rule only serves as a low-weight negative auxiliary and cannot carry the main discrimination function.
+      Skill-exclusive rationale: the absence of unrelated scaffolds is mostly a natural behavior of strong models, but the app-builder template table still requires convergence to a single template; mixing in other templates is a weak signal of skill over-generalization.
+    signal:
+      must_not_match: >-
+        (?i)("file_path"\s*:\s*"[^"]*(?:prisma/schema\.prisma|app/page\.[tj]sx|pages/api/|pages/index\.[tj]sx|server\.[tj]s|app\.js|app\.json|pubspec\.yaml|lib/main\.dart|electron/main\.[tj]s|bin/[^"/]+|next\.config\.[^"/]+)"|commander|@prisma/client|PrismaClient)
+
+  - id: tc_manifest_entry
+    type: task-completion
+    provenance: task
+    locus: trace
+    verifier: regex
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The extension prototype should actually write an MV3 manifest entry: manifest_version: 3, and include action.default_popup or an equivalent invokable entry.
+    signal:
+      pattern: >-
+        (?i)("file_path"\s*:\s*"[^"]*manifest\.json"[^}]{0,5000}manifest_version"?\s*[:=]\s*3[^}]{0,5000}(action|default_popup)|manifest_version"?\s*[:=]\s*3[^}]{0,5000}default_popup)
+
+  - id: tc_crud_logic
+    type: task-completion
+    provenance: task
+    locus: trace
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The reading-list prototype should support add, update, and delete of items, and be based on actual JS event binding or state-change logic, not just function names.
+    signal:
+      query: |
+        Based on the actual written HTML/JS/TS file content, rather than the final answer or a function-name list, is there interaction logic for adding, updating, and deleting reading-list items, with evidence of event binding, form/button handling, state-array/storage changes, or DOM updates? Answer YES only if add/update/delete each have real code paths. Answer NO if only README/final answer claims support, or only empty function names exist without state/DOM/storage changes.
+      acceptable: "JS has add/update/delete button or form event handlers that modify items/chrome.storage/localStorage/DOM."
+      unacceptable: "Only empty addItem/updateItem/deleteItem functions, or only notes without interaction code."
+      judge_context_window: [serialized_steps]
+
+  - id: tc_unpacked_instructions
+    type: task-completion
+    provenance: task
+    locus: trace
+    verifier: regex
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The final notes should explain how to load or verify the browser extension locally.
+    signal:
+      pattern: >-
+        (?i)(chrome://extensions|load unpacked|加载已解压|已解压扩展|开发者模式|unpacked extension)

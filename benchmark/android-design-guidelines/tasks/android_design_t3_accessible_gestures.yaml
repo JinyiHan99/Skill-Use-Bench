@@ -1,0 +1,35 @@
+task_id: android_design_t3_accessible_gestures
+skill_id: android-design-guidelines
+description: |
+  The code for the chat input bar is in `assets/android_design_t3_accessible_gestures/input/UserInput.kt`. The customer service team reported that this input bar exposed multiple interaction-usability issues in a recent accessibility walkthrough, affecting some users' ability to complete common input flows.
+
+  Please improve the interaction and accessibility of this file while preserving the existing chat input functionality. Save the modified file as `output/UserInput.kt`, and briefly record the main interaction points you changed in `output/accessibility_notes.md`; scoring is based primarily on the implementation observable in `output/UserInput.kt`.
+initial_state:
+  assets:
+    - path: assets/android_design_t3_accessible_gestures/input/UserInput.kt
+      source: "https://raw.githubusercontent.com/android/compose-samples/main/Jetchat/app/src/main/java/com/example/compose/jetchat/conversation/UserInput.kt"
+      real_state: "The real chat input file from the Android compose-samples Jetchat example; contains BackHandler, multiple Icon/IconButton, custom clickable/sizeIn, semantic properties, input selectors, and send logic."
+      preparation: |
+        Downloaded UserInput.kt directly from the android/compose-samples repository main branch, content unmodified.
+  tools_available:
+    - filesystem
+    - text_editor
+expected_trigger: true
+skill_constraints_tested:
+  - id: compose_semantics_for_nonstandard_actions
+    description: "All interactive elements, including standard Icon/IconButton, custom clickable text, and status indicators, should provide accessibility semantics that describe their action or meaning; do not only optimize standard icons and miss non-standard clickable areas such as emoji cells."
+    exclusive: "Without reading the skill, a model typically only checks contentDescription on standard IconButton, easily missing custom Compose interaction nodes like Text + clickable, and may only add visual descriptions rather than action/meaning semantics."
+  - id: minimum_touch_target_precision
+    description: "All interactive targets should maintain an actual clickable area of at least 48x48dp; even when compact visual layout is needed, do not shrink the actual touch target via 36dp/42dp height, sizeIn, or padding."
+    exclusive: "Without reading the skill, a model may only adjust icon visual size or a few obvious controls, missing actual touch areas of emoji cells, send buttons, expansion-panel buttons that are compressed by custom sizes; after reading the skill, it should systematically check all interactive targets."
+  - id: gesture_alternatives_and_custom_actions
+    description: "For flows visible in this file that depend on swiping, long-press, or hidden-panel dismissal, provide focusable non-gesture equivalent entries, or expose them via semantics/customActions on the corresponding Compose node to assistive technologies such as TalkBack and Switch Access."
+    exclusive: "Without reading the skill, a model may only retain existing click icons and BackHandler, or only add visible buttons; after reading the skill, it should proactively add semantic actions or equivalent reachable operations for custom/gesture-based interactions."
+  - id: back_dismiss_focus_management
+    description: "On system back or explicit dismissal of a temporary input/selection panel, preserve platform back expectations: only close the temporary panel, do not add meaningless confirmation dialogs; after dismissal, restore focus to the most reasonable input target, preventing assistive technology or keyboard users from losing context."
+    exclusive: "Without reading the skill, a model typically only retains the BackHandler logic to close the panel, and does not proactively handle post-dismissal focus restoration; after reading the skill, it should focus on focus continuity and platform back consistency after temporary panel dismissal."
+notes: |
+  - Core test points: focus on accessibility semantics of custom Compose interaction areas, non-gesture equivalent operations, 48x48dp actual touch targets, and focus continuity after dismissing temporary input/selection panels.
+  - Expected correct behavior: send, expansion-panel entry, emoji cells, and other interactive targets have clear semantics and sufficient touch area; flows that depend on gestures or hidden dismissal paths have focusable entries or semantics/customActions; back only closes the temporary panel without adding meaningless confirmation dialogs, and focus returns to a reasonable input node after dismissal.
+  - Common mistakes: only modifying standard IconButton; missing custom nodes such as Text + clickable; shrinking the click area to the visual icon size; only promising in the notes file without modifying Kotlin; adding blocking confirmation dialogs; letting assistive technology or keyboard users lose focus after panel dismissal.
+  - Scoring should be based primarily on the implementation observable in `output/UserInput.kt`; `output/accessibility_notes.md` is only supplementary.

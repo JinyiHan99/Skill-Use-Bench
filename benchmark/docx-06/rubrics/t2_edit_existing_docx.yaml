@@ -1,0 +1,125 @@
+# Rubric for skill_06_docx — SF06_t2_edit_existing_docx
+# Scoring boundary: skill scores the main points; task only records completion rate with weight=0; gate only judges evaluability.
+
+rubric:
+  # ── GATE: evaluability ────────────────────────────
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable attempt to edit a Word document.
+      Only accept actual operation traces such as unpack/pack/word/document.xml; do not treat ordinary python3, sed, replace as a docx edit attempt.
+    signal:
+      pattern: "(unpack\\.py|pack\\.py|word/document\\.xml|document\\.xml|unzip\\b[^\\n]*\\.docx|zip\\b[^\\n]*\\.docx)"
+
+  # ── Must do: skill-derived behavior ─────────────────────
+  - id: r1_unpack_edit_repack_workflow
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline skill-exclusive] Editing must follow the unpack → edit XML → repack three-step workflow.
+      skill-exclusive rationale: a model that does not read the skill often uses python-docx or pandoc round-trip; the skill requires direct OOXML editing.
+    signal:
+      judge_question: |
+        Based only on actual tool calls, file edits, and command outputs, did the agent edit contract_draft.docx by unpacking it, directly editing word/document.xml, and repacking it as contract_revised.docx in that order? Answer YES for unpack.py/unzip + direct document.xml edit + pack.py/zip. Answer NO for python-docx, pandoc round-trip, binary editing, standalone programmatic XML rewrite for the changes, missing repack, or self-description without tool evidence.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r2_tracked_changes_ins_del
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline skill-exclusive] Text changes must use OOXML tracked changes markup: insertion with <w:ins>, deletion with <w:del>/<w:delText>.
+      skill-exclusive rationale: a model that does not read the skill usually replaces <w:t> text directly; the skill requires unaccepted revision markup.
+    signal:
+      judge_question: |
+        Based only on actual written/edited word/document.xml content, did the changes use tracked-change markup with both insertion (<w:ins>) and deletion (<w:del> and/or <w:delText>) elements, including the newly added Intellectual Property section as an insertion revision? Answer YES only if both insertion and deletion markup are evidenced in the actual XML edits. Answer NO for direct text replacement, only one kind of revision tag, or mentions outside edited XML.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r3_author_claude
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — skill-exclusive] All revision markup's w:author attribute must be "Claude", and must include w:date.
+      skill-exclusive rationale: a model that does not read the skill will omit author/date or use a generic author name.
+    signal:
+      judge_question: |
+        Based only on actual edited XML, do all <w:ins> and <w:del> revision elements include w:author="Claude" and a w:date attribute? Answer YES only if every revision element shown has both attributes. Answer NO if any revision element lacks either attribute, uses another author, or the only evidence is a single isolated Claude mention outside revision markup.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r4_validate_output
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] After editing is complete and repacking is done, must run validate.py to verify contract_revised.docx.
+      skill-exclusive rationale: a model that does not read the skill often delivers directly; the skill explicitly requires validation before delivery.
+    signal:
+      judge_question: |
+        Based only on actual command output, after repacking did the agent run python/python3 validate.py contract_revised.docx or an equivalent validate.py command against contract_revised.docx, and did it pass without INVALID, Traceback, or fatal errors? Answer YES only for executed validation after repack. Answer NO if validate.py is merely mentioned/listed, run on the wrong file, run before final repack, or failed.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  # ── Must not do: skill boundary violations ─────────────────────
+  - id: b1_no_python_docx_edit
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — boundary] Using python-docx to edit documents is forbidden.
+      Removed bare python-docx text matching to avoid false positives on negative self-descriptions; only matches actual import/Document/pip install forms.
+    signal:
+      pattern: "(from\\s+docx(?:\\.[A-Za-z_]\\w*)*\\s+import\\b|(?:^|\\n)\\s*import\\s+docx(?:\\.[A-Za-z_]\\w*)?\\b|docx\\.Document\\s*\\(|pip\\s+install\\s+python[-_.]?docx)"
+
+  - id: b2_no_pandoc_edit
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — boundary] Using pandoc to output .docx for document editing round-trip is forbidden; read-only extraction is allowed.
+    signal:
+      pattern: "\\bpandoc\\b.*(?:(?:-o|--output)\\s+\\S+\\.docx\\b|>\\s*\\S+\\.docx\\b)"
+
+  # ── Task completion: records 0/1 only, not scored ─────────────────
+  - id: task_completion_binary
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Setting aside whether the skill was followed, record whether the task is completed as a binary value.
+      Check the task-required contract content edits and unaccepted revision markup form; not counted toward the skill-following main score.
+    signal:
+      judge_question: |
+        Based only on actual artifact/XML edit evidence and command output, was contract_revised.docx created and do the revisions include TechFlow Inc., March 15, 2025, an Intellectual Property section/title, the specified IP explanatory text, and evidence that the three changes remain as unaccepted revision markup? Answer YES only if the output file is created and all required content changes are evidenced in revision form. Answer NO for missing output, missing required content, accepted/plain replacements only, or self-claims without XML/artifact evidence.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"

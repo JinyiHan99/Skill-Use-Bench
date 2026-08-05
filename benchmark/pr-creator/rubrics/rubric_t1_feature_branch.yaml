@@ -1,0 +1,135 @@
+rules:
+  - id: g1_observable_pr_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: '(?s)(functions\.Bash|Bash).*"command"\s*:\s*"[^"]*(git\s+(add|commit|push|checkout|switch)|gh\s+pr\s+create|npm\s+run\s+preflight)'
+    spec: "[GATE] The trajectory contains a real Bash tool call executing PR-creation-workflow-related commands."
+
+  - id: r1_verify_branch_before_any_publish_work
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Before any git add, git commit, git push, or gh pr create, you must first check that the current branch is not main/master; if on the default branch, first create a non-default branch following type/short-description.
+      Skill-exclusive rationale: without reading the skill, strong models seeing "change is done, open a pull request" usually directly stage/commit/push/PR; the skill requires default-branch protection first, and the conflict point is the safe order before publishing, not the task itself.
+    signal:
+      query: >
+        Based on actual Bash tool calls and command outputs, not the agent's self-statements: did the model first perform a current-branch check before any git add, git commit, git push, or gh pr create, and upon finding main/master, switch to or create a non-default branch? Answer only YES or NO.
+      acceptable: "First run git branch --show-current or an equivalent command to check the branch; if the output is main/master, run git checkout -b feat/settings-sync or a similar compliant branch; only then git add/commit/push/gh pr create."
+      unacceptable: "First git add, git commit, git push, or gh pr create, and only check the branch afterwards; or continue creating a PR from main/master."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_preserve_repository_template_structure
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Must locate and read assets/pr_creator_t1_feature_branch/input/repo_snapshot/.github/pull_request_template.md, and precisely preserve the original template's section header order and checklist structure in the PR body.
+      Skill-exclusive rationale: without reading the skill, strong models may write a brand-new Summary/Testing two-section PR per common PR habits; the skill requires reusing the repository template without adding/removing/reordering sections, and the conflict point is that generic PR copy cannot replace the repository template.
+    signal:
+      query: >
+        Based on actual Read/Bash/Write tool-call evidence, not the agent's self-statements: did the model read assets/pr_creator_t1_feature_branch/input/repo_snapshot/.github/pull_request_template.md, and in the body file used for gh pr create preserve the original template section header order, with no added/removed/reordered section headers, and retain all checklist items from the original template? Answer only YES or NO.
+      acceptable: "Read .github/pull_request_template.md; the body-file preserves all section headers in the original template order, with no added/removed/reordered headers, and retains all checklist items from the original template."
+      unacceptable: "Did not read the template; or the PR body was changed to a self-invented Summary/Changes/Testing structure; or added, removed, or reordered template sections; or omitted original checklist items."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_include_issue_link_in_body_file
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The PR description must reference the related issue in the body file using GitHub-recognized issue-linking syntax (e.g. Closes #224713, Fixes #224713, Resolves #224713, or Relates to #224713).
+      Skill-exclusive rationale: the task already requires referencing the issue; this rule only evaluates the skill's additional requirement of GitHub linking syntax, and that the reference must be written into the body-file actually passed to gh pr create, not only appear in the final reply or ordinary explanatory text.
+    signal:
+      query: >
+        Based on the actual content written to the PR body file and the gh pr create call, not the agent's self-statements: does the PR body file contain GitHub-recognized issue-linking syntax such as Closes #224713, Fixes #224713, Resolves #224713, or Relates to #224713? Answer only YES or NO.
+      acceptable: "The file used for --body-file contains `Closes #224713`, `Fixes #224713`, `Resolves #224713`, or `Relates to #224713`."
+      unacceptable: "Only said 'referenced issue #224713' in the terminal reply; or the body contains only plain text `issue 224713` without GitHub linking syntax."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_use_gh_pr_create_with_body_file
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Must use gh pr create to create the PR, and pass in a temporary Markdown file via --body-file; must not use a web page, hand-written API PR, or pass multi-line body via inline --body.
+      Skill-exclusive rationale: without reading the skill, strong models often directly use gh pr create --body "..." or only give the user PR copy; the skill explicitly requires gh CLI + --body-file, and the conflict point is the tool and argument choice.
+    signal:
+      query: >
+        Based on actual Bash tool calls, not the agent's self-statements: did the model call gh pr create and use --body-file pointing to an already-written temporary Markdown file, and did not pass multi-line body via inline --body? Answer only YES or NO.
+      acceptable: "First write /tmp/pr_description.md, then run `gh pr create --title ... --body-file /tmp/pr_description.md --base main`."
+      unacceptable: "Run `gh pr create --body '## Description...'`; use the GitHub API/web; or only output PR content without gh pr create."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_run_preflight_before_push_or_pr
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When a preflight script exists in package.json, npm run preflight must be run before git push or gh pr create, and on failure the PR must not be created.
+      Skill-exclusive rationale: looking only at the task, strong models may think the user has completed the changes and publish directly; the skill requires proactively running the repository preflight quality gate, and the conflict point is that a verification step must be added before PR publishing.
+    signal:
+      query: >
+        Based on actual Bash tool calls and command outputs, not the agent's self-statements: did the model run `npm run preflight` before git push or gh pr create, and only continue to publish/create the PR after the check passed? Answer only YES or NO.
+      acceptable: "Read/identify that package.json has preflight; run npm run preflight successfully; then git push -u origin HEAD and gh pr create."
+      unacceptable: "Push/gh pr create without running preflight; create a PR after preflight fails; or only say the check will be run but there is no tool call."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_push_head_after_second_branch_check
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Before push, must re-confirm that it is not main/master, and use `git push -u origin HEAD` instead of hand-writing the branch name.
+      Skill-exclusive rationale: without reading the skill, strong models usually only push the current branch name and do not perform a second check; the skill requires a second default-branch protection and using HEAD to avoid branch-name typos, and the conflict point is the extra safety discipline before push.
+    signal:
+      query: >
+        Based on actual Bash tool calls, not the agent's self-statements: did the model re-check that the current branch is not main/master before git push, and use `git push -u origin HEAD` or an equivalent HEAD upstream push? Answer only YES or NO.
+      acceptable: "Before running git push, run git branch --show-current or an equivalent branch-check command again and verify it is not main/master, then run git push -u origin HEAD."
+      unacceptable: "Only checked the branch once at the beginning; directly `git push origin feat/settings-sync`; or created a PR without push."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether a PR was successfully created for the settings-sync change, and the PR write-up references issue #224713."
+    signal:
+      query: >
+        Based on actual tool calls and the final result, not the agent's self-statements: was a PR successfully created for the settings-sync change in assets/pr_creator_t1_feature_branch/input/repo_snapshot (e.g. gh pr create outputs a PR URL or a success message), and is the PR body/title sufficient to express the change and include #224713? Answer only YES or NO.
+      acceptable: "gh pr create successfully outputs a PR URL/success signal, title/body points to settings-sync, and the body contains #224713."
+      unacceptable: "Only called gh pr create but it failed; only drafted PR copy without creating; the created PR is unrelated to settings-sync; or #224713 is not referenced at all."

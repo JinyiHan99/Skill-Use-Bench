@@ -1,178 +1,175 @@
-# Skill-Use-Bench
+<div align="center">
 
-> Companion benchmark for **Skill-Use: Can LLMs Actually Use Skills in Agentic Harnesses?** (AAAI 2027).
+# Skill-Use: Can LLMs Actually Use Skills in Agentic Harnesses?
 
-Skill-Use-Bench is the data and evaluation release for the Skill-Use benchmark. It measures whether an LLM agent, on its own, can **recognize**, **retrieve**, and **follow** a skill under progressive disclosure, rather than whether a skill helps it finish a task.
+<p>
+  <a href="https://arxiv.org/abs/XXXX.XXXXX"><img alt="Paper" src="https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv&logoColor=white"></a>
+  <a href="https://huggingface.co/datasets/skill-use/skill-use-bench"><img alt="Data" src="https://img.shields.io/badge/Data-%F0%9F%A4%97%20HuggingFace-yellow"></a>
+  <a href="./LICENSE"><img alt="Code License" src="https://img.shields.io/badge/Code-MIT-blue"></a>
+  <a href="./LICENSE"><img alt="Data License" src="https://img.shields.io/badge/Data-CC%20BY%204.0-lightgrey"></a>
+</p>
 
-- **79 real-world skills**, curated from community repositories.
-- **177 executable tasks** across **9 domains**, each grounded in real files.
-- **Trajectory-based rubrics** (1:1 with tasks) mixing deterministic verifiers with an LLM judge.
-- **Isolated Docker sandbox**; full agent trajectories are logged and scored.
-- **Two harnesses**: Claude Code and Codex; 8 frontier LLMs evaluated in the paper.
+<p>
+  <b>79</b> real skills&nbsp;·&nbsp;<b>177</b> executable tasks&nbsp;·&nbsp;<b>177</b> trajectory rubrics&nbsp;·&nbsp;<b>9</b> domains&nbsp;·&nbsp;<b>2</b> agent harnesses
+</p>
 
-## What Skill-Use Measures
+</div>
 
-A skill is a structured document that specifies **when** it applies, **which** procedure to follow, and **which** tools are forbidden. Under progressive disclosure, an agent first sees only a skill's name and one-line description; the full procedure is loaded on demand.
+**Skill-Use** measures whether an LLM agent can actually *recognize*, *follow*, and *stay within* a skill under progressive disclosure. Given only a skill's name and short description, the agent has to decide the skill is relevant, retrieve its full procedure, and then apply it faithfully. Skill-Use grades the entire *trajectory*, not just the final answer, and decomposes theability into three separately observable facets:
 
-Skill-Use decomposes this ability into three facets and one gated aggregate:
 
-| Facet | What it captures |
-| --- | --- |
-| **Trigger** | Does the agent invoke the relevant skill from name + description alone? |
-| **Compliance** | Does the trajectory follow the prescribed procedure? |
-| **Boundary** | Does the trajectory avoid forbidden operations? |
-| **Skill-Use (SU)** | `trigger x (0.7 * compliance + 0.3 * boundary)`. Execution earns credit only after the skill is triggered. |
+- **Trigger** — does the agent invoke the relevant skill?
+- **Compliance** — does it faithfully follow the prescribed procedure?
+- **Boundary** — does it avoid the forbidden operations?
 
-Comp.† and Bound.† denote the same metrics restricted to triggered traces.
+<div align="center">
+  <img src="assets/pipeline.png" width="92%" alt="Skill-Use construction pipeline"/>
+  <br/><em>Data construction pipeline: 79 real skills paired with 177 executable tasks and 177 trajectory rubrics across 9 domains.</em>
+</div>
+
+## Contents
+
+- [News](#news)
+- [Highlights](#highlights)
+- [Benchmark](#benchmark)
+- [Main Results](#main-results)
+- [Repository Layout](#repository-layout)
+- [Setup](#setup)
+- [Run](#run)
+- [Score](#score)
+- [Citation](#citation)
+
+
+## Benchmark
+
+
+Skill-Use spans nine domains and pairs each skill with an in-scope executable task and a trajectory rubric. The 177 rubrics carry **1,314 scoring items** (avg. 7.4 per rubric, range 3–16), of which **882 are skill-derived** and enter Compliance and Boundary.
+
+<div align="center">
+  <img src="assets/domain_dist.png" width="94%" alt="Domain distribution and task counts"/>
+  <br/><em>(a) Domain distribution over 79 skills. (b) Skill and task counts per domain. (c) Rubric item composition by type. (d) Skill-exclusive requirements per task (mean = 4.8).</em>
+</div>
+
+## Main Results
+
+We evaluate **eight frontier LLMs** from seven families under two agent harnesses. All metrics are in `[0, 1]`. `Compliance†` and `Boundary†` are restricted to traces that trigger the target skill; `SU⁺` is the SU restricted to those triggered traces. 🏆 marks the best SU under each harness.
+
+<table>
+<thead>
+<tr>
+<th align="center">Harness</th>
+<th align="left">Model</th>
+<th align="center">Trigger</th>
+<th align="center">Comp.</th>
+<th align="center">Bound.</th>
+<th align="center"><b>SU</b></th>
+<th align="center">Comp.†</th>
+<th align="center">Bound.†</th>
+<th align="center"><b>SU⁺</b></th>
+</tr>
+</thead>
+<tbody>
+<tr><td rowspan="8" align="center"><b>Claude Code</b></td>
+<td>Claude Opus 4.7</td><td align="center">0.966</td><td align="center">0.609</td><td align="center">0.712</td><td align="center">0.599</td><td align="center">0.606</td><td align="center">0.709</td><td align="center">0.637</td></tr>
+<tr><td>Claude Opus 4.8</td><td align="center">0.940</td><td align="center"><b>0.625</b></td><td align="center">0.704</td><td align="center">0.597</td><td align="center"><b>0.638</b></td><td align="center">0.710</td><td align="center"><b>0.660</b></td></tr>
+<tr><td>🏆 GPT-5.5</td><td align="center"><b>0.972</b></td><td align="center">0.611</td><td align="center"><b>0.718</b></td><td align="center"><b>0.613</b></td><td align="center">0.625</td><td align="center"><b>0.723</b></td><td align="center">0.654</td></tr>
+<tr><td>DeepSeek-V4-Pro</td><td align="center">0.324</td><td align="center">0.439</td><td align="center">0.658</td><td align="center">0.250</td><td align="center">0.588</td><td align="center">0.699</td><td align="center">0.621</td></tr>
+<tr><td>GLM-5.1</td><td align="center">0.324</td><td align="center">0.455</td><td align="center">0.639</td><td align="center">0.267</td><td align="center"><b>0.638</b></td><td align="center">0.632</td><td align="center">0.636</td></tr>
+<tr><td>MiniMax-M3</td><td align="center">0.833</td><td align="center">0.569</td><td align="center">0.706</td><td align="center">0.501</td><td align="center">0.592</td><td align="center">0.698</td><td align="center">0.624</td></tr>
+<tr><td>Kimi-K2.6</td><td align="center">0.337</td><td align="center">0.447</td><td align="center">0.580</td><td align="center">0.190</td><td align="center">0.576</td><td align="center">0.464</td><td align="center">0.542</td></tr>
+<tr><td>Qwen3.6-Max</td><td align="center">0.446</td><td align="center">0.475</td><td align="center">0.625</td><td align="center">0.318</td><td align="center">0.590</td><td align="center">0.650</td><td align="center">0.608</td></tr>
+<tr><td rowspan="8" align="center"><b>Codex</b></td>
+<td>Claude Opus 4.7</td><td align="center">0.836</td><td align="center"><b>0.604</b></td><td align="center">0.705</td><td align="center">0.535</td><td align="center"><b>0.626</b></td><td align="center"><b>0.724</b></td><td align="center"><b>0.655</b></td></tr>
+<tr><td>🏆 Claude Opus 4.8</td><td align="center">0.881</td><td align="center">0.599</td><td align="center"><b>0.715</b></td><td align="center"><b>0.559</b></td><td align="center">0.626</td><td align="center">0.721</td><td align="center">0.654</td></tr>
+<tr><td>GPT-5.5</td><td align="center"><b>0.966</b></td><td align="center">0.486</td><td align="center">0.700</td><td align="center">0.503</td><td align="center">0.490</td><td align="center">0.709</td><td align="center">0.556</td></tr>
+<tr><td>DeepSeek-V4-Pro</td><td align="center">0.650</td><td align="center">0.496</td><td align="center">0.653</td><td align="center">0.379</td><td align="center">0.571</td><td align="center">0.701</td><td align="center">0.610</td></tr>
+<tr><td>GLM-5.1</td><td align="center">0.706</td><td align="center">0.525</td><td align="center">0.617</td><td align="center">0.421</td><td align="center">0.599</td><td align="center">0.616</td><td align="center">0.604</td></tr>
+<tr><td>MiniMax-M3</td><td align="center">0.864</td><td align="center">0.475</td><td align="center">0.632</td><td align="center">0.446</td><td align="center">0.497</td><td align="center">0.655</td><td align="center">0.544</td></tr>
+<tr><td>Kimi-K2.6</td><td align="center">0.706</td><td align="center">0.489</td><td align="center">0.623</td><td align="center">0.374</td><td align="center">0.529</td><td align="center">0.614</td><td align="center">0.554</td></tr>
+<tr><td>Qwen3.6-Max</td><td align="center">0.684</td><td align="center">0.266</td><td align="center">0.573</td><td align="center">0.238</td><td align="center">0.304</td><td align="center">0.571</td><td align="center">0.384</td></tr>
+</tbody>
+</table>
+
+> - The best model–harness pair reaches an SU of only **0.613**. Even restricted to triggered traces, the top `Comp.†` is **0.638** — models miss steps *after* they enter the skill.
+> - Boundary is higher than Compliance in almost every row: models refrain from forbidden operations more easily than they finish the prescribed workflow.
+> - Rankings shift with the harness. GPT-5.5 leads under Claude Code, Claude Opus 4.8 leads under Codex. Skill use is a property of the *model + harness*, not of the model alone.
+
 
 ## Repository Layout
 
 ```
 Skill-Use-Bench/
 ├── benchmark/
-│   ├── skill_XX_<name>/              # one directory per skill (79 total)
-│   │   ├── skill/
-│   │   │   ├── skill.md              # rewritten skill document used at eval time
-│   │   │   └── skill.original.md     # original seed for provenance
-│   │   ├── tasks/
-│   │   │   └── t*_<slug>.yaml        # task definitions (1..k per skill)
-│   │   ├── rubrics/
-│   │   │   └── rubric_t*_<slug>.yaml # trajectory rubric, 1:1 with tasks
+│   ├── <skill_name>/
+│   │   ├── skill/skill.md            # rewritten skill document (source form)
+│   │   ├── tasks/*.yaml              # task definitions
+│   │   ├── rubrics/rubric_*.yaml# trajectory rubric, 1:1 with tasks
 │   │   └── assets/<TASK_ID>/         # real files staged into the sandbox
-│   └── _scripts/
-│       ├── score_trace.py            # reference scoring engine
-│       ├── score_matrix.py           # aggregate SU / Trigger / Comp / Bound
-│       └── verify_task_success.py    # task-completion verifier
+│   ├── _mapping.json                # source_dir ↔ target_name provenance
+│   └── _scripts/                     # scoring engine (score_trace / score_matrix)
 ├── evaluation/
-│   ├── docker/                       # sandbox image + entrypoints (CC / Codex)
-│   ├── tasks/
-│   │   ├── run_task.sh               # single-task runner
-│   │   └── run_batch.sh              # batch runner
-│   └── evaluate/                     # judge protocol and post-processing
-├── docs/                             # design principles and SOPs
+│   ├── docker/                       # sandbox + task-runner images
+│   ├── tasks/                        # run_task.sh / run_batch.sh entrypoints
+│   └── evaluate/                     # host-side batch scoring helpers
+├── assets/                           # figures used by this README
 └── README.md
 ```
 
-### Task file (excerpt)
+Skill directories are keyed by the `name:` field of their `SKILL.md`. The runtime stages each skill to `.claude/skills/<name>/SKILL.md` so both Claude Code and Codex CLIs pick it up.
 
-```yaml
-# benchmark/skill_03_pdf/tasks/t1_merge_unordered.yaml
-task_id: SF03_t1_merge_unordered
-skill_id: skill_03_pdf
-level: L2
-description: |
-  I am writing a compliance review. Merge these NIST and IETF PDFs
-  in docs/ into a single PDF in the current directory ...
-initial_state:
-  files: [...]
-  binary_assets:                       # real, downloadable source URLs
-    - path: docs/rfc9110_http_semantics.pdf
-      source_url: https://www.rfc-editor.org/rfc/rfc9110.pdf
-      pages: 194
-  tools_available: [bash, read, edit, grep]
-expected_trigger: true
-```
-
-### Rubric file (excerpt)
-
-```yaml
-# benchmark/skill_03_pdf/rubrics/rubric_t1_merge_unordered.yaml
-rules:
-  - id: g1_observable_pdf_attempt        # GATE: evaluability only, not scored
-    provenance: gate
-    verifier: regex
-    signal: { pattern: '\.(pdf|PDF)\b' }
-
-  - id: r1_uses_pdftk_for_pdf_merge      # COMPLIANCE, skill-derived
-    provenance: skill
-    type: required-tool
-    exclusive: true
-    weight: 1.5
-    signal: { command_pattern: '\bpdftk\b.*\bcat\b.*\boutput\b' }
-```
-
-Every rubric item carries a `provenance` (`skill` / `generic` / `task` / `gate`) and a `type` (`required-tool`, `boundary`, `forbidden-tool`, `forbidden-arg`, ...). Only `provenance ∈ {skill, generic}` items with a scored `type` enter Compliance and Boundary; `gate` items only test whether a trace is evaluable.
-
-## Quick Start
-
-### 1. Clone
+## Setup
 
 ```bash
-git clone https://github.com/<org>/Skill-Use-Bench.git
+git clone https://github.com/JinyiHan99/Skill-Use-Bench.git
 cd Skill-Use-Bench
+
+# Expand nested-Git fixtures used by code-review-expert / git-workflows /
+# using-git-worktrees. Idempotent; safe to re-run.
+bash benchmark/_scripts/restore_fixtures.sh
+
+pip install pyyaml openai
+docker build -t skill-use-bench:latest        -f evaluation/docker/Dockerfile      .
+docker build -t skill-use-bench-runner:latest -f evaluation/docker/Dockerfile.task .
 ```
 
-### 2. Browse a skill
+Skill-Use-Bench talks to the official APIs directly — no internal gateway is required.
 
 ```bash
-ls benchmark/skill_03_pdf
-# skill/  tasks/  rubrics/  assets/  reports/
-cat benchmark/skill_03_pdf/skill/skill.md
-cat benchmark/skill_03_pdf/tasks/t1_merge_unordered.yaml
-cat benchmark/skill_03_pdf/rubrics/rubric_t1_merge_unordered.yaml
+export ANTHROPIC_API_KEY=sk-ant-...    # for --harness cc
+export OPENAI_API_KEY=sk-...           # for --harness codex / codex-native
 ```
 
-### 3. Run one task
+## Run
 
 ```bash
-# builds the sandbox image, stages assets, runs the agent, collects trace
 bash evaluation/tasks/run_task.sh \
-    --skill skill_03_pdf \
-    --task  SF03_t1_merge_unordered \
-    --model claude-opus-4.8 \
-    --harness cc               # cc | codex | codex-native
+    --skill   pdftk-server \
+    --task    SF03_t1_merge_unordered \
+    --model   claude-opus-4-8 \
+    --harness cc                # cc | codex | codex-native
 ```
 
-Outputs are written to `runs/<harness>/<model>/<task_id>/`:
+Outputs land in `runs/<harness>/<model>/<task_id>/` as `trace.jsonl`, `answer.txt`, `meta.json`. For batch evaluation, feed a JSONL manifest (`{"skill": ..., "task": ...}` per line) to `evaluation/tasks/run_batch.sh`.
 
-- `trace.jsonl`           – normalized agent trajectory
-- `gateway_logs/`         – raw LLM I/O, latency, budget
-- `meta.json`             – exit code and wall-clock
+| Harness         | Channel                                                        |
+| :---            | :---                                                           |
+| `cc`            | Claude Code, native progressive disclosure                |
+| `codex`         | Codex, skill body preloaded into `.codex/instructions.md`      |
+| `codex-native`  | Codex, skill installed under `$CODEX_HOME/skills/` with metadata only |
 
-### 4. Score a trace
+## Score
 
 ```bash
 python benchmark/_scripts/score_trace.py \
-    --trace runs/cc/claude-opus-4.8/SF03_t1_merge_unordered/trace.jsonl \
-    --rubric benchmark/skill_03_pdf/rubrics/rubric_t1_merge_unordered.yaml \
-    --out    runs/cc/claude-opus-4.8/SF03_t1_merge_unordered/score.json
-```
+    --trace  runs/cc/<model>/<task_id>/trace.jsonl \
+    --rubric benchmark/<skill_name>/rubrics/rubric_<task>.yaml \
+    --out    runs/cc/<model>/<task_id>/score.json \
+    --judge-model gpt-5
 
-### 5. Aggregate the leaderboard
-
-```bash
 python benchmark/_scripts/score_matrix.py --runs-root runs/ --out leaderboard.csv
 ```
 
-`score_matrix.py` emits per-model **Trigger**, **Compliance**, **Boundary**, and gated **SU**, matching the paper.
-
-## Reference Numbers
-
-Paper results (best per harness, over 79 skills / 177 tasks):
-
-| Harness      | Best model         | Trigger | Comp.† | Bound.† |   SU   |
-| ------------ | ------------------ | :-----: | :----: | :-----: | :----: |
-| Claude Code  | GPT-5.5            |  0.972  | 0.625  |  0.740  | **0.613** |
-| Codex        | Claude Opus 4.8    |  0.966  | 0.626  |  0.739  |  0.594  |
-
-Full per-model table, harness-delta correlations, and category-level Compliance / Boundary are in the paper's main results and appendix.
-
-## Extending the Benchmark
-
-Adding a new skill follows the pipeline in `docs/`:
-
-1. Seed a skill from a community repo, rewrite it against the constraints in `docs/skill_rewrite_design_principles.md`.
-2. Author 1–k executable tasks with real assets (`docs/task_construction_rules.md`).
-3. Author a trajectory rubric (`docs/rubric_design_principles.md`), one item per verifiable requirement.
-4. Run the three-stage validation: masked-skill screening, multi-agent adversarial review, end-to-end dry-run.
-
-`docs/BATCH_SYNTHESIS_SOP.md` walks through the full seven-stage SOP.
-
-## License
-
-- **Code** (`benchmark/_scripts/`, `evaluation/`): MIT.
-- **Skill documents, tasks, rubrics**: CC BY 4.0.
-- **Third-party assets** under `benchmark/*/assets/`: retain their original licenses; source URLs are listed in each task's `binary_assets.source_url`.
+`score_matrix.py` emits per-model Trigger, Compliance, Boundary, gated SU, plus the triggered-only variants `Comp.†`, `Bound.†`, and `SU⁺`.
 
 ## Citation
 
@@ -180,11 +177,8 @@ Adding a new skill follows the pipeline in `docs/`:
 @inproceedings{skilluse2027,
   title     = {Skill-Use: Can LLMs Actually Use Skills in Agentic Harnesses?},
   author    = {Anonymous},
-  booktitle = {Proceedings of AAAI},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
   year      = {2027}
 }
 ```
 
-## Acknowledgments
-
-Skills are curated from public community repositories; each `skill.original.md` preserves the seed for attribution. We thank the maintainers of Claude Code and OpenAI Codex for the harness specifications that made cross-harness evaluation possible.

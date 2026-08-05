@@ -1,0 +1,208 @@
+# Rubric for SF36_t1_exam_block_sequencing
+# Skill: mip-solver-and-solution-audit
+# Task: Assign 24 exam blocks to 24 time slots minimizing student burden
+# Instance: 24 blocks × 24 slots, solver time limit 120s
+
+rules:
+  # ── GATE ──
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: state-diff
+    weight: 0
+    signal:
+      file: "output/schedule.csv"
+      file_must_contain: "\\S"
+    spec: "[GATE] A non-empty output/schedule.csv finally exists, showing the model produced an evaluable schedule artifact; any Bash or self-description is not accepted as pass evidence."
+
+  # ── Skill-Following rules (scored) ──
+
+  - id: r1_pyscipopt_discovery
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The skill requires checking whether PySCIPOpt is available before abandoning the MIP solver route; if PySCIPOpt is importable and no better solver is available for the task/environment, it should be prioritized.
+      Skill-exclusive rationale: Without reading the skill, a strong model usually directly chooses the solver it is familiar with (e.g., OR-Tools/Gurobi/PuLP) or switches to a heuristic when that solver is unavailable, and does not additionally prioritize checking PySCIPOpt.
+    signal:
+      query: >
+        Based on actually executed code and command output, not agent self-description, comments, pip install logs, traceback text, or unexecuted scripts: did the model proactively check pyscipopt availability before choosing a solver or abandoning the MIP route?
+        A written script counts as evidence only if it is clearly executed later in the trace. Accept importlib.util.find_spec("pyscipopt"), import pyscipopt, from pyscipopt import Model/quicksum followed by successful modeling/solving, and equivalent checks.
+        Answer YES if executed code proactively checked or directly imported PySCIPOpt before choosing another solver/fallback, including successful direct use of `from pyscipopt import Model`.
+        Answer NO if PySCIPOpt only appears in comments, install logs, exception text, an unexecuted script, or was never checked before using another solver or a heuristic fallback.
+      acceptable: "The executed script first runs importlib.util.find_spec('pyscipopt'); or try: from pyscipopt import Model, quicksum ... except Exception ...; or successfully executes from pyscipopt import Model and uses Model() to model and solve."
+      unacceptable: "Directly from ortools.sat.python import cp_model, or directly writing greedy/local search, with no actually executed pyscipopt import/find_spec in the trace."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_a", "reviewer_b", "reviewer_c"]
+      consensus: high
+
+  - id: r2_mip_solver_used
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The skill requires that for tasks requiring integer programming, an installed MIP solver or exact mathematical-optimization solver must be used to build and solve the integer/constraint-optimization model; pure greedy search, local search, swap heuristics, or advisory scripts must not be the main method.
+      The core signal is not "mentions a solver" but that the data in the final output/schedule.csv comes from a solver incumbent/solution; if a pure heuristic fallback overwrites the final output after solver failure, it does not count as following the skill.
+      Skill-exclusive rationale: Without reading the skill, a strong model may naturally choose heuristics for complex combinatorial optimization; the skill explicitly requires solver/incumbent discipline.
+    signal:
+      query: >
+        Based on actually executed code, command output, and the code path that writes the final output/schedule.csv, not agent self-description, comments, or unexecuted scripts: did the model actually use a MIP/CP/math-optimization solver to build and solve the model, and extract the final schedule from the solver solution/incumbent?
+        Accept PySCIPOpt/SCIP (Model, addVar, addCons, optimize, getBestSol/getSolVal/getVal), OR-Tools CP-SAT (CpModel, NewBoolVar, Add, Solve, solver.Value), Gurobi (Model, addVar/addConstr, optimize, X), PuLP/CBC, and other exact/mathematical-optimization APIs.
+        A written script counts as evidence only if it is clearly executed later in the trace. Accept extracting a feasible solution from the incumbent after a time limit; proving optimality is not required.
+        Answer YES if executed code creates and solves a MIP/CP/math-optimization model and the final output/schedule.csv is primarily derived from solver variable values/incumbent.
+        Answer NO if only heuristics are used as the main method, or a solver is attempted but the final schedule is generated/overwritten by a pure heuristic fallback rather than solver extraction.
+      acceptable: "Executed code has CpModel(); NewBoolVar(...); model.Add(...); solver.Solve(model); writes output/schedule.csv with solver.Value(x); or after PySCIPOpt optimize, extracts the incumbent with getSolVal/getVal."
+      unacceptable: "Code only uses random.shuffle + swap/local search to write schedule.csv; or after solver timeout/error, discards the incumbent and uses greedy to generate the final schedule."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_a"]
+      consensus: high
+
+  - id: r3_independent_evaluator
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The skill requires building an independent pure-evaluator code path that depends only on input data and the final schedule output, not on solver variables; use it to write metrics/audit, and cross-validate numerically against the solver objective.
+      Skill-exclusive rationale: Without reading the skill, a strong model usually directly trusts the solver objective or derives metrics from solver variables, and does not additionally build an independent evaluator to compare against the solver objective.
+    signal:
+      query: >
+        Based on actually executed code and command output, not agent self-description, comments, or unexecuted scripts: did the model actually execute an independent function/module/pure code path that recomputes objective/metrics from the input data and the final schedule, and numerically compares that recomputed objective with the solver objective/incumbent objective within a tolerance?
+        The independent evaluator must not reference solver model/sol/var objects or solver extraction APIs like model.getSolVal/solver.Value; it should depend only on input data and the schedule artifact/data structure.
+        A written script counts as evidence only if it is clearly executed later in the trace.
+        Answer YES if a separate pure evaluation path is actually executed to recompute metrics from the final schedule and compare against the solver objective within a tolerance.
+        Answer NO if metrics come only from model.getObjVal()/solver expressions, the evaluator references solver objects, no solver-vs-recomputed comparison occurs, or the evaluator is defined but never executed.
+      acceptable: "def evaluate_schedule(schedule, data): ...; metrics = evaluate_schedule(final_schedule, data); assert abs(metrics['objective'] - solver_obj) <= 1e-6. The function does not reference model/sol/var internally."
+      unacceptable: "metrics = {'objective': model.getObjVal()}; or evaluate_schedule internally calls model.getSolVal/solver.Value; or the function is written but not run and compared."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_a", "reviewer_b"]
+      consensus: high
+
+  - id: r4_roundtrip_verification
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The skill requires that after writing the final output/schedule.csv, the final submitted file must be reloaded from disk and re-verified with the independent pure evaluator to ensure the disk artifact is consistent with the reported metrics.
+      It is not required to happen after metrics.json is written; a compliant flow can be "write schedule -> reload schedule -> evaluate/compare -> write metrics/report/audit". The comparison should allow a reasonable numeric tolerance, not only hard equality.
+      Skill-exclusive rationale: Without reading the skill, a strong model usually computes in memory and writes the file directly, and does not read the final disk artifact back as the source of truth and recompute.
+    signal:
+      query: >
+        Based on actually executed code and command output, not agent self-description, comments, or unexecuted scripts: after writing the final output/schedule.csv, did the model read that schedule file back from disk, run the independent/pure evaluator on the reloaded data to recompute metrics/objective, and check consistency against the original metrics/recomputed values (tolerance allowed)?
+        This reload+evaluate may happen before writing metrics.json or before final termination; the key is that it reads the final submission path output/schedule.csv or an equivalent final path, not just reusing the in-memory schedule.
+        A written script counts as evidence only if it is clearly executed later in the trace.
+        Answer YES if executed code writes final schedule.csv, reloads that disk file, reruns the pure evaluator, and checks consistency within tolerance.
+        Answer NO if the code only writes files, only evaluates an in-memory schedule, reloads a different/non-final file, or defines roundtrip code but never executes it.
+      acceptable: "After writing output/schedule.csv, execute pd.read_csv('output/schedule.csv'); rt = evaluate_schedule(reloaded, data); assert abs(rt['objective'] - metrics['objective']) < 1e-6; writing metrics.json afterward is also fine."
+      unacceptable: "After writing schedule.csv/metrics.json, just end; or only assert evaluate_schedule(in_memory_schedule) == metrics; or the reloaded file is not the final output/schedule.csv."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_a", "reviewer_b", "reviewer_c"]
+      consensus: high
+
+  - id: r5_solver_certificate_reporting
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The skill requires honestly reporting the solver certificate in output/formulation.md and/or output/report.md: solver status, incumbent objective, time limit; if the solver can provide it, also report best bound or MIP gap, or state unavailable if not available. Non-optimal status must not be claimed as optimal.
+      Skill-exclusive rationale: Without reading the skill, a strong model usually only reports the final objective value and schedule, and does not record status/bound/gap/time-limit in detail, and may mislabel a time-limited incumbent as optimal.
+    signal:
+      query: >
+        Look only at the final written output/formulation.md and/or output/report.md contents and actual solver output evidence; do not fill in based on agent self-description: does the report include solver status, incumbent objective, time limit, and when the solver can provide it, best bound or MIP gap (or an explicit unavailable/not-provided note when unavailable), and is it honest about non-optimal/time-limited status?
+        Answer YES if the written report/formulation includes status, incumbent objective, time limit, and available bound/gap information or an explicit unavailable note, and is honest about non-optimal/time-limited status.
+        Answer NO if it omits status/incumbent/time limit, omits available bound/gap without noting unavailable, or falsely claims optimality when solver status/gap does not certify optimal.
+      acceptable: "report.md/formulation.md states solver=SCIP, status=time limit, incumbent objective=42.5, best bound=38.2 or gap=10.1%, time limit=120s, solution is a feasible incumbent not proven optimal."
+      unacceptable: "Only writes Objective: 42.5; or solver status is timelimit/gaplimit but writes found optimal solution; or does not report time limit/status at all."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_a", "reviewer_b", "reviewer_c"]
+      consensus: high
+
+  - id: r6_formulation_detail
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/AUX — not counted toward SF] Whether output/formulation.md describes the objective and constraints per the task requirements, and includes auditable variable/assignment-uniqueness/minimize/weight statements. This rule records artifact quality and is not the main skill-following score.
+    signal:
+      file: "output/formulation.md"
+      file_must_contain:
+        - "(?i)(variable|decision variable|binary|x_?\\{|x\\[|x_)"
+        - "(?i)(each block|each item|one-to-one|exactly once|assigned to exactly one|unique)"
+        - "(?i)(minimize|minimization|minimise|minimisation)"
+        - "(?i)(objective|weight|eve.*morn|back-to-back|triple|three-in-four|pressure)"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_a"]
+      consensus: medium
+
+  - id: r7_audit_json_fields
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] The skill requires the final audit.json to semantically reflect solver objective vs independent recomputation and roundtrip consistency, not just field names. solver_objective and recomputed_objective should be valid numbers, abs_diff should approximately equal their absolute difference, and roundtrip_match should indicate that the reload+evaluate consistency of the final output/schedule.csv passed.
+      Skill-exclusive rationale: The task lists audit.json but does not naturally imply filling in real values consistent with solver-vs-recomputed and roundtrip audit; this semantics comes from the skill workflow. Down-weighted due to partial overlap with r3/r4.
+    signal:
+      query: >
+        Look only at the actual contents of the final output/audit.json and the actual executed recomputation/roundtrip evidence, not agent self-description: does audit.json semantically consistently record solver_objective, recomputed_objective, abs_diff, and roundtrip_match? Require solver_objective and recomputed_objective to be valid numbers, abs_diff to approximately equal their absolute difference (small decimal tolerance allowed), and roundtrip_match to be boolean true corresponding to the final output/schedule.csv reload+evaluate passing.
+        Answer YES if final audit.json contains valid numeric solver/recomputed objectives, a mathematically consistent abs_diff, and roundtrip_match true backed by the actual final-artifact check.
+        Answer NO if fields are missing/null/placeholders/non-numeric, abs_diff is inconsistent, roundtrip_match is missing/false/not boolean, or values are unsupported by the executed audit workflow.
+      acceptable: "audit.json: {\"solver_objective\": 42.5, \"recomputed_objective\": 42.5, \"abs_diff\": 0.0, \"roundtrip_match\": true}, and the trace actually executed independent recomputation and final schedule reload."
+      unacceptable: "audit.json only has field names but values are null/placeholders; abs_diff is inconsistent with the two objectives; roundtrip_match is the string 'yes' or false; or there is no actual roundtrip evidence."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_a", "reviewer_b", "reviewer_c"]
+      consensus: medium
+
+  # ── Task completion record (not scored) ──
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Data-driven feasibility check based on the final output/schedule.csv and instance.json: 24 rows, slot set matches instance all_blocks, block set matches instance all_blocks, and all large_blocks are assigned to early_slots. Prefer the deterministic verifier_summary.json generated by eval_task_completion.py.
+    signal:
+      file: "output/verifier_summary.json"
+      file_must_contain:
+        - '"solution_feasibility"'
+        - '"is_feasible"\s*:\s*true'
+        - '"num_schedule_rows"\s*:\s*24'
+        - '"expected_num_slots"\s*:\s*24'
+        - '"num_expected_blocks"\s*:\s*24'
+
+  - id: tc2_metrics_exist
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/metrics.json exists and contains the 6 real fields required by the task, all valid numbers: objective, eve_morn_b2b_count, other_b2b_count, same_day_triple_count, cross_day_triple_count, z_three_in_four_count.
+    signal:
+      file: "output/metrics.json"
+      file_must_contain:
+        - '"objective"\s*:\s*-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?'
+        - '"eve_morn_b2b_count"\s*:\s*-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?'
+        - '"other_b2b_count"\s*:\s*-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?'
+        - '"same_day_triple_count"\s*:\s*-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?'
+        - '"cross_day_triple_count"\s*:\s*-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?'
+        - '"z_three_in_four_count"\s*:\s*-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?'

@@ -1,0 +1,139 @@
+rubric_id: skill_101_git_workflows_t4_port_hotfix_to_stable
+objective: Evaluate whether the model uses the git-workflows selective cherry-pick and conflict-resolution workflow to linearly port a single target README fix from hotfix to stable.
+rules:
+  - id: g1_observable_port_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace contains an observable Git port or target hotfix commit localization action.
+    signal:
+      pattern: >-
+        (?s)(?:\bBash\b.{0,800}\bgit\b.{0,200}\b(?:cherry-pick|merge)\b|\bBash\b.{0,800}\bgit\b.{0,200}\b(?:log|show)\b.{0,200}\bhotfix/readme-clarity\b)
+
+  - id: r1_cherry_pick_target_typo_commit_not_whole_branch
+    type: required-tool
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Identify the target README fix commit from hotfix/readme-clarity, and use cherry-pick to port that single commit, rather than merge/squash the entire branch or cherry-pick the branch tip.
+      skill-exclusive rationale: looking only at the task description, a strong model may directly merge hotfix/readme-clarity or cherry-pick the branch tip, causing subsequent cleanup to enter stable together; git-workflows explicitly provides cherry-pick to copy a specific commit across branches. Default practice X = merge / take the whole branch, skill requires Y = select target commit for cherry-pick, conflict point Z = the hotfix branch contains later cleanup commits that do not belong to the support-line release.
+    signal:
+      query: |
+        Based on actual Bash tool calls and command outputs — not the agent's self-description: did the model first identify the target README typo-fix/wording-fix commit on hotfix/readme-clarity, then execute git cherry-pick on that single non-tip target commit?
+        Answer YES if the trace shows log/show inspection of hotfix commits and cherry-pick of the commit identified by its typo-fix message or non-tip hash, without importing the later cleanup commit.
+        Answer NO if it runs git merge hotfix/readme-clarity, git cherry-pick hotfix/readme-clarity, cherry-picks the branch tip/later cleanup commit, or otherwise imports the cleanup commit. Hashes may be used as supporting evidence but are not required.
+      acceptable: "git log hotfix/readme-clarity shows a README typo-fix commit before a later cleanup; git cherry-pick <that non-tip typo-fix commit>."
+      unacceptable: "git merge hotfix/readme-clarity, git cherry-pick hotfix/readme-clarity, or cherry-pick of the tip cleanup commit."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_follow_cherry_pick_conflict_continue_workflow
+    type: order
+    provenance: skill
+    locus: trace
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] After a cherry-pick conflict appears, resolve the file, stage the resolved content, then git cherry-pick --continue to complete the interrupted operation.
+      skill-exclusive rationale: without reading the skill, a model may manually edit README then do an ordinary git commit, leaving CHERRY_PICK_HEAD, or stop midway; the git-workflows cherry-pick conflict chapter explicitly requires resolve → stage → cherry-pick --continue. Default practice X = treat the conflict as an ordinary edit/commit, skill requires Y = continue the original cherry-pick, conflict point Z = the interrupted operation must be properly finalized.
+    signal:
+      pattern: >-
+        (?s)\bBash\b.{0,800}\bgit\s+add\s+(?:README|\.|-u)\b.{0,2000}\bBash\b.{0,800}\bgit\s+cherry-pick\s+--continue\b
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_no_merge_topology
+    type: boundary
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The result should be a completed linear port commit on stable; merge/whole-branch import must not be used and no merge commit should be produced.
+      skill-exclusive rationale: without reading the skill, merging the branch is the natural approach and even seems simpler; the git-workflows cherry-pick goal is to copy a specific commit to the current branch, keeping it linear. Default practice X = merge / take the branch tip, skill requires Y = single-parent cherry-pick port, conflict point Z = the support line only needs one README fix.
+    signal:
+      query: |
+        Based on actual Git commands and outputs — not the agent's self-description: does the final stable avoid merge/whole-branch import and present as a single-parent cherry-pick-style linear port?
+        Answer YES if evidence such as git cherry-pick of the target commit, git log --parents -1 HEAD, git log --graph, and absence of git merge shows no merge commit/whole-branch import.
+        Answer NO if git merge was used, a merge commit was created, the branch tip was imported, or the evidence shows whole hotfix branch topology/content was brought in.
+      acceptable: "git cherry-pick <target typo-fix commit> completes; git log --parents -1 HEAD shows a single parent on stable."
+      unacceptable: "git merge hotfix/readme-clarity, a merge commit in git log, or cherry-pick/import of hotfix branch tip."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The final README content satisfies the support-line requirements: preserves stable policy, includes hotfix wording, has no old typo, no conflict markers, and no unrelated cleanup.
+    signal:
+      file: assets/SF101_t4_port_hotfix_to_stable/input/repo/README
+      file_must_contain:
+        - 'Stable branch keeps the classic greeting for the support line\.'
+      file_must_not_contain:
+        - '\bsuport\b'
+        - 'Support handoff note'
+        - '(<<<<<<<|=======|>>>>>>>)'
+
+  - id: tc2_conflict_resolution_result
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The conflict-resolution result preserves stable semantics, includes the hotfix wording fix, and excludes cleanup/conflict markers.
+    signal:
+      file: assets/SF101_t4_port_hotfix_to_stable/input/repo/README
+      file_must_contain:
+        - 'Stable branch keeps the classic greeting for the support line\.'
+      file_must_not_contain:
+        - '\bsuport\b'
+        - 'Support handoff note'
+        - '(<<<<<<<|=======|>>>>>>>)'
+
+  - id: tc3_clean_repo_state
+    type: task-completion
+    provenance: task
+    locus: trace
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The repository is finally conflict-free, with no in-progress cherry-pick/merge, and a clean working tree.
+    signal:
+      judge_context_window:
+        - serialized_steps
+        - tool_results_first_n: 8
+      query: |
+        Based on actual Bash tool calls and their outputs — not the agent's self-description: does the final state show no CHERRY_PICK_HEAD/merge state, no conflict files, and git status --porcelain is empty or git status shows clean? Answer YES or NO.
+      acceptable: "After git cherry-pick --continue, git status --porcelain has no output, or git status shows working tree clean."
+      unacceptable: "Still has unmerged paths, CHERRY_PICK_HEAD/MERGE_HEAD, conflict markers, uncommitted changes, or no final-state evidence."
+
+  - id: tc4_stable_branch_advanced_from_initial
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The stable branch actually produced a port commit and cannot stay at the initial stable commit; this avoids a "do nothing" pass when the asset's initial README already contains the correct wording.
+    signal:
+      file: assets/SF101_t4_port_hotfix_to_stable/input/repo/.git/refs/heads/stable
+      file_must_not_contain: '^ca162068adaf215aeddcf690e37d89aa8a4ebc6f$'

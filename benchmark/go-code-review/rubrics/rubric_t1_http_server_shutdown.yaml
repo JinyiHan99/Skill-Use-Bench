@@ -1,0 +1,119 @@
+task_id: go_code_review_t1_http_server_shutdown
+skill_id: go-code-review
+rules:
+  - id: g1_observable_review_report_write
+    type: task-completion
+    provenance: gate
+    verifier: state-diff
+    weight: 0
+    spec: "[GATE — not counted toward SF] The final review-report file exists and is non-empty; this gate only confirms there is an evaluable artifact and is not used as skill-following evidence."
+    signal:
+      file: "output/go_code_review_t1_review.md"
+      file_must_contain: "(?s)\\S"
+
+  - id: r1_pre_review_checks_before_manual_review
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    locus: trace
+    judge_context_window: [serialized_steps]
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Before manually reviewing diffs/file-by-file, Go automated pre-review checks must be run first: preferentially the skill-pointed scripts/pre-review.sh, also accepting equivalent gofmt + go vet (may include golangci-lint) attempts; missing tools or command failure does not deduct this flow score.
+      skill-exclusive rationale: without reading the skill, a strong model may directly unpack and read the patch then write the review, or temporarily run tests during the review; the skill requires doing pre-review checks before entering manual review. The conflict point is that the checks must occur before substantive review, not as an after-the-fact supplement or only self-stated in the report.
+    signal:
+      query: >
+        Based on actual tool-call evidence (Bash/Read/Edit/Write calls and command outputs), not the agent's self-description or plan: before opening and substantively reviewing the change.patch diff content or Go source files, did the agent attempt to run scripts/pre-review.sh, or equivalently run Go pre-review checks such as gofmt and go vet? Unpacking, ls/Glob, reading metadata, reading skill resources or templates does not count as starting manual review; reading and analyzing the diff content of change.patch or Go source code such as _examples/graceful/main.go counts as entering manual review. Command failure, missing golangci-lint, or missing Go toolchain still counts as YES, as long as there is a real attempt first. Answer YES or NO only.
+      acceptable: "First Bash unpack, list directories or read skill resources, then run bash skill/scripts/pre-review.sh ./... in the repo; or first run gofmt -d . and go vet ./..., then read the change.patch diff content and write the review."
+      unacceptable: "First reads/analyzes change.patch and _examples/graceful/main.go then runs go vet; or only writes 'pre-review run' in the final report without a real tool call."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_route_to_web_server_reference
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    locus: trace
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] This change simultaneously involves HTTP server, concurrency, context, logging, error handling, and shutdown behavior; per Resource Routing, references/WEB-SERVER.md should be read before review.
+      skill-exclusive rationale: without reading the skill, a strong model may also discuss graceful shutdown, context, and log.Fatal based on Go experience; the skill additionally requires reading dedicated reference material when hitting this scenario. The conflict point is that one cannot rely only on general knowledge to generate similar opinions.
+    signal:
+      pattern: "(?is)(?:(?:tool[:=]\\s*[\"']?Read[\"']?|recipient_name[\"']?\\s*:\\s*[\"']functions\\.Read[\"']).{0,2000}?(?:file_path|path)[\"']?\\s*[:=]\\s*[\"'][^\"']*references/WEB-SERVER\\.md[\"']|(?:tool[:=]\\s*[\"']?Bash[\"']?|recipient_name[\"']?\\s*:\\s*[\"']functions\\.Bash[\"']).{0,2000}?command[\"']?\\s*[:=]\\s*[\"'][^\"']*references/WEB-SERVER\\.md[^\"']*[\"'])"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_use_review_template_severity_groups
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The review report should apply the three-section severity structure of assets/review-template.md: Must Fix, Should Fix, Nits.
+      skill-exclusive rationale: without reading the skill, a strong model may output an ordinary bullet list, summary/suggestions/conclusion, or use arbitrary severity labels; the skill explicitly specifies the Must Fix / Should Fix / Nits template. The conflict point is that the output structure must use that template rather than a generic review format.
+    signal:
+      file: "output/go_code_review_t1_review.md"
+      file_must_contain: "(?s)## Must Fix[\\s\\S]*?## Should Fix[\\s\\S]*?## Nits"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_findings_include_rule_name_and_line_reference
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Each valid review finding should include a checklist rule name and a specific file line reference.
+      skill-exclusive rationale: without reading the skill, a strong model may give file names, code snippets, or generalized suggestions; the skill requires using a rule name (e.g. Goroutine lifetimes, Contexts, Use slog, Handle errors, Don't panic) + a verifiable path:line location. The conflict point is that one cannot only write a natural-language problem description.
+    signal:
+      query: >
+        Only inspect the report content finally written to output/go_code_review_t1_review.md, not the agent's description of intent: does each valid Must Fix/Should Fix/Nits finding in the report simultaneously include a rule name from the Go Code Review Checklist or an obviously equivalent variant, and give a specific file line reference? Source line-number examples include _examples/graceful/main.go:28, _examples/graceful/main.go:36, _examples/graceful/main.go:40; patch line numbers such as change.patch:60-61 or change.patch:73-78 are also accepted. Empty sections, Automated checks, summary/conclusion paragraphs can be ignored; if any valid finding lacks either element, answer NO. Answer YES or NO only.
+      acceptable: "- **[Goroutine lifetimes]** (File: `_examples/graceful/main.go:28`) ...; or - **[Contexts]** (`change.patch:73-78`) ..."
+      unacceptable: "- Background goroutine calls log.Fatal and should be changed. (no rule name or no path:line)"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_validate_real_http_shutdown_findings
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The final review report must not contain generalized or hallucinated findings that cannot be supported by specific lines of the patch/source; for HTTP server shutdown-related opinions, retained findings should anchor to real added/changed lines.
+      skill-exclusive rationale: without reading the skill, a strong model may list generic shutdown or logging suggestions based on experience; the skill requires re-checking that each finding really exists and is supported by specific lines. The conflict point is that the report must not contain best practices detached from the patch.
+    signal:
+      query: >
+        Only look at the report content finally written to output/go_code_review_t1_review.md, not the agent's self-description: are the main findings in the report all anchored to real positions in the patch/source (e.g. the goroutine/log.Fatal at _examples/graceful/main.go:28, context.WithTimeout(context.Background()) at _examples/graceful/main.go:36, server.Shutdown at _examples/graceful/main.go:40, or corresponding change.patch:60-61, change.patch:73-78), rather than generalized HTTP server suggestions without specific line support or hallucinated findings about code not present in the bundle? Answer YES if findings are line-specific and patch-grounded; Answer NO if they are generic or about code not present in the bundle.
+      acceptable: "Points out that log.Fatal in the goroutine at _examples/graceful/main.go:28 will directly exit the process, or the shutdown timeout/context lifecycle issues at _examples/graceful/main.go:36/_examples/graceful/main.go:40; corresponding change.patch line numbers are also accepted."
+      unacceptable: "Generic statement like 'recommend using context and structured logging for graceful shutdown', without locating specific lines or symbols in the patch."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] Generate a pre-release Go code review report, with content centered on the graceful shutdown change."
+    signal:
+      file: "output/go_code_review_t1_review.md"
+      file_must_contain: "(?is)(?:_examples/graceful/main\\.go|change\\.patch):\\d+"

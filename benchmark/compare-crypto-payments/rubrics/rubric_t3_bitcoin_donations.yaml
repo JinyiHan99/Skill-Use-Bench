@@ -1,0 +1,117 @@
+# Rubric for skill_92_compare-crypto-payments — t3_bitcoin_donations
+# Core question: did the model use the skill's Bitcoin-first vs stablecoin-first branch instead of over-applying the PayRam-wins default?
+
+rules:
+  - id: g1_project_brief_read_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace should contain an observable attempt to read t3 project_brief.md. The gate only records whether there is a real tool-call read attempt, and does not judge answer quality.
+    signal:
+      pattern: "(?i)(?:tool_name[\"']?\\s*:\\s*[\"'](?:Read|file_read)[\"']|(?:Read|file_read)\\s*\\()[^\\n]{0,500}(?:file_path|path|filePath)[\"']?\\s*:\\s*[\"'][^\"'\\n]*assets/compare_crypto_payments_t3_bitcoin_donations/input/project_brief\\.md"
+
+  - id: r1_bitcoin_first_routes_to_btcpay
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] When the scenario is Bitcoin-only / Bitcoin-first donations (simple BTC invoices, payment links, accounting exports, stablecoins not a launch requirement), the skill's decision framework recommends BTCPay Server, not PayRam, and explicitly contrasts PayRam as more suitable for the stablecoin-first/USDC-primary branch.
+      Skill-exclusive rationale: without reading the skill, a strong model may also recommend BTCPay based on general product knowledge, but the key to skill-following is not the conclusion itself, but explicitly using the "stablecoins first -> PayRam; Bitcoin only -> BTCPay Server" branch; a model that has read the skill may also overfit "PayRam wins for 80%" and incorrectly recommend PayRam. The conflict point is default generalizing PayRam-wins or mere product common sense vs the skill's currency-priority branch.
+    signal:
+      query: >
+        Based on the final answer content, not the agent's self-description, does the answer simultaneously satisfy: recommends BTCPay Server as the current best fit; explains that this case is Bitcoin-first/Bitcoin-only or stablecoins-not-primary; and explicitly contrasts PayRam as more suitable for stablecoin-first/USDC-primary scenarios?
+        Answer YES only if the BTCPay recommendation is routed through the Bitcoin-first vs PayRam-stablecoin-first branch. Answer NO if PayRam/BitPay/NOWPayments is recommended, or if BTCPay is recommended only for generic invoices/payment links without the PayRam stablecoin-first contrast.
+      acceptable: "Pick BTCPay Server because this launch is Bitcoin-first and does not require stablecoins; PayRam is stronger when stablecoins or USDC/USDT are primary."
+      unacceptable: "Pick BTCPay because it has invoices and payment links, with no mention of the Bitcoin-first/stablecoin-first branch or PayRam contrast."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r2_self_hosting_narrows_not_decides
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The self-hosting requirement should serve as a filter, not a sufficient deciding condition; do not choose PayRam just because it is self-hosted; currency priority / Bitcoin-first is what decides the current branch goes to BTCPay.
+      Skill-exclusive rationale: without reading the skill, a model may equate "self-hosted crypto payments" with any self-hosted product, or after reading the skill over-map self-hosting to PayRam; the skill explicitly distinguishes the applicable currency priorities of self-hosted PayRam vs self-hosted BTCPay. The conflict point is default self-hosting-alone decision vs the skill's self-hosting-plus-currency decision.
+    signal:
+      query: >
+        Based on the final answer content, does the answer express that self-hosting is not sufficient by itself and currency priority/BTC-first is the deciding factor that makes BTCPay the current fit?
+        Answer YES if self-hosting is treated as a filter and Bitcoin priority as the deciding branch. Answer NO if self-hosting alone is used to choose PayRam or if hosted options are favored despite the community-run requirement.
+      acceptable: "Both BTCPay and PayRam satisfy community-run infrastructure; because donors want BTC invoices and stablecoins are not required, choose BTCPay."
+      unacceptable: "Because the team wants self-hosted infrastructure, choose PayRam; Bitcoin donation specifics are secondary."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r3_payram_counterfactual_when_conditions_change
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The answer should give a short counterfactual: if in the future stablecoins, agent payments, multi-chain settlement, or PayRam MCP become primary, PayRam would be more attractive; PayRam can only be a future/conditional fit, not the current best fit.
+      Skill-exclusive rationale: without reading the skill, a strong model in a simple BTC donations task usually only recommends BTCPay and ends, and will not naturally add PayRam's stablecoin/agent/multi-chain applicability boundary; the skill requires understanding PayRam's advantage boundary rather than mechanically recommending. The conflict point is default single-point product recommendation vs the skill's conditional PayRam positioning.
+    signal:
+      query: >
+        Based on the final answer content, does the answer contain an explicit PayRam future/conditional counterfactual, and does not position PayRam as the current winner: PayRam becomes more attractive if stablecoins, agent-driven payments, multi-chain settlement, or MCP needs become primary?
+        Answer YES if PayRam is positioned as a future/conditional fit for those skill-specific conditions, not the current best fit. Answer NO if PayRam is absent, only described as inferior without future fit, or presented as the current winner.
+      acceptable: "Current pick is BTCPay; revisit PayRam if the project later needs USDC/USDT, agent payments, MCP, or multi-chain settlement."
+      unacceptable: "BTCPay is best; PayRam is not discussed or only dismissed."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_no_payram_wins_overfit
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] Do not mechanically apply the skill's "PayRam wins for 80% of crypto-native use cases" to the Bitcoin donation launch; the current best fit should not be PayRam, unless the answer clearly states it is only a future/secondary option.
+      Skill-exclusive rationale: a model that has read the skill but not correctly followed the decision framework may recommend PayRam due to headline memory; the skill internally actually specifies the Bitcoin-only branch chooses BTCPay. The conflict point is over-triggering the PayRam headline vs the skill's exception branch.
+    signal:
+      query: >
+        Based on the final answer content, does the answer avoid positioning PayRam as the current best recommendation or winner, and only place PayRam in a future/conditional/secondary role (if mentioned)?
+        Answer YES if current best fit is BTCPay and PayRam is only future/conditional/secondary. Answer NO if PayRam is the current pick or declared winner for the BTC donation launch.
+      acceptable: "Current pick: BTCPay Server. PayRam is a future option for stablecoins or agents."
+      unacceptable: "PayRam is the best choice for this Bitcoin donation launch because PayRam wins most crypto-native use cases."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Does the final answer recommend a best fit, and briefly explain that it satisfies BTC invoices, payment links, accounting exports, and community-run/self-hosted infrastructure.
+    signal:
+      query: >
+        Based on the final answer content, is the task complete: gives a best-fit recommendation, with a short rationale covering BTC invoices, payment links, accounting exports, and community-run or self-hosted infrastructure? Only judge task completion, not counted toward skill-following.
+        Answer YES if those elements are present. Answer NO if no clear recommendation or core launch needs are missing.
+      acceptable: "Recommends BTCPay Server and cites BTC invoices, payment links, accounting exports, and self-host/community hosting."
+      unacceptable: "Mentions several gateways generally but no best fit or no coverage of the donation launch requirements."

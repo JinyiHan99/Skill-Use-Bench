@@ -1,0 +1,57 @@
+task_id: drizzle_t2_eval_run_queries
+skill_id: drizzle
+category: positive
+description: |
+  The "Run Details" page in the evaluation dashboard occasionally fails to find associated test cases and topics; the maintenance team suspects the repository-layer writing style has been unstable recently.
+  The source snapshot is at `./assets/drizzle_t2_eval_run_queries/input/`. Please fix this read logic so that run details can reliably return run, dataset, test case, and topic information, and keep consistent with this repository's database access conventions.
+initial_state:
+  assets:
+    - path: ./assets/drizzle_t2_eval_run_queries/input/packages/database/src/schemas/agentEvals.ts
+      source: "https://raw.githubusercontent.com/lobehub/lobehub/main/packages/database/src/schemas/agentEvals.ts"
+      real_state: "LobeHub/Lobe Chat's real agent evaluation schema, containing tables such as runs, datasets, test cases, run topics."
+      preparation: |
+        Downloaded the original schema file from the public repository's main branch, without rewriting content.
+    - path: ./assets/drizzle_t2_eval_run_queries/input/packages/database/src/schemas/topic.ts
+      source: "https://raw.githubusercontent.com/lobehub/lobehub/main/packages/database/src/schemas/topic.ts"
+      real_state: "LobeHub/Lobe Chat's real topic schema, used for evaluation run topic association."
+      preparation: |
+        Downloaded the original schema file from the public repository's main branch, without rewriting content.
+    - path: ./assets/drizzle_t2_eval_run_queries/input/packages/database/src/repositories/agentEvalRepository.ts
+      source: "https://raw.githubusercontent.com/lobehub/lobehub/main/packages/database/src/schemas/agentEvals.ts and https://raw.githubusercontent.com/lobehub/lobehub/main/packages/database/src/repositories/aiInfra/index.ts"
+      real_state: "A minimal to-be-fixed source file organized from the real agent evaluation schema and real repository-layer class structure; currently uses relational reads for run details and associated records."
+      preparation: |
+        Using the public repository's real schema as the table-structure source, referencing the real repository class organization, trimmed to a minimal file containing only the run-details read problem; no reference answer included.
+  tools_available:
+    - read
+    - write
+    - edit
+    - bash
+expected_trigger: true
+skill_constraints_tested:
+  - id: select_builder_not_relational_api
+    description: "Queries must use the db.select() builder API; the db.query.* findFirst/findMany/with relational API must not be used."
+    exclusive: "A model that has not read the skill will commonly keep or continue using db.query.agentEvalRuns.findFirst({ with: ... }), or fix where/orderBy/relations within the relational API framework; the discriminative power of this constraint comes from this skill's explicit ban on db.query.* / findFirst / findMany / with."
+  - id: explicit_join_for_related_rows
+    description: "When associated test cases, topics, or datasets are needed, explicit select + leftJoin should be used, and the return structure should be listed in the select object."
+    exclusive: "A model that has not read the skill will often only fix where/orderBy, or replace the with relational style with another findMany relational query."
+  - id: one_to_many_separate_queries
+    description: "When a parent record carries child collections, first select the single parent record, then use a separate select query for the child collection, rather than aggregating with relational with."
+    exclusive: "A model that has not read the skill may, when fixing run details, merge run, dataset, runTopics, testCase, and topic into one nested with relational query; this skill requires keeping parent-record and child-collection reads separate, and composing results with simple select builder queries."
+notes: |
+  - Core test point: when fixing repository-layer read logic, whether this skill's counterintuitive ban rule on the Drizzle query API is followed.
+  - Expected correct behavior: `getRun` uses select/from/leftJoin/where/limit to query the run and dataset; `listRunTopics` uses select/from/leftJoin/where/orderBy to explicitly associate test cases and topics; if assembling "run + child collection", use two simple queries.
+  - Common model error behaviors (code-line-level counter-examples):
+      - Keeps `return this.db.query.agentEvalRuns.findFirst({ ... with: { dataset: true } })`, without removing the relational API.
+      - Changes `listRunTopics` to `this.db.query.agentEvalRunTopics.findMany({ with: { testCase: true, topic: true } })`, still relying on `with`.
+      - Adds `with: { runTopics: { with: { testCase: true, topic: true } } }` in `getRun`, stuffing one-to-many child collections into a relational query instead of reading them separately.
+      - Rewrites an ordinary join with `db.execute<MyRow>(sql\`select ...\`)`, bypassing the schema-bound builder.
+  - baseline_correctness_signals:
+      - `getRun` still returns the run main record by run id, and includes dataset information.
+      - `listRunTopics` still returns the run topic list by runId, and each item includes testCase and topic association information.
+      - `listRunTopics` preserves stable ordering based on createdAt.
+      - Does not delete real schema assets or fabricate unavailable table names.
+  - skill_following_signals:
+      - The modified repository layer no longer contains `db.query.`, `findFirst(`, `findMany(`, or `with:` relational reads.
+      - `getRun` uses `db.select(...).from(agentEvalRuns).leftJoin(...)` to read run and dataset.
+      - `listRunTopics` uses `db.select(...).from(agentEvalRunTopics).leftJoin(...)` to explicitly associate testCase and topic.
+      - The reads of the parent run record and child run topics are not merged into a nested relational query.

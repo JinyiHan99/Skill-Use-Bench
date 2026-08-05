@@ -1,0 +1,126 @@
+# Rubric for docs-writer — docs_writer_t3_markdown_outside_docs
+rules:
+  - id: g1_contributing_review_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must show an observable attempt to read the supplied
+      top-level CONTRIBUTING.md file.
+    signal:
+      pattern: '(?m)^(?:Read|read_file|Grep|grep_search):.{0,800}assets/docs_writer_t3_markdown_outside_docs/input/CONTRIBUTING\.md'
+
+  - id: r2_identify_project_specific_style_issue_grounded_in_file
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.25
+    spec: |
+      [SKILL] The docs-writer skill applies to any `.md` file in the repository,
+      not only files under `/docs`; the review must apply project-specific
+      documentation standards to top-level CONTRIBUTING.md and identify a concrete
+      standards issue that is actually grounded in that file, such as
+      table-of-contents-like structure, missing overview paragraphs after
+      headings, Latin abbreviations, `please`/`should` wording, or empty image alt
+      text.
+      skill-exclusive reason: Without the skill, a model may treat CONTRIBUTING.md
+      as a generic Markdown review and focus on broad readability. The skill
+      expands scope to all `.md` files and requires this project's documentation
+      standards, so it surfaces issues like `e.g.`, `should`, TOC lists, or empty
+      alt text as project-standard violations.
+    signal:
+      judge_context_window: [serialized_steps, final_answer]
+      query: |
+        Based on the final answer and actual CONTRIBUTING.md evidence from the
+        read output or supplied file content, does the review identify at least
+        one concrete project-specific docs-writer standards issue that is truly
+        present in `assets/docs_writer_t3_markdown_outside_docs/input/CONTRIBUTING.md`?
+        The issue must be tied to this top-level `.md` file as docs-writer scope,
+        not presented as generic Markdown advice. Accept examples such as a
+        table-of-contents-like opening list, missing prose after a heading before
+        a subheading/list, Latin abbreviation `e.g.`, use of `please` or vague
+        `should`, or empty image alt text, but only if the evidence shows the
+        issue exists in the file. Answer YES if at least one real, file-specific
+        docs-writer standard issue is identified. Answer NO if the feedback is
+        generic, not grounded in file evidence, or only hallucinates an issue.
+      acceptable: "It says the file has an image with empty alt text and recommends descriptive alt text."
+      unacceptable: "It says 'improve clarity and consistency' or invents a docs-writer issue not present in CONTRIBUTING.md."
+
+  - id: r3_apply_meta_file_link_exception
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    locus: final-output
+    spec: |
+      [SKILL] Do not apply the docs-directory relative-link rule to this meta
+      file; CONTRIBUTING.md may keep external links such as the Google CLA link.
+      skill-exclusive reason: A model that half-remembers the docs link rule may
+      over-apply it and demand relative docs links everywhere. The skill includes
+      a meta-file exception, so the conflict is blanket relative-link enforcement
+      versus the README/CONTRIBUTING exception.
+    signal:
+      judge_context_window: [final_answer]
+      query: |
+        Based only on the final answer, does the review avoid falsely requiring
+        external links in CONTRIBUTING.md, such as the Google CLA link, to be
+        converted into relative docs links? Answer YES if it does not make that
+        false link-rule demand, or if it explicitly notes the meta-file exception.
+        Answer NO only if it says the CLA or other external meta-file links must
+        become relative docs links because of the docs link rule.
+      acceptable: "The answer leaves the Google CLA URL alone or says external links are fine in CONTRIBUTING.md."
+      unacceptable: "The answer says the Google CLA link should be changed to a relative docs link."
+
+  - id: r5_use_docs_writer_voice_in_recommendations
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: final-output
+    spec: |
+      [SKILL] Recommendations should use the project documentation voice: direct,
+      active, and clear about requirements or recommendations rather than relying
+      on `please` or vague `should` phrasing.
+      skill-exclusive reason: In normal review prose, models often say "please"
+      and "should". The skill gives a project-specific voice rule to avoid
+      "please" and clarify must versus recommended language.
+    signal:
+      judge_context_window: [final_answer]
+      query: |
+        Based only on reviewer-authored recommendations in the final answer, are
+        the recommendations written in direct project-docs style without using
+        "please" as an instruction and without vague "should" where "must" or
+        "recommend" is needed? Ignore direct quotations from CONTRIBUTING.md,
+        fenced code blocks, and source-file snippets that include those words.
+        Answer YES if the reviewer's own recommendations use direct wording.
+        Answer NO if the reviewer's own recommendations repeatedly use "please"
+        or vague "should" language.
+      acceptable: "Replace `e.g.` with `for example`; add descriptive alt text to the React DevTools image."
+      unacceptable: "Please consider updating this section; you should maybe add better alt text."
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    spec: |
+      [TASK — not included in skill-following] The response is a maintainer-facing
+      review of the supplied CONTRIBUTING.md and says what, if anything, to
+      improve.
+    signal:
+      judge_context_window: [final_answer]
+      query: |
+        Based only on the final answer, does the response clearly review the
+        supplied CONTRIBUTING.md for maintainers and provide at least one
+        file-specific improvement, or clearly state that no improvement is needed?
+        Answer YES if it is a maintainer-facing review of that file with a
+        concrete recommendation or an explicit no-change assessment. Answer NO if
+        it reviews a different file, gives only generic writing advice, invents
+        unrelated implementation details, or does not give a recommendation.
+      acceptable: "The answer says CONTRIBUTING.md needs targeted updates and lists concrete findings."
+      unacceptable: "The answer discusses source-code architecture or generic documentation quality instead of the supplied CONTRIBUTING.md."

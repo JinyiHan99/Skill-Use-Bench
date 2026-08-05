@@ -1,0 +1,103 @@
+rubric_id: skill_81_software_architecture_t2_api_boundary
+objective: Evaluate whether the model follows the software-architecture skill to model suspend user as a clear account-management use case, rather than counting task completion toward the SF score.
+rules:
+  - id: g1_observable_backend_source_edit
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trajectory must contain an observable write/edit attempt to the admin backend input files.
+      The gate only judges whether there is an evaluable code change, not whether the boundary design is correct.
+    signal:
+      pattern: >-
+        \b(?:Write|Edit)\b[\s\S]{0,1500}(?:assets/software_architecture_t2_api_boundary/input/|software_architecture_t2_api_boundary/input/|./assets/software_architecture_t2_api_boundary/input/)(?:user\.controller|user\.service|user\.model)\.js
+
+  - id: r1_dedicated_suspension_use_case
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Use cases should be clearly defined and kept isolated, using domain language to express business actions.
+      Skill-exclusive rationale: looking only at the task, strong models may treat suspension as an ordinary user update, directly reusing `updateUser`/`updateUserById` to accept `suspended` or `status` fields; the skill requires modeling "suspend account" as an independent account-management use case, and the conflict point is "generic CRUD update field" vs. "explicit suspend/suspension business action".
+    signal:
+      query: |
+        Based on the actual file contents in `assets/software_architecture_t2_api_boundary/input/`, not the agent's self-statements or plans:
+        Is suspend user implemented as a dedicated account-management use case/operation, using user/account suspension domain language, rather than only writing a field via generic updateUser/updateUserById?
+        Answer YES if there is a distinct suspension/account-disable/deactivation handler and a distinct service/use-case function whose code owns the account suspension state transition.
+        Answer NO if the operation is only a thin wrapper that forwards to generic `updateUserById(..., { suspended: true })` / generic update status logic, if suspension is only accepted through the existing generic update path, or if the only change is adding a model field.
+        Equivalent domain names such as `disableAccount`, `deactivateUser`, `suspendAccount`, or `setAccountSuspension` may count as YES when they represent the dedicated use case; vague names such as `updateStatus` without account-suspension meaning should not.
+      acceptable: |
+        `suspendUser` controller calls `userService.suspendUserById(...)`, and the service function owns the account suspension state transition rather than delegating to generic update.
+      unacceptable: |
+        `updateUser` or `updateUserById` is modified so staff can send `{ suspended: true }`, or `suspendUser` simply calls `updateUserById(id, { suspended: true })` with no dedicated suspension use-case logic.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_no_suspension_logic_inside_generic_update
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Each module/use case should have a single clear purpose, avoiding mixing different business transitions into generic CRUD.
+      Skill-exclusive rationale: the task says "later see that state reflected in normal user data", and the default behavior is very likely to extend the existing `updateUserById`, because it can already save any userBody; the skill requires isolating distinct use cases, and the conflict point is "explicitly or implicitly passing through the suspension field in generic update" vs. "update stays generic, suspension has a dedicated boundary".
+    signal:
+      query: |
+        Based on the actual code in `user.controller.js` and `user.service.js`, not the agent's self-statements:
+        Given that the final code does implement suspension/account-status functionality, does the existing generic `updateUser` controller / `updateUserById` service not explicitly or implicitly bear the suspension state write?
+        Answer YES if the generic update path either remains unrelated to suspension or explicitly rejects/removes suspension/account-status fields to preserve the dedicated boundary, while suspension is handled by a separate use case.
+        Answer NO if generic update can accept, pass through, spread/Object.assign, `$set`, or otherwise persist `suspend`, `suspended`, `isSuspended`, `status`, `accountStatus`, or equivalent account-suspension fields; also answer NO if there is no actual suspension/account-status implementation and the rule would otherwise pass only because generic update was unchanged.
+      acceptable: |
+        `updateUserById` remains the generic user update function and rejects/removes `isSuspended`/`accountStatus`; `suspendUserById` is a separate exported service function.
+      unacceptable: |
+        `updateUserById` checks `if (updateBody.suspended)`, spreads arbitrary `updateBody` into persistence allowing `isSuspended`, or assigns account status as part of generic update behavior.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_controller_no_direct_persistence_access
+    type: boundary
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: false
+    weight: 0.25
+    spec: |
+      [SKILL] Database queries should stay away from controllers; controllers should only do HTTP adaptation and delegate to service/use case.
+      This rule is an auxiliary boundary signal: it only checks that the controller has no direct persistence/model access, and does not mix full controller-design quality into this rule.
+    signal:
+      file: assets/software_architecture_t2_api_boundary/input/user.controller.js
+      file_must_not_contain: >-
+        (?:require\(["'][^"']*(?:\.\./models|user\.model)["']\)|from\s+["'][^"']*(?:\.\./models|user\.model)["']|mongoose\.model\s*\(|\b\w+\s*\.\s*(?:find(?:ById|One)?|findOneAndUpdate|findByIdAndUpdate|update(?:One|Many)?|delete(?:One|Many)?|create|save|aggregate|bulkWrite)\s*\()
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Staff can suspend accounts, and normal user data reflects that state.
+    signal:
+      query: |
+        Based on the actual file contents in `assets/software_architecture_t2_api_boundary/input/`, not the agent's self-statements:
+        Does the code include a persistable user-suspension state field, expose a staff/admin-callable suspension entry point, and does normal get/list user data return that state?
+        Answer YES only if persistence, an entry point, and serialization visibility all exist. Answer NO if only a model field or only a controller stub exists, or if the status is hidden from normal user data by `select: false`, `private: true`, a `toJSON`/transform omission, or equivalent serialization filtering unless the code explicitly includes it in output.
+      acceptable: |
+        `user.model.js` includes an `isSuspended`/`accountStatus` field, controller/service exports a suspend operation returning the updated user, and normal user serialization includes that field.
+      unacceptable: |
+        Only `user.model.js` adds `isSuspended` but no controller/service action can set it, the controller action exists but no persisted field is added, or the field is hidden from ordinary user responses.

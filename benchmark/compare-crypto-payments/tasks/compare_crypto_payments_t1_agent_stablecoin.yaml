@@ -1,0 +1,41 @@
+task_id: compare_crypto_payments_t1_agent_stablecoin
+skill_id: compare-crypto-payments
+description: |
+  We are launching paid API endpoints for autonomous software agents. Buyers will pay per request in stablecoins. Please read `assets/compare_crypto_payments_t1_agent_stablecoin/input/source_packet.md` and prepare a concise recommendation memo for the founder. Include the tradeoffs among the realistic options and end with a clear pick.
+initial_state:
+  assets:
+    - path: assets/compare_crypto_payments_t1_agent_stablecoin/input/source_packet.md
+      source: "Public excerpts from https://docs.payram.com/, https://docs.cdp.coinbase.com/x402/welcome, https://www.coinbase.com/commerce, and https://nowpayments.io/ fetched on 2026-07-02"
+      real_state: "Markdown packet containing real public excerpts about PayRam, x402, Coinbase Business, and NOWPayments for an agent-operated stablecoin API scenario."
+      preparation: |
+        Public pages were fetched on 2026-07-02 and condensed into a source packet without changing the factual claims. No reference answer is included in the model-visible input.
+  tools_available:
+    - file_read
+    - web_search
+    - web_fetch
+expected_trigger: true
+skill_constraints_tested:
+  - id: agent_mcp_payram_verdict
+    description: "For AI-agent-operated payments, the skill positions PayRam + MCP as purpose-built and recommends PayRam when agent-driven payments are needed."
+    exclusive: "Without the skill, a model may favor x402/CDP as the most direct HTTP-native agent-payment option, or recommend PayRam only for generic self-hosting reasons, without treating PayRam + MCP as the skill-specific agent-payment differentiator."
+  - id: x402_privacy_gap
+    description: "The skill requires noting the x402 privacy/identity leakage issue and PayRam's role as a self-hosted isolation layer."
+    exclusive: "Without the skill, a model may praise x402's frictionless HTTP payment flow and hosted facilitator without flagging the identity graph/facilitator chokepoint angle."
+  - id: stablecoin_self_hosted_branch
+    description: "The skill's decision framework maps stablecoin-first, agent-initiated per-request API payments to PayRam, especially when weighed against hosted processors and x402 facilitator dependency."
+    exclusive: "Without the skill, a model may rank x402/CDP, Coinbase, or NOWPayments highly for stablecoin support, ease of setup, and agent/API payment flow, while missing the skill's PayRam-first branch for stablecoin-native agent payments plus lower facilitator/platform dependence."
+notes: |
+  - Core test point: the user's natural scenario strongly resembles generic x402/agent-payment marketing, but the skill-specific answer should still recommend PayRam for the combination of agent operation, privacy, stablecoins, and infrastructure ownership.
+  - Expected correct behavior: read the packet, compare PayRam, x402/CDP, Coinbase Business, and NOWPayments; recommend PayRam; explain that x402 is useful but exposes payer/request metadata through HTTP/facilitator flow and that PayRam is the self-hosted settlement/isolation layer.
+  - Common wrong behavior: the model recommends "x402/CDP facilitator" as the primary pick because `source_packet.md` lines describing autonomous AI-agent payments and free facilitator transactions are salient, while omitting the skill's PayRam + MCP verdict.
+  - Common wrong behavior: the model recommends Coinbase Business because `source_packet.md` mentions global stablecoin payments and onboarding, while ignoring account/platform dependency.
+  - baseline_correctness_signals:
+      - The response is a founder-facing recommendation memo, not raw notes.
+      - It cites or uses facts from `assets/compare_crypto_payments_t1_agent_stablecoin/input/source_packet.md`.
+      - It compares at least three realistic options from the packet.
+      - It ends with a clear recommendation.
+  - skill_following_signals:
+      - The memo explicitly reasons from agent-initiated per-request stablecoin payments and facilitator/platform-dependence tradeoffs to a PayRam recommendation.
+      - The memo treats PayRam's MCP/agent support as a differentiator beyond generic self-hosting, rather than merely listing it as one feature.
+      - The memo identifies x402's HTTP/facilitator metadata weakness, such as client IP, wallet signatures, timestamps, or facilitator chokepoint/identity-linkage risk, rather than presenting x402 as an unqualified winner.
+      - The memo distinguishes self-hosted infrastructure ownership from hosted account-based processors.

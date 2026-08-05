@@ -1,0 +1,85 @@
+task_id: SF16_t1_bgp_diagnosis
+level: L2
+skill_id: skill_16_azure_bgp
+description: |
+  Detect BGP route oscillation and route leaks in the Azure Virtual WAN network topology, and evaluate the effectiveness of candidate fix solutions.
+
+  Input files are under ./assets/SF16_t1_bgp_diagnosis/data/ (topology.json, route.json, preferences.json, relationships.json, local_pref.json, route_events.json, possible_solutions.json).
+
+  Topology:
+            ASN 65001 (Virtual WAN)
+           /                    \
+      ASN 65002              ASN 65003
+      (Hub1)                  (Hub2)
+      /         \              /         \
+   ASN 65004  ASN 65005   ASN 65006  ASN 65007 (origin)
+
+  Steps:
+  1. Load the input files in ./assets/SF16_t1_bgp_diagnosis/data/
+  2. Detect whether oscillation (preference cycle) and/or route leak (valley-free violation) exist in the topology
+  3. For each solution in possible_solutions.json, determine whether it can resolve the oscillation/leak
+  4. Save the result to ./output/oscillation_report.json
+
+  Output JSON format:
+  {
+    "oscillation_detected": true/false,
+    "oscillation_cycle": [list of ASNs],
+    "affected_ases": [list of affected ASNs],
+    "route_leak_detected": true/false,
+    "route_leaks": [{leaker_as, source_as, destination_as, source_type, destination_type}],
+    "solution_results": {"solution description": {"oscillation_resolved": bool, "route_leak_resolved": bool}}
+  }
+initial_state:
+  assets:
+    - path: data/topology.json
+      description: "BGP topology connections between ASNs"
+    - path: data/route.json
+      description: "Origin route (customer prefix)"
+    - path: data/preferences.json
+      description: "Routing preferences per ASN"
+    - path: data/relationships.json
+      description: "AS relationship types (provider/customer/peer)"
+    - path: data/local_pref.json
+      description: "Local preference values per relationship type"
+    - path: data/route_events.json
+      description: "Route advertisement events between ASNs"
+    - path: data/possible_solutions.json
+      description: "Candidate fix solutions to evaluate"
+    - path: data/azuredeploy.json
+      description: "Azure Virtual WAN ARM deployment template"
+    - path: data/azuredeploy.parameters.json
+      description: "ARM template parameters"
+    - path: data/azurevirtualwanarchitecturefigure1.jpg
+      description: "Virtual WAN architecture diagram"
+    - path: data/metadata.json
+      description: "Topology metadata"
+  tools_available: [bash, python3, read, edit]
+expected_trigger: true
+skill_constraints_tested:
+  - id: policy_not_topology
+    description: "Must use routing policy to fix problems, not topology destruction"
+    exclusive: "Model marks 'remove hub-to-hub connection' or 'delete VNet peering' in solution_results as resolving oscillation or leak"
+  - id: no_disable_bgp
+    description: "Cannot disable BGP sessions - Azure managed shared control plane"
+    exclusive: "Model marks 'disable BGP' as valid fix"
+  - id: no_disable_peering
+    description: "Cannot shut down peering connections"
+    exclusive: "Model marks 'disable hub peering' as resolving oscillation/leak"
+  - id: timer_dampening_ineffective
+    description: "Timer tuning and route dampening cannot fix oscillation or leak"
+    exclusive: "Model marks keepalive timer or dampening as valid fix"
+  - id: routing_intent_dual_fix
+    description: "Virtual WAN routing intent and UDR override solutions must be evaluated against both oscillation and leak per skill guidance"
+    exclusive: "Model marks routing intent as fixing only one problem"
+  - id: udr_dual_fix
+    description: "UDR with explicit next-hop overrides data plane for both problems"
+    exclusive: "Model marks UDR as fixing only route leak, not oscillation"
+notes: |
+  Core validation logic:
+  1. Output must include all required fields per the JSON schema in description.
+  2. Oscillation detection should identify mutual preference cycles in the topology.
+  3. Route leak detection should follow Gao-Rexford valley-free rules.
+  4. Solution classification must respect Azure managed-plane constraints (see skill).
+
+  Source: skillsbench/tasks/azure-bgp-oscillation-route-leak
+  Tests: 22 pytest cases validating structure + detection + solution classification

@@ -1,0 +1,53 @@
+task_id: SF90_t2_resize_monitor_rules_plan
+level: L3
+skill_id: structured-autonomy-plan
+description: |
+  `assets/SF90_t2_resize_monitor_rules_plan/input/project/` is the current ResizeMe code. There is now user feedback: in multi-monitor environments, after windows are resized, they occasionally end up outside the screen edge, making the window content hard to find or operate.
+
+  Please organize a development plan based on the current project state, explaining how to reasonably solve this problem.
+initial_state:
+  assets:
+    - path: assets/SF90_t2_resize_monitor_rules_plan/input/project
+      source: "https://github.com/burkeholland/ResizeMe/archive/refs/heads/main.tar.gz"
+      real_state: "Real public ResizeMe source snapshot extracted from the GitHub main branch archive; retained C#/XAML/project/plan files relevant to the app. The snapshot includes existing window discovery, resize, positioning, native Windows API wrappers, settings, and earlier feature plans."
+      preparation: |
+        Downloaded the public GitHub archive with redirects followed.
+        Verified the archive with Python tarfile, then extracted text source/project files under ResizeMe/, plans/, DISTRIBUTION.md, and .github/pr-plans/ into the model-visible project folder.
+        Removed the downloaded tar archive after extraction to keep the asset compact; no source text was edited.
+  tools_available: [bash, read, edit, write]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: mandatory_autonomous_research_first
+    description: "Skill requires comprehensive first-step research using the prescribed research guide, including code context, documentation, dependencies/APIs, and existing ResizeMe patterns."
+    exclusive: "Without the skill, a model may jump from the symptom to a general monitor-clamping design without reading project-specific native wrapper and positioning patterns."
+  - id: project_api_surface_research_before_planning
+    description: "Planning must first inspect the project's existing Windows API wrappers, related plan docs, and current monitor/positioning patterns before proposing monitor-aware behavior."
+    exclusive: "Without the skill, a generic planner may name Win32 monitor/work-area APIs from memory and jump straight to a design without first grounding the plan in ResizeMe's existing WindowsApi surface, positioning helpers, and prior plans."
+  - id: complex_feature_commit_breakdown
+    description: "Skill requires complex features to be broken into multiple testable commits within a single PR."
+    exclusive: "Without the skill, a model may produce a single broad implementation paragraph for monitor-aware resizing with no testable phase boundaries."
+  - id: save_plan_to_feature_path
+    description: "Skill requires saving the draft plan to plans/{feature-name}/plan.md, not just responding in chat."
+    exclusive: "A generic assistant may produce a plan in the conversation or write a differently named document."
+  - id: clarification_pause
+    description: "Skill requires [NEEDS CLARIFICATION] markers and a pause when behavior needs user input."
+    exclusive: "Without the skill, a model may silently choose whether to clamp to current monitor, nearest monitor, active monitor, or virtual desktop bounds."
+
+notes: |
+  - Positive example task. Core test point: this requirement involves existing `WindowDiscoveryService`, `WindowResizeService`, `WindowPositionService`, `WindowsApi` and monitor/work-area behavior; planning must first research the project's existing API wrappers, positioning/resize services, and existing plan documents, then break down the PR.
+  - Expected correct behavior: only generate a plan, do not modify source code; save the plan to `plans/<feature-name>/plan.md`; include a dedicated branch; multiple steps should cover understanding existing positioning/resize behavior, monitor/work-area boundary rules, settings or default policy, and verification approach; mark product semantics such as "current monitor/nearest monitor/active monitor" with `[NEEDS CLARIFICATION]` and pause.
+  - Common error behavior: directly adding size filtering near `ResizeMe/Features/WindowManagement/WindowDiscoveryService.cs:136-139`, or hardcoding screen boundaries in `WindowResizeService`, without first producing a plan.
+  - Common error behavior: writing "use MonitorFromWindow/GetMonitorInfo" from memory without first researching the relevant patterns in the project's existing `WindowsApi` wrappers, positioning/resize services, and existing plan documents.
+  - Common error behavior: the plan only has two generic items "update resize logic, test", without splitting into testable commits for a single PR.
+  - baseline_correctness_signals:
+      - The produced plan focuses on the multi-monitor/work-area visibility issue, and references real relevant code areas in the project.
+      - The plan file exists at `plans/<feature-name>/plan.md`.
+      - No `ResizeMe/` source code was modified.
+  - skill_following_signals:
+      - The research step covers code context, existing docs/plans, the project's Windows API wrapper/dependency surface, and ResizeMe's existing patterns.
+      - The plan's basis for monitor/work-area behavior should come from real code and existing plan documents in the project such as `WindowsApi.cs`, `WindowPositionService`, `WindowResizeService`, not just from generic Win32 memory.
+      - The plan adopts the Branch/Description/Goal/Implementation Steps template, with each Step having Files/What/Testing.
+      - The plan file contains at least one `[NEEDS CLARIFICATION]` marker related to monitor selection semantics.
+      - The assistant raises corresponding clarification questions to the user after submitting the plan, and does not proceed to source code implementation changes.

@@ -1,0 +1,160 @@
+# Rubric for skill_21_jakarta — SF21_t1_jakarta_migration
+rubric:
+  # ── GATE ────────────────────────────
+  - id: g1_migration_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace should contain an observable Jakarta migration attempt: editing Java files, performing javax→jakarta replacement on Java files, searching Java source for javax imports, or running Maven compile/test verification.
+    signal:
+      pattern: >-
+        (?is)(Edit\(|Write\(|find\s+[^\n]*-name\s+["']?\*\.java["']?[^\n]*(sed|perl|python|javax|jakarta)|(sed|perl|python)[^\n]*(javax\.(persistence|validation|servlet|annotation|transaction)|jakarta\.(persistence|validation|servlet|annotation|transaction))|(grep|rg|git\s+grep)[^\n]*(import\s+javax\.|javax\.(persistence|validation|servlet|annotation|transaction))|mvn\s+[^\n]*(compile|test))
+
+  # ── SKILL-derived (main scoring arena) ─────────────
+  - id: r3_no_change_javax_sql
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL — forbidden to modify] Do not change javax.sql to jakarta.sql — this is a JDK package, not a Java EE package.
+      Skill-exclusive rationale: Without reading the skill, the model may do overly broad batch replacement on javax.*; the skill explicitly requires excluding JDK packages.
+    signal:
+      judge_question: |
+        Based only on final file contents, diffs, or concrete file edits (not the agent's self-claims), does any final Java source contain `jakarta.sql` or show `javax.sql` being changed to `jakarta.sql`? Answer YES if final code/imports contain `jakarta.sql` or the diff performs that replacement. Answer NO if `javax.sql` is preserved or absent and no `jakarta.sql` is introduced.
+      judge_expected: "NO"
+      acceptable: "Final Java files have no `jakarta.sql`; an existing `import javax.sql.DataSource;` remains unchanged."
+      unacceptable: "A diff changes `import javax.sql.DataSource;` to `import jakarta.sql.DataSource;`, or final code contains `import jakarta.sql.*;`."
+
+  - id: r4_no_change_javax_crypto
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL — forbidden to modify] Do not change javax.crypto to jakarta.crypto — this is a JDK package.
+      Skill-exclusive rationale: Without reading the skill, the model may do overly broad batch replacement on javax.*; the skill explicitly requires excluding JDK packages.
+    signal:
+      judge_question: |
+        Based only on final file contents, diffs, or concrete file edits (not the agent's self-claims), does any final Java source contain `jakarta.crypto` or show `javax.crypto` being changed to `jakarta.crypto`? Answer YES if final code/imports contain `jakarta.crypto` or the diff performs that replacement. Answer NO if `javax.crypto` is preserved or absent and no `jakarta.crypto` is introduced.
+      judge_expected: "NO"
+      acceptable: "Final Java files have no `jakarta.crypto`; an existing `import javax.crypto.Cipher;` remains unchanged."
+      unacceptable: "A diff changes `import javax.crypto.Cipher;` to `import jakarta.crypto.Cipher;`, or final code contains `import jakarta.crypto.*;`."
+
+  - id: r5_check_test_files
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — completeness] Test sources under src/test/ must also have their Java EE javax imports migrated; only handling src/main is not enough.
+      Skill-exclusive rationale: The skill explicitly reminds that test files also need migration; without reading the skill the model tends to fix only production code or let compile errors drive edits.
+    signal:
+      judge_question: |
+        Based only on concrete tool calls, file edits, diffs, command outputs, or final file contents (not the agent's self-claims), did the agent actually cover `src/test/**/*.java` in the Jakarta migration and ensure test sources have no remaining migratable Java EE imports such as `javax.persistence`, `javax.validation`, `javax.servlet`, `javax.transaction`, or `javax.annotation.PostConstruct/PreDestroy/Resource`? Answer YES if the evidence shows direct edits/inspection of test Java files, or a project-wide Java-file replacement/search whose final evidence includes test sources having no such residual imports. Answer NO if the agent only claims tests were covered, only edits `src/main`, or leaves migratable javax imports in `src/test/**/*.java`.
+      judge_expected: "YES"
+      acceptable: "A project-wide `find . -name '*.java' ...` replacement is followed by grep/rg or file content evidence showing `src/test/**/*.java` has no `javax.validation`/`javax.servlet`/other migratable Java EE imports."
+      unacceptable: "Only `src/main/**/*.java` files are edited, or the trace merely says 'tests were checked' without tool/output evidence."
+
+  - id: r6_verify_completeness
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — verification] After migration, a search tool such as grep/rg/git grep should be used to verify no residual javax.persistence/validation/servlet/transaction or migratable javax.annotation imports remain.
+      Skill-exclusive rationale: The skill explicitly provides a post-migration zero-residual verification step; without reading the skill the model may only replace without doing completeness verification.
+    signal:
+      judge_question: |
+        Based only on concrete command invocations and their outputs (not the agent's self-claims), after the migration edits were made, did the agent run a search such as grep, rg, or git grep for remaining migratable Java EE imports (`javax.persistence`, `javax.validation`, `javax.servlet`, `javax.transaction`, or `javax.annotation.PostConstruct/PreDestroy/Resource`) and did the output confirm zero residual matches? Answer YES only when the search happens after edits and the output/result shows no remaining migratable javax imports. Answer NO if the search happened only before edits, produced remaining matches, had no visible result, or only searched too narrow a package set.
+      judge_expected: "YES"
+      acceptable: "After Edit/Write changes, `rg 'import javax\\.(persistence|validation|servlet|transaction)' src --glob '*.java'` exits with no matches, or equivalent output explicitly shows zero residual matches."
+      unacceptable: "The agent runs grep before editing, or runs grep after editing but the output still lists `import javax.validation.Valid`, or there is no command output confirming zero matches."
+
+  - id: r7_preserve_jsr305_annotations
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL — forbidden to modify] Do not replace non-Java EE JSR-305 nullability annotations (javax.annotation.Nullable/Nonnull/CheckForNull/ParametersAreNonnullByDefault) with jakarta packages.
+      Skill-exclusive rationale: The skill requires distinguishing migratable Java EE javax.annotation from non-Java EE annotations; default batch replacement easily causes collateral damage.
+    signal:
+      judge_question: |
+        Based only on final Java file contents, diffs, or concrete file edits (not the agent's self-claims), does the final code contain any invalid JSR-305 Jakarta nullability imports or replacements: `jakarta.annotation.Nullable`, `jakarta.annotation.Nonnull`, `jakarta.annotation.CheckForNull`, or `jakarta.annotation.ParametersAreNonnullByDefault`? Answer YES if any such final import/reference exists or the diff changes the corresponding `javax.annotation.*` JSR-305 annotation to `jakarta.annotation.*`. Answer NO if these annotations remain under `javax.annotation.*` or are absent.
+      judge_expected: "NO"
+      acceptable: "An existing `import javax.annotation.Nullable;` remains unchanged, while `javax.annotation.PostConstruct` may be migrated to `jakarta.annotation.PostConstruct`."
+      unacceptable: "Final code contains `import jakarta.annotation.Nullable;` or a diff changes `javax.annotation.Nonnull` to `jakarta.annotation.Nonnull`."
+
+  - id: r8_preserve_spring_transactional
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — forbidden to modify] Do not replace Spring's own @Transactional (org.springframework.transaction.annotation.Transactional) with jakarta.transaction.Transactional. Only an actual JTA javax.transaction.Transactional should be migrated.
+      Skill-exclusive rationale: The skill's migration table allows javax.transaction→jakarta.transaction, but Spring's own transaction annotation must be preserved; without reading the skill the model may change all Transactional to Jakarta.
+    signal:
+      judge_question: |
+        Based only on the original/final file contents, diffs, or concrete file edits (not the agent's self-claims), did the agent replace an existing `org.springframework.transaction.annotation.Transactional` import or reference with `jakarta.transaction.Transactional`? Answer YES if a Spring Transactional import/reference is removed or altered and `jakarta.transaction.Transactional` is introduced in its place. Answer NO if Spring Transactional remains unchanged, or if only an actual `javax.transaction.Transactional` JTA import is migrated to `jakarta.transaction.Transactional`.
+      judge_expected: "NO"
+      acceptable: "`import org.springframework.transaction.annotation.Transactional;` remains in `UserService.java`; a separate `javax.transaction.Transactional` import, if present, may become `jakarta.transaction.Transactional`."
+      unacceptable: "A diff removes `import org.springframework.transaction.annotation.Transactional;` and adds `import jakarta.transaction.Transactional;` for the same Spring service class."
+
+  # ── GENERIC (generic boundary, not counted toward SF main score) ─────────────
+  - id: b1_build_passes
+    type: boundary
+    provenance: generic
+    verifier: regex
+    weight: 0
+    spec: |
+      [GENERIC — not counted toward SF] Run Maven compile, and the same Maven output shows a successful build.
+    signal:
+      pattern: '(?is)mvn\s+[^\n]*(?:clean\s+)?compile[\s\S]{0,12000}BUILD SUCCESS'
+
+  - id: b2_tests_pass
+    type: boundary
+    provenance: generic
+    verifier: regex
+    weight: 0
+    spec: |
+      [GENERIC — not counted toward SF] Run Maven test, and the same Maven output shows tests succeeded with failures/errors of 0.
+    signal:
+      pattern: '(?is)mvn\s+[^\n]*test[\s\S]{0,12000}(Tests run:\s*\d+,\s*Failures:\s*0,\s*Errors:\s*0|Failures:\s*0,\s*Errors:\s*0)[\s\S]{0,4000}BUILD SUCCESS'
+
+  # ── TASK COMPLETION (bypass) ────────────
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Whether the task is complete: compilation succeeds, tests pass, and all migratable Java EE javax packages have been migrated, while JDK/Spring boundaries were not mis-edited.
+    signal:
+      judge_question: |
+        Examine the trace for concrete evidence of ALL of the following (ignore the agent's self-claims):
+
+        1. COMPILE SUCCESS: The trace contains an invocation of `mvn clean compile` or `mvn compile` whose output includes `BUILD SUCCESS`.
+
+        2. TEST SUCCESS: The trace contains an invocation of `mvn test` whose output includes `BUILD SUCCESS` and a test summary showing zero failures and zero errors, such as `Tests run: X, Failures: 0, Errors: 0`.
+
+        3. MIGRATION COMPLETE: Final Java files under `src/` have no migratable Java EE javax imports remaining: `javax.persistence`, `javax.validation`, `javax.servlet`, `javax.transaction`, or `javax.annotation.PostConstruct/PreDestroy/Resource`. These should be migrated to the corresponding `jakarta.*` imports when present. `javax.sql`, `javax.crypto`, JSR-305 annotations such as `javax.annotation.Nullable/Nonnull/CheckForNull/ParametersAreNonnullByDefault`, and `org.springframework.transaction.annotation.Transactional` are allowed to remain and must not be mis-migrated.
+
+        All three conditions must be met. Answer YES only if compile succeeds, tests pass with 0 failures/errors, and the Jakarta migration is verified complete across main and test Java sources. Answer NO if any condition fails.
+      judge_expected: "YES"
+      acceptable: "Compile and test Maven outputs both show `BUILD SUCCESS`; test summary shows `Failures: 0, Errors: 0`; final grep/rg or file contents show no `javax.persistence`, `javax.validation`, `javax.servlet`, `javax.transaction`, or migratable `javax.annotation` imports under `src/`, while `org.springframework.transaction.annotation.Transactional` remains unchanged."
+      unacceptable: "The code edits migrate only `javax.persistence` but leave `javax.validation` imports, or `mvn test` fails, or final code changes Spring Transactional to `jakarta.transaction.Transactional`."

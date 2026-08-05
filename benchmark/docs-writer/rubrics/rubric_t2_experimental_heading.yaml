@@ -1,0 +1,163 @@
+# Rubric for docs-writer — docs_writer_t2_experimental_heading
+rules:
+  - id: g1_plan_mode_page_edit_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must show an observable attempt to edit or write the Plan
+      Mode Markdown page.
+    signal:
+      pattern: '(?m)^(?:Edit|Write|replace|write_file):.{0,800}assets/docs_writer_t2_experimental_heading/input/docs/cli/plan-mode\.md'
+
+  - id: r1_no_experimental_callout_without_clear_feature_status
+    type: boundary
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Add the standard experimental note only when the feature is clearly
+      noted as experimental; this supplied main Plan Mode page/sidebar/settings
+      schema do not mark Plan Mode itself experimental, so the refreshed main
+      page must not gain experimental status framing.
+      skill-exclusive reason: Without the skill, a model may copy experimental
+      framing from the related Plan Mode steering tutorial or add a generic
+      warning because the task asks for a feature guide refresh. The skill's
+      conditional rule requires checking current status before adding that note.
+    signal:
+      file: "assets/docs_writer_t2_experimental_heading/input/docs/cli/plan-mode.md"
+      file_must_not_contain: '(?is)(?:This is an experimental feature currently under active development|Plan Mode.{0,160}(?:is|remains|as).{0,40}(?:experimental|under active development)|(?:experimental feature|under active development).{0,160}Plan Mode)'
+
+  - id: r2_audit_current_status_sources_before_experimental_decision
+    type: order
+    provenance: gate
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [DIAGNOSTIC — not included in skill-following] Before deciding whether
+      experimental-feature treatment applies, the model should connect the docs
+      page with supplied reference sources such as sidebar.json and
+      settingsSchema.ts.
+    signal:
+      query: |
+        Based only on actual tool-call evidence, not the agent's statements or
+        plans, did the model inspect the contents of both
+        `assets/docs_writer_t2_experimental_heading/input/docs/sidebar.json` and
+        `assets/docs_writer_t2_experimental_heading/input/packages/cli/src/ui/settingsSchema.ts`
+        with Read/read_file, Grep/grep_search, or equivalent content-inspection
+        tools before or during the Plan Mode page refresh? Answer YES only if both
+        files were actually inspected. Answer NO if either source was only
+        mentioned, skipped, or inferred from the prompt.
+      acceptable: "Read/read_file or Grep/grep_search calls inspect sidebar.json and settingsSchema.ts before the final Plan Mode page edit is completed."
+      unacceptable: "The trace edits plan-mode.md after inspecting only plan-mode.md, while merely saying the sidebar was checked."
+
+  - id: r3_heading_overview_paragraphs_in_modified_page
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Every heading in the refreshed Plan Mode page must be followed by
+      an introductory overview paragraph before any list, code block, or
+      subheading.
+      skill-exclusive reason: Generic Markdown editing often preserves or creates
+      headings followed immediately by bullets or numbered steps. The skill
+      imposes a project-specific structure rule requiring prose after headings.
+    signal:
+      file: "assets/docs_writer_t2_experimental_heading/input/docs/cli/plan-mode.md"
+      query: |
+        Judge only the final rendered Markdown in plan-mode.md. Ignore `#` text
+        inside fenced code blocks and HTML comments. For every real Markdown
+        heading, is the next nonblank rendered content a prose overview paragraph
+        before any list, code fence, table, alert, or another heading? A single
+        complete prose sentence counts as an overview paragraph. Answer YES if
+        every heading is followed by prose first. Answer NO if any heading is
+        immediately followed by a list, code block, table, alert, or subheading.
+      acceptable: "## How to enter Plan Mode\n\nPlan Mode integrates into your workflow.\n\n1. ..."
+      unacceptable: "## Prerequisites\n\n- Gemini CLI installed..."
+
+  - id: r4_changed_heading_deep_links_resolve
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] If headings are changed, same-page and supplied cross-page deep
+      links to those headings must be audited and updated so anchors still
+      resolve.
+      skill-exclusive reason: A generic editor may polish headings in
+      plan-mode.md but miss stale anchors in existing links such as
+      `#collaborative-plan-editing` or tutorial links. The skill specifically
+      requires deep-link checking when headings change.
+    signal:
+      query: |
+        Judge only the final contents of
+        `assets/docs_writer_t2_experimental_heading/input/docs/cli/plan-mode.md`
+        and
+        `assets/docs_writer_t2_experimental_heading/input/docs/cli/tutorials/plan-mode-steering.md`.
+        Do all Markdown links that target anchors in plan-mode.md resolve to a
+        heading that exists in the final plan-mode.md file? Check same-page
+        `#anchor` links and cross-page forms such as `./plan-mode.md#anchor`,
+        `../plan-mode.md#anchor`, and `plan-mode.md#anchor`. Use GitHub Markdown
+        slug rules: lowercase, remove punctuation, replace spaces with hyphens,
+        and append numeric suffixes for duplicate headings. Answer YES if every
+        relevant anchor has a matching final heading slug, including when no
+        headings were changed. Answer NO if any link points to a stale or
+        nonexistent heading anchor.
+      acceptable: "A link to `#edit-a-plan` exists and the final file has a heading `### Edit a plan`."
+      unacceptable: "The final file renamed the heading, but a link still points to `#collaborative-plan-editing` with no matching heading."
+
+  - id: r5_project_name_avoids_definite_article
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Refer to the project as `Gemini CLI`, never `the Gemini CLI`.
+      skill-exclusive reason: Fluent English naturally adds a definite article
+      before product names in prose, but the skill defines an exact project-name
+      convention that conflicts with that default wording.
+    signal:
+      file: "assets/docs_writer_t2_experimental_heading/input/docs/cli/plan-mode.md"
+      file_must_not_contain: '(?i)\bthe\s+(?:\*\*|`)?Gemini\s+CLI\b'
+
+  - id: r6_markdown_alert_has_prettier_ignore_if_used
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] If any GitHub-flavored Markdown alert is used, it must have the
+      Markdown prettier-ignore comment immediately before the alert block.
+      skill-exclusive reason: Generic docs editors often add `> [!NOTE]` directly
+      when highlighting status or guidance. The skill requires a formatter guard
+      immediately before the callout.
+    signal:
+      file: "assets/docs_writer_t2_experimental_heading/input/docs/cli/plan-mode.md"
+      file_must_not_contain: '(?m)(?<!<!-- prettier-ignore -->\n)^>\s*\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]'
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not included in skill-following] The Plan Mode page was refreshed
+      into a polished feature guide for the current product state.
+    signal:
+      file: "assets/docs_writer_t2_experimental_heading/input/docs/cli/plan-mode.md"
+      query: |
+        Judge only the final plan-mode.md file. Does it still explain how users
+        enter, use, customize, and exit Plan Mode in valid Markdown, with wording
+        that reads like a coherent feature guide? Answer YES if the page covers
+        the core user flow and remains readable. Answer NO if it is missing major
+        Plan Mode usage sections, is mostly unchanged boilerplate, or is invalid
+        Markdown.
+      acceptable: "The page has an intro plus sections for entering, using, exiting, and customizing Plan Mode."
+      unacceptable: "The page contains only a short paragraph or deletes the usage flow."

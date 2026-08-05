@@ -1,0 +1,200 @@
+# Rubric for skill_34_azure_bgp — SF34_t1_azure_bgp_oscillation_route_leak
+
+rules:
+# ── GATE ──
+- id: g1_observable_attempt
+  type: required-tool
+  provenance: gate
+  verifier: regex
+  weight: 0
+  spec: "[GATE] The trace contains an observable write intent or attempt (loose gate, may match self-description text)"
+  signal:
+    pattern: '(?i)(Write|Edit|oscillation_report\.json|/app/output)'
+
+# ── Skill-Following rules (scored) ──
+
+- id: r1_reject_disable_peering
+  type: forbidden-arg
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.75
+  spec: |
+    [SKILL] In solution_results, "disable hub peering between vhubvnet1 and vhubvnet2" must be marked as allowed_in_azure=false.
+    Skill-exclusive rationale: without reading the skill, a strong model facing an oscillation problem may suggest suspending peering to break the oscillation propagation path (a common network troubleshooting method).
+    But the skill explicitly states: Peering connections cannot be shut down as a fix — it would interrupt all other traffic on that connection, and in Azure this is not a customer-controllable operation.
+  signal:
+    judge_question: |
+      In the oscillation_report.json finally written by the agent (via Write/Edit tool calls),
+      is the solution "disable hub peering between vhubvnet1 and vhubvnet2" marked as allowed_in_azure: false?
+      Judgment basis: look only at the content actually written to the file (the content parameter of Write/Edit tool calls), not the agent's self-description or explanation.
+      When matching the solution key, tolerate minor differences such as trailing spaces, case, and quote format; semantic matching prevails.
+      Answer YES if this solution has allowed_in_azure set to false in the written output.
+      Answer NO if it is set to true, or if the output file was never written.
+    judge_expected: "YES"
+    acceptable: '"disable hub peering between vhubvnet1 and vhubvnet2": {"oscillation_resolved": ..., "route_leak_resolved": ..., "allowed_in_azure": false}'
+    unacceptable: '"disable hub peering between vhubvnet1 and vhubvnet2": {"oscillation_resolved": true, "route_leak_resolved": true, "allowed_in_azure": true}'
+
+- id: r2_reject_restart_bgp
+  type: forbidden-arg
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.75
+  spec: |
+    [SKILL] In solution_results, "Restart BGP session on hub1" must be marked as allowed_in_azure=false.
+    Skill-exclusive rationale: without reading the skill, a strong model may view "restart BGP session" as a reasonable transient-fault recovery method.
+    But the skill explicitly states: Restart devices only resets transient state, and BGP session is part of Azure's shared control plane, whose session state customers cannot manage.
+  signal:
+    judge_question: |
+      In the oscillation_report.json finally written by the agent (via Write/Edit tool calls),
+      is the solution "Restart BGP session on hub1" marked as allowed_in_azure: false?
+      When matching this solution, ignore trailing-space and case differences (hub1/Hub1); as long as it semantically corresponds to "Restart BGP session on hub1".
+      Judgment basis: look only at the content actually written to the file, not the agent's self-description.
+      When matching the solution key, tolerate minor differences such as trailing spaces, case, and quote format; semantic matching prevails.
+      Answer YES if this solution has allowed_in_azure set to false.
+      Answer NO if it is set to true, or if the output file was never written.
+    judge_expected: "YES"
+    acceptable: '"Restart BGP session on hub1": {"oscillation_resolved": false, "route_leak_resolved": false, "allowed_in_azure": false}'
+    unacceptable: '"Restart BGP session on hub1": {"oscillation_resolved": true, "route_leak_resolved": false, "allowed_in_azure": true}'
+
+- id: r3_routing_intent_tier1
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] In solution_results, "Enable Virtual WAN hub routing intent to enforce all hub-to-hub routes go through Virtual WAN (ASN 65001) only" must be marked as resolving both oscillation and route leak simultaneously (oscillation_resolved=true, route_leak_resolved=true, allowed_in_azure=true).
+    Skill-exclusive rationale: without reading the skill, a strong model will prefer standard BGP policy tools (route-map, community, AS-path filter) as the primary recommendation.
+    But the skill explicitly states: Virtual WAN Routing Intent is an Azure Virtual WAN-specific, effective solution that resolves both oscillation and route leak simultaneously; it "operates above BGP" and can resolve both oscillation (breaking the preference cycle) and route leak (preventing leaked routes from being used as transit).
+  signal:
+    judge_question: |
+      In the oscillation_report.json finally written by the agent,
+      is the solution "Enable Virtual WAN hub routing intent to enforce all hub-to-hub routes go through Virtual WAN (ASN 65001) only"
+      marked as: oscillation_resolved=true and route_leak_resolved=true and allowed_in_azure=true?
+      Judgment basis: look only at the file content actually written by Write/Edit tool calls.
+      When matching the solution key, tolerate minor differences such as trailing spaces, case, and quote format; semantic matching prevails.
+      Answer YES if all three fields match the expected values. Answer NO otherwise.
+    judge_expected: "YES"
+    acceptable: '"Enable Virtual WAN hub routing intent...": {"oscillation_resolved": true, "route_leak_resolved": true, "allowed_in_azure": true}'
+    unacceptable: '"Enable Virtual WAN hub routing intent...": {"oscillation_resolved": false, "route_leak_resolved": false, "allowed_in_azure": true}'
+
+- id: r4_udr_as_valid_fix
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.75
+  spec: |
+    [SKILL] In solution_results, "Configure user defined route override on vhubvnet1 defaultRouteTable to prefer specific next-hop" must be marked as allowed_in_azure=true and as resolving both problem classes simultaneously (oscillation_resolved=true and route_leak_resolved=true).
+    Skill-exclusive rationale: without reading the skill, a strong model typically focuses on BGP control-plane fixes (policy, filtering) and will not proactively introduce data-plane UDR to backstop control-plane problems.
+    But the skill explicitly states: UDR is a Tier 3 effective solution that "masks" control-plane problems (plural) by fixing forwarding paths in the data plane; overriding defaultRouteTable simultaneously fixes the data-plane paths for both oscillation and leak.
+  signal:
+    judge_question: |
+      In the oscillation_report.json finally written by the agent,
+      is the solution "Configure user defined route override on vhubvnet1 defaultRouteTable to prefer specific next-hop"
+      marked as allowed_in_azure=true, and oscillation_resolved=true and route_leak_resolved=true (both true)?
+      Judgment basis: look only at the file content actually written by Write/Edit tool calls.
+      When matching the solution key, tolerate minor differences such as trailing spaces, case, and quote format; semantic matching prevails.
+      Answer YES if allowed_in_azure is true AND oscillation_resolved is true AND route_leak_resolved is true.
+      Answer NO otherwise.
+    judge_expected: "YES"
+    acceptable: '"Configure user defined route override...": {"oscillation_resolved": true, "route_leak_resolved": true, "allowed_in_azure": true}'
+    unacceptable: '"Configure user defined route override...": {"oscillation_resolved": false, "route_leak_resolved": false, "allowed_in_azure": true}'
+
+- id: r5_reject_timer_dampening
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.75
+  spec: |
+    [SKILL] In solution_results, timer tuning and route dampening solutions must not be marked as resolving oscillation (oscillation_resolved should be false).
+    Affected solutions: "Change BGP keepalive timer..." and "Enable route dampening...".
+    Skill-exclusive rationale: without reading the skill, a strong model may consider timer tuning and dampening as reasonable oscillation-mitigation methods (which are indeed common practice in traditional networks).
+    But the skill explicitly states Common Pitfalls: "Timer tuning or dampening fixes oscillation — False. These reduce symptoms but don't break preference cycles."
+  signal:
+    judge_question: |
+      In the oscillation_report.json finally written by the agent, check the following two solutions:
+      (1) "Change BGP keepalive timer of vhubvnet1 to 30 seconds and holdtime to 90 seconds"
+      (2) "Enable route dampening on vhubvnet1 S2S VPN Gateway with penalty threshold 1000 and suppress limit 2000"
+      Are both marked as oscillation_resolved=false?
+      Judgment basis: look only at the file content actually written by Write/Edit tool calls.
+      When matching the solution key, tolerate minor differences such as trailing spaces, case, and quote format; semantic matching prevails.
+      Answer YES if BOTH solutions have oscillation_resolved set to false.
+      Answer NO if either one has oscillation_resolved set to true.
+    judge_expected: "YES"
+    acceptable: '"Change BGP keepalive timer...": {"oscillation_resolved": false, ...}  and  "Enable route dampening...": {"oscillation_resolved": false, ...}'
+    unacceptable: '"Change BGP keepalive timer...": {"oscillation_resolved": true, ...} — timer tuning cannot break preference cycles'
+
+- id: r6_reject_passive_waiting
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.25
+  spec: |
+    [SKILL] In solution_results, "Wait for Virtual WAN automatic convergence or ASN 65003 to change AS_PATH length of routes" must not be marked as resolving oscillation or route leak.
+    Skill-exclusive rationale: without reading the skill, a strong model may consider waiting for automatic convergence a reasonable strategy (BGP eventual convergence is a protocol characteristic).
+    But the skill requires: Problems must be fixed using routing policy; waiting is not a policy fix, and oscillation stems from a preference cycle that will not disappear on its own.
+  signal:
+    judge_question: |
+      In the oscillation_report.json finally written by the agent,
+      is "Wait for Virtual WAN automatic convergence or ASN 65003 to change AS_PATH length of routes"
+      marked as oscillation_resolved=false and route_leak_resolved=false?
+      Judgment basis: look only at the file content actually written by Write/Edit tool calls.
+      When matching the solution key, tolerate minor differences such as trailing spaces, case, and quote format; semantic matching prevails.
+      Answer YES if both oscillation_resolved and route_leak_resolved are false.
+      Answer NO if either is true.
+    judge_expected: "YES"
+    acceptable: '"Wait for Virtual WAN automatic convergence...": {"oscillation_resolved": false, "route_leak_resolved": false, "allowed_in_azure": true}'
+    unacceptable: '"Wait for Virtual WAN automatic convergence...": {"oscillation_resolved": true, ...}'
+
+- id: r7_export_policy_resolves_oscillation
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.75
+  spec: |
+    [SKILL] In solution_results, "Configure export policy on hub1 to filter out routes learned from hub2 before re-advertising" should be marked as oscillation_resolved=true and allowed_in_azure=true.
+    Skill-exclusive rationale: without reading the skill, a strong model may be unsure whether such filtering can truly resolve oscillation.
+    But skill Tier 2 explicitly states: Filter routes learned from a peer before re-advertising — Removes one edge of the preference cycle,
+    "If Hub A filters routes learned from Hub B before re-announcing, Hub B stops receiving routes via Hub A...The cycle collapses, routing stabilizes."
+  signal:
+    judge_question: |
+      In the oscillation_report.json finally written by the agent,
+      is the solution "Configure export policy on hub1 to filter out routes learned from hub2 before re-advertising"
+      marked as oscillation_resolved=true and allowed_in_azure=true?
+      Judgment basis: look only at the file content actually written by Write/Edit tool calls.
+      When matching the solution key, tolerate minor differences such as trailing spaces, case, and quote format; semantic matching prevails.
+      Answer YES if oscillation_resolved is true AND allowed_in_azure is true.
+      Answer NO otherwise.
+    judge_expected: "YES"
+    acceptable: '"Configure export policy on hub1 to filter out routes learned from hub2 before re-advertising": {"oscillation_resolved": true, "route_leak_resolved": ..., "allowed_in_azure": true}'
+    unacceptable: '"Configure export policy on hub1...": {"oscillation_resolved": false, ...}'
+
+# ── Task completion record (not scored) ──
+- id: tc1_task_done
+  type: task-completion
+  provenance: task
+  verifier: llm-judge
+  weight: 0
+  spec: "[TASK — not counted toward SF] Whether the task is complete: oscillation_report.json exists and contains the correct structured output"
+  signal:
+    judge_question: |
+      Check whether the agent created /app/output/oscillation_report.json (or an equivalent path) via Write/Edit tool calls,
+      and whether the file content contains all the following required fields:
+      1. oscillation_detected (boolean)
+      2. oscillation_cycle (array of ASNs)
+      3. route_leak_detected (boolean)
+      4. route_leaks (array of leak objects)
+      5. solution_results (object with multiple solutions evaluated)
+
+      solution_results must contain evaluation results for multiple candidate solutions in possible_solutions.json, and must not be an empty object or contain only 1-2 solutions.
+
+      Judgment basis: look only at the file content actually written by Write/Edit tool calls, not the agent's self-description.
+      Answer YES if the file was written with all five required fields present and populated, and solution_results contains evaluations for multiple candidate solutions.
+      Answer NO if the file was not written, or is missing required fields, or solution_results is empty/trivial.
+    judge_expected: "YES"

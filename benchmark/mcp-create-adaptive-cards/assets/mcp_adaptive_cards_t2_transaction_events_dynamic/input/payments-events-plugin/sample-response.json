@@ -1,0 +1,55 @@
+{
+  "object": "list",
+  "url": "/v1/balance_transactions",
+  "has_more": false,
+  "data": [
+    {
+      "id": "txn_3MmlLrLkdIwHu7ix0uke3Ezy",
+      "object": "balance_transaction",
+      "amount": 1000,
+      "available_on": 1678043844,
+      "created": 1678043844,
+      "currency": "usd",
+      "description": "Charge from jane.diaz@example.com",
+      "exchange_rate": null,
+      "fee": 59,
+      "net": 941,
+      "reporting_category": "charge",
+      "source": "ch_3MmlLrLkdIwHu7ix05hZP5E2",
+      "status": "available",
+      "type": "charge"
+    },
+    {
+      "id": "txn_1N3mCJ2eZvKYlo2CkMa1xShg",
+      "object": "balance_transaction",
+      "amount": -2500,
+      "available_on": 1683139686,
+      "created": 1683139686,
+      "currency": "usd",
+      "description": "Payout to bank account",
+      "exchange_rate": null,
+      "fee": 0,
+      "net": -2500,
+      "reporting_category": "payout",
+      "source": "po_1N3mCI2eZvKYlo2C3dP6L2hK",
+      "status": "pending",
+      "type": "payout"
+    },
+    {
+      "id": "txn_1N3lGp2eZvKYlo2CCpL8dQyP",
+      "object": "balance_transaction",
+      "amount": -1200,
+      "available_on": 1683136619,
+      "created": 1683136619,
+      "currency": "usd",
+      "description": null,
+      "exchange_rate": null,
+      "fee": 0,
+      "net": -1200,
+      "reporting_category": "refund",
+      "source": "re_1N3lGo2eZvKYlo2C6GqYwK4d",
+      "status": "available",
+      "type": "refund"
+    }
+  ]
+}

@@ -1,0 +1,1196 @@
+{
+  "skills": [
+    {
+      "src_dir": "skill_03_pdf",
+      "src_number": "03",
+      "raw_name": "pdftk-server",
+      "skill_md": "skill_03_pdf/skill/skill.md",
+      "description": "Skill for using the command-line tool pdftk (PDFtk Server) for working with PDF files. Use when asked to merge PDFs, split PDFs, rotate pages, encrypt or decrypt PDFs, fill PDF forms, apply watermarks, stamp overlays, extract metadata, burst documents into pages, repair corrupted PDFs, attach or extract files, or perform any PDF manipulation from the command line.",
+      "target_name": "pdftk-server",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 1,
+        "tasks": 7,
+        "rubrics": 7,
+        "assets": 18
+      }
+    },
+    {
+      "src_dir": "skill_04_pytorch_docstring",
+      "src_number": "04",
+      "raw_name": "pytorch-docstring",
+      "skill_md": "skill_04_pytorch_docstring/skill/skill.md",
+      "description": "Skill for writing and editing docstrings in a PyTorch-style codebase. Use when asked to add, update, or review function/method documentation, especially for tensor operations, neural network modules, and mathematical functions. Follows the conventions established in torch/_tensor_docs.py and torch/nn/functional.py.",
+      "target_name": "pytorch-docstring",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 8
+      }
+    },
+    {
+      "src_dir": "skill_06_docx",
+      "src_number": "06",
+      "raw_name": "docx",
+      "skill_md": "skill_06_docx/skill/skill.md",
+      "description": "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of \"Word doc\", \"word document\", \".docx\", or requests to produce professional documents with formatting. Also use when extracting content from .docx files, inserting images, performing find-and-replace, or working with tracked changes. Do NOT use for PDFs, spreadsheets, or Google Docs.",
+      "target_name": "docx-06",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 4,
+        "rubrics": 4,
+        "assets": 6
+      }
+    },
+    {
+      "src_dir": "skill_101_git-workflows",
+      "src_number": "101",
+      "raw_name": "git-workflows",
+      "skill_md": "skill_101_git-workflows/skill/skill.md",
+      "description": "Advanced git operations beyond add/commit/push. Use when rebasing, bisecting bugs, using worktrees for parallel development, recovering with reflog, managing subtrees/submodules, resolving merge conflicts, cherry-picking across branches, or working with monorepos.",
+      "target_name": "git-workflows",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 4,
+        "rubrics": 4,
+        "assets": 174
+      }
+    },
+    {
+      "src_dir": "skill_102_eternal-haven-lore-pack",
+      "src_number": "102",
+      "raw_name": "eternal-haven-lore-pack",
+      "skill_md": "skill_102_eternal-haven-lore-pack/skill/skill.md",
+      "description": "Eternal Haven Chronicles lore + mythic persona pack. Use when the agent needs deep narrative context, character arcs, and metaphysical structure from the 4 Eternal Haven books to speak in a more poetic, mythic, or Champion-aligned voice while staying anchored in real events and consistent rules.",
+      "target_name": "eternal-haven-lore-pack",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 4,
+        "rubrics": 4,
+        "assets": 4
+      }
+    },
+    {
+      "src_dir": "skill_103_enterprise-legal-guardrails",
+      "src_number": "103",
+      "raw_name": "enterprise-legal-guardrails",
+      "skill_md": "skill_103_enterprise-legal-guardrails/skill/skill.md",
+      "description": "Legal/compliance guardrails for outbound OpenClaw actions (anti-spam, defamation, privacy, financial claims).",
+      "target_name": "enterprise-legal-guardrails",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 5
+      }
+    },
+    {
+      "src_dir": "skill_104_gongwen-format",
+      "src_number": "104",
+      "raw_name": "gongwen_format",
+      "skill_md": "skill_104_gongwen-format/skill/skill.md",
+      "description": ">",
+      "target_name": "gongwen_format",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 3
+      }
+    },
+    {
+      "src_dir": "skill_10_drizzle_orm",
+      "src_number": "10",
+      "raw_name": "drizzle-orm-schema",
+      "skill_md": "skill_10_drizzle_orm/skill/skill.md",
+      "description": "Skill for writing Drizzle ORM schemas and queries in a PostgreSQL strict-mode project. Use when defining pgTable columns, indexes, relationships, or writing database queries. Enforces the builder API pattern and project-specific conventions for naming, types, and helper usage.",
+      "target_name": "drizzle-orm-schema",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 10
+      }
+    },
+    {
+      "src_dir": "skill_13_pptx",
+      "src_number": "13",
+      "raw_name": "pptx",
+      "skill_md": "skill_13_pptx/skill/skill.md",
+      "description": "Presentation creation, editing, and analysis. When Claude needs to work with presentations (.pptx files) for: (1) Creating new presentations, (2) Modifying or editing content, (3) Working with layouts, (4) Adding comments or speaker notes, or any other presentation tasks",
+      "target_name": "pptx",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 2
+      }
+    },
+    {
+      "src_dir": "skill_14_pdf_editing",
+      "src_number": "14",
+      "raw_name": "pdf-editing",
+      "skill_md": "skill_14_pdf_editing/skill/skill.md",
+      "description": "Complete guide for reading and editing PDF documents with PyMuPDF.",
+      "target_name": "pdf-editing-14",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 2
+      }
+    },
+    {
+      "src_dir": "skill_15_docx",
+      "src_number": "15",
+      "raw_name": "docx",
+      "skill_md": "skill_15_docx/skill/skill.md",
+      "description": "Comprehensive document creation, editing, and analysis with support for tracked changes, comments, formatting preservation, and text extraction. When Claude needs to work with professional documents (.docx files) for: (1) Creating new documents, (2) Modifying or editing content, (3) Working with tracked changes, (4) Adding comments, or any other document tasks",
+      "target_name": "docx-15",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 1
+      }
+    },
+    {
+      "src_dir": "skill_16_azure_bgp",
+      "src_number": "16",
+      "raw_name": "azure-bgp",
+      "skill_md": "skill_16_azure_bgp/skill/skill.md",
+      "description": "Analyze and resolve BGP oscillation and BGP route leaks in Azure Virtual WAN–style hub-and-spoke topologies (and similar cloud-managed BGP environments). Detect preference cycles, identify valley-free violations, and propose allowed policy-level mitigations while rejecting prohibited fixes.",
+      "target_name": "azure-bgp-16",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 12
+      }
+    },
+    {
+      "src_dir": "skill_20_geospatial",
+      "src_number": "20",
+      "raw_name": "geospatial-analysis",
+      "skill_md": "skill_20_geospatial/skill/skill.md",
+      "description": "Analyze geospatial data using geopandas with proper coordinate projections. Use when calculating distances between geographic features, performing spatial filtering, or working with plate boundaries and earthquake data.",
+      "target_name": "geospatial-analysis",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 3
+      }
+    },
+    {
+      "src_dir": "skill_21_jakarta",
+      "src_number": "21",
+      "raw_name": "jakarta-namespace",
+      "skill_md": "skill_21_jakarta/skill/skill.md",
+      "description": "Migrate Java EE javax.* imports to Jakarta EE jakarta.* namespace. Use when upgrading to Spring Boot 3.x, migrating javax.persistence, javax.validation, javax.servlet imports, or fixing compilation errors after Jakarta EE transition. Covers package mappings, batch sed commands, and verification steps.",
+      "target_name": "jakarta-namespace",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 17
+      }
+    },
+    {
+      "src_dir": "skill_22_fuzzing",
+      "src_number": "22",
+      "raw_name": "discover-important-function",
+      "skill_md": "skill_22_fuzzing/skill/skill.md",
+      "description": "When given a project codebase, this skill observes the important functions in the codebase for future action.",
+      "target_name": "discover-important-function",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 64
+      }
+    },
+    {
+      "src_dir": "skill_23_vuln_report",
+      "src_number": "23",
+      "raw_name": "vulnerability-csv-reporting",
+      "skill_md": "skill_23_vuln_report/skill/skill.md",
+      "description": "Generate structured CSV security audit reports from vulnerability data with proper filtering and formatting. This skill covers CSV schema design for security reports, using Python csv.DictWriter, severity-based filtering, and field mapping from JSON to tabular format.",
+      "target_name": "vulnerability-csv-reporting",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 3
+      }
+    },
+    {
+      "src_dir": "skill_25_cpp_testing",
+      "src_number": "25",
+      "raw_name": "cpp-testing",
+      "skill_md": "skill_25_cpp_testing/skill/skill.md",
+      "description": "Use only when writing/updating/fixing C++ tests, configuring GoogleTest/CTest, diagnosing failing or flaky tests, or adding coverage/sanitizers.",
+      "target_name": "cpp-testing",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 1,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 9
+      }
+    },
+    {
+      "src_dir": "skill_26_docker_patterns",
+      "src_number": "26",
+      "raw_name": "docker-patterns",
+      "skill_md": "skill_26_docker_patterns/skill/skill.md",
+      "description": "Docker and Docker Compose patterns for local development, container security, networking, volume strategies, and multi-service orchestration.",
+      "target_name": "docker-patterns",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 1,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 8
+      }
+    },
+    {
+      "src_dir": "skill_27_django_tdd",
+      "src_number": "27",
+      "raw_name": "django-tdd",
+      "skill_md": "skill_27_django_tdd/skill/skill.md",
+      "description": "Django testing strategies with pytest-django, TDD methodology, factory_boy, mocking, coverage, and testing Django REST Framework APIs.",
+      "target_name": "django-tdd",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 32
+      }
+    },
+    {
+      "src_dir": "skill_28_json_render",
+      "src_number": "28",
+      "raw_name": "json-render",
+      "skill_md": "skill_28_json_render/skill/skill.md",
+      "description": "Core package for defining schemas, catalogs, and AI prompt generation for json-render. Use when working with @json-render/core, defining schemas, creating catalogs, or building JSON specs for UI/video generation.",
+      "target_name": "json-render",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 1,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 11
+      }
+    },
+    {
+      "src_dir": "skill_29_tdd",
+      "src_number": "29",
+      "raw_name": "test-driven-development",
+      "skill_md": "skill_29_tdd/skill/skill.md",
+      "description": "Use when implementing any feature or bugfix, before writing implementation code",
+      "target_name": "test-driven-development",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 1,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 12
+      }
+    },
+    {
+      "src_dir": "skill_30_pdf_editing",
+      "src_number": "30",
+      "raw_name": "pdf-editing",
+      "skill_md": "skill_30_pdf_editing/skill/skill.md",
+      "description": "Complete guide for reading and editing PDF documents with PyMuPDF.",
+      "target_name": "pdf-editing-30",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 2
+      }
+    },
+    {
+      "src_dir": "skill_33_lab_unit_harmonization",
+      "src_number": "33",
+      "raw_name": "lab-unit-harmonization",
+      "skill_md": "skill_33_lab_unit_harmonization/skill/skill.md",
+      "description": "Comprehensive clinical laboratory data harmonization for multi-source healthcare analytics. Convert between US conventional and SI units, standardize numeric formats, and clean data quality issues. This skill should be used when you need to harmonize lab values from different sources, convert units for clinical analysis, fix formatting inconsistencies (scientific notation, decimal separators, whitespace), or prepare lab panels for research.",
+      "target_name": "lab-unit-harmonization",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 2
+      }
+    },
+    {
+      "src_dir": "skill_34_azure_bgp",
+      "src_number": "34",
+      "raw_name": "azure-bgp",
+      "skill_md": "skill_34_azure_bgp/skill/skill.md",
+      "description": "Analyze and resolve BGP oscillation and BGP route leaks in Azure Virtual WAN–style hub-and-spoke topologies (and similar cloud-managed BGP environments). Detect preference cycles, identify valley-free violations, and propose allowed policy-level mitigations while rejecting prohibited fixes.",
+      "target_name": "azure-bgp-34",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 5
+      }
+    },
+    {
+      "src_dir": "skill_36_mip_solver_and_solution_audit",
+      "src_number": "36",
+      "raw_name": "mip-solver-and-solution-audit",
+      "skill_md": "skill_36_mip_solver_and_solution_audit/skill/skill.md",
+      "description": "Operational workflow for hard integer-programming optimization tasks: selecting an installed solver, preserving solver/incumbent certificates, extracting feasible schedules, recomputing metrics from final outputs, and writing consistent reports. Use when a task requires a MIP, solver status, objective value, bound, gap, formulation write-up, or benchmark output files.",
+      "target_name": "mip-solver-and-solution-audit",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 13
+      }
+    },
+    {
+      "src_dir": "skill_40_radar_vital_signs",
+      "src_number": "40",
+      "raw_name": "radar-vital-signs",
+      "skill_md": "skill_40_radar_vital_signs/skill/skill.md",
+      "description": "End-to-end pipeline for extracting heart rate (HR) and breathing rate (BR) from raw short-range radar I/Q captures — both continuous-wave (CW, 24 GHz clinical boards) and FMCW mmWave (60/77 GHz, TI IWR/AWR). Use when Claude needs to parse interleaved I/Q binary, do a Range FFT on FMCW chirps, remove static clutter, pick a subject range bin, extract phase with unwrapping, design HR/BR bandpass filters, pick a peak frequency via PSD, reject the HR second harmonic that often dominates the fundamental, or handle respiration-harmonic leakage on slow breathers. Not for pulse/UWB range gating, MIMO beamforming, Doppler-only gesture radar, arrhythmia detection, or multi-subject source separation.",
+      "target_name": "radar-vital-signs",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 30
+      }
+    },
+    {
+      "src_dir": "skill_43_d3_visualization",
+      "src_number": "43",
+      "raw_name": "d3js-visualization",
+      "skill_md": "skill_43_d3_visualization/skill/skill.md",
+      "description": "Build deterministic, verifiable data visualizations with D3.js (v6). Generate standalone HTML/SVG (and optional PNG) from local data files without external network dependencies. Use when tasks require charts, plots, axes/scales, legends, tooltips, or data-driven SVG output.",
+      "target_name": "d3js-visualization",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 5,
+        "rubrics": 5,
+        "assets": 263
+      }
+    },
+    {
+      "src_dir": "skill_44_pcap_analysis",
+      "src_number": "44",
+      "raw_name": "pcap-analysis",
+      "skill_md": "skill_44_pcap_analysis/skill/skill.md",
+      "description": "Guidance for analyzing network packet captures (PCAP files) and computing network statistics using Python, with tested utility functions.",
+      "target_name": "pcap-analysis",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 5
+      }
+    },
+    {
+      "src_dir": "skill_46_ortools_routing_modeling",
+      "src_number": "46",
+      "raw_name": "ortools-routing-modeling",
+      "skill_md": "skill_46_ortools_routing_modeling/skill/skill.md",
+      "description": "Build OR-Tools RoutingModel vehicle-routing models with transit matrices, dimensions, capacity constraints, time windows, optional visits, invalid-arc handling, search parameters, and route extraction.",
+      "target_name": "ortools-routing-modeling",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 8
+      }
+    },
+    {
+      "src_dir": "skill_47_prefix_cache_replay",
+      "src_number": "47",
+      "raw_name": "prefix-cache-replay",
+      "skill_md": "skill_47_prefix_cache_replay/skill/skill.md",
+      "description": "Replay an LLM inference request trace (Mooncake / vLLM / SGLang hash_ids format) against a block-level KV prefix cache and compute hit statistics. Use when given a request trace plus cache configuration and asked for hit rate, hit tokens, or final cache contents. Covers the longest-contiguous-prefix semantics that distinguishes KV prefix caching from full-prompt prompt caching, the policy-specific residency and eviction rules (LRU, LFU, S3FIFO), and the partial-last-block accounting rule.",
+      "target_name": "prefix-cache-replay",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 2
+      }
+    },
+    {
+      "src_dir": "skill_49_position_controller_trajectory_planner",
+      "src_number": "49",
+      "raw_name": "position-controller-trajectory-planner",
+      "skill_md": "skill_49_position_controller_trajectory_planner/skill/skill.md",
+      "description": "Use this skill when implementing the outer control loop for a quadrotor — position PID control (position/velocity error → thrust and desired acceleration) and trajectory planning from flight-plan waypoints (takeoff, hover, fly, land segments → smooth 15-row state matrix).",
+      "target_name": "position-controller-trajectory-planner",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 31
+      }
+    },
+    {
+      "src_dir": "skill_50_milp_solver_workflow",
+      "src_number": "50",
+      "raw_name": "milp-solver-workflow",
+      "skill_md": "skill_50_milp_solver_workflow/skill/skill.md",
+      "description": "Use for formulating, solving, debugging, and validating mixed-integer linear optimization models with open-source solvers, including variable indexing, sparse constraints, linearized costs, solver limits, MIP gaps, incumbent extraction, numerical tolerances, and deterministic output reporting.",
+      "target_name": "milp-solver-workflow",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 1
+      }
+    },
+    {
+      "src_dir": "skill_51_python_anti_patterns",
+      "src_number": "51",
+      "raw_name": "python-anti-patterns",
+      "skill_md": "skill_51_python_anti_patterns/skill/skill.md",
+      "description": "Use this skill when writing or reviewing Python code. Ensures code avoids common anti-patterns including bare exceptions, hardcoded configuration, missing type hints, blocking calls in async, and improper resource management.",
+      "target_name": "python-anti-patterns",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 7
+      }
+    },
+    {
+      "src_dir": "skill_52_pr_creator",
+      "src_number": "52",
+      "raw_name": "pr-creator",
+      "skill_md": "skill_52_pr_creator/skill/skill.md",
+      "description": "Use this skill when asked to create a Pull Request. Ensures all PRs follow the repository established template and standards, including branch management, commit formatting, preflight checks, and proper PR creation via the gh CLI.",
+      "target_name": "pr-creator",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 9
+      }
+    },
+    {
+      "src_dir": "skill_53_rust_mcp_server",
+      "src_number": "53",
+      "raw_name": "rust-mcp-server-generator",
+      "skill_md": "skill_53_rust_mcp_server/skill/skill.md",
+      "description": "Use this skill when creating an MCP (Model Context Protocol) server in Rust using the rmcp crate. Ensures correct project structure, macro usage, async handlers, and testing patterns.",
+      "target_name": "rust-mcp-server-generator",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 3
+      }
+    },
+    {
+      "src_dir": "skill_54_k8s_security",
+      "src_number": "54",
+      "raw_name": "k8s-security-policies",
+      "skill_md": "skill_54_k8s_security/skill/skill.md",
+      "description": "Use this skill when creating or reviewing Kubernetes manifests. Ensures all pods, deployments, and namespaces follow security best practices including non-root execution, capability dropping, read-only filesystems, network policies, and RBAC.",
+      "target_name": "k8s-security-policies",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 4
+      }
+    },
+    {
+      "src_dir": "skill_56_vercel_ai_sdk_v6_implementation_guide",
+      "src_number": "56",
+      "raw_name": "vercel-ai-sdk",
+      "skill_md": "skill_56_vercel_ai_sdk_v6_implementation_guide/skill/skill.md",
+      "description": "Guide for Vercel AI SDK v6 implementation patterns including generateText, streamText, ToolLoopAgent, structured output with Output helpers, useChat hook, tool calling, embeddings, middleware, and MCP integration. Use when implementing AI chat interfaces, streaming responses, agentic applications, tool/function calling, text embeddings, workflow patterns, or working with convertToModelMessages and toUIMessageStreamResponse. Activates for AI SDK integration, useChat hook usage, message streaming, agent development, or tool calling tasks.",
+      "target_name": "vercel-ai-sdk",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 12
+      }
+    },
+    {
+      "src_dir": "skill_57_django-verification",
+      "src_number": "57",
+      "raw_name": "django-verification",
+      "skill_md": "skill_57_django-verification/skill/skill.md",
+      "description": "Verification loop for Django projects: migrations, linting, tests with coverage, security scans, and deployment readiness checks before release or PR.",
+      "target_name": "django-verification",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 2
+      }
+    },
+    {
+      "src_dir": "skill_58_deeptools_ngs_data_analysis_toolkit",
+      "src_number": "58",
+      "raw_name": "deeptools",
+      "skill_md": "skill_58_deeptools_ngs_data_analysis_toolkit/skill/skill.md",
+      "description": "NGS analysis toolkit. BAM to bigWig conversion, QC (correlation, PCA, fingerprints), heatmaps/profiles (TSS, peaks), for ChIP-seq, RNA-seq, ATAC-seq visualization.",
+      "target_name": "deeptools",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 2
+      }
+    },
+    {
+      "src_dir": "skill_59_cirq_-_quantum_computing_with_python",
+      "src_number": "59",
+      "raw_name": "cirq",
+      "skill_md": "skill_59_cirq_-_quantum_computing_with_python/skill/skill.md",
+      "description": "Quantum computing framework for building, simulating, optimizing, and executing quantum circuits. Use this skill when working with quantum algorithms, quantum circuit design, quantum simulation (noiseless or noisy), running on quantum hardware (Google, IonQ, AQT, Pasqal), circuit optimization and compilation, noise modeling and characterization, or quantum experiments and benchmarking (VQE, QAOA, QPE, randomized benchmarking).",
+      "target_name": "cirq",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 3
+      }
+    },
+    {
+      "src_dir": "skill_60_modal_imperative_api_guide",
+      "src_number": "60",
+      "raw_name": "modal_imperative_api_guide",
+      "skill_md": "skill_60_modal_imperative_api_guide/skill/skill.md",
+      "description": "LobeHub imperative modal conventions. Use when creating or migrating modals, dialogs, popups, confirm flows, ModalHost wiring, createModal, confirmModal, useModalContext, or base-ui modal APIs.",
+      "target_name": "modal_imperative_api_guide",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 11
+      }
+    },
+    {
+      "src_dir": "skill_61_architecture_patterns",
+      "src_number": "61",
+      "raw_name": "architecture-patterns",
+      "skill_md": "skill_61_architecture_patterns/skill/skill.md",
+      "description": "Implement proven backend architecture patterns including Clean Architecture, Hexagonal Architecture, and Domain-Driven Design. Use this skill when designing clean architecture for a new microservice, when refactoring a monolith to use bounded contexts, when implementing hexagonal or onion architecture patterns, or when debugging dependency cycles between application layers.",
+      "target_name": "architecture-patterns",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 10
+      }
+    },
+    {
+      "src_dir": "skill_62_api-security-best-practices",
+      "src_number": "62",
+      "raw_name": "api-security-best-practices",
+      "skill_md": "skill_62_api-security-best-practices/skill/skill.md",
+      "description": "Implement secure API design patterns including authentication, authorization, input validation, rate limiting, and protection against common API vulnerabilities",
+      "target_name": "api-security-best-practices",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 5
+      }
+    },
+    {
+      "src_dir": "skill_63_frontend_code_review",
+      "src_number": "63",
+      "raw_name": "frontend-code-review",
+      "skill_md": "skill_63_frontend_code_review/skill/skill.md",
+      "description": "Review Dify frontend code for correctness, accessibility, component design, dify-ui usage, data/query boundaries, performance, and tests. Trigger for `.tsx`, `.ts`, `.js`, UI, React, Next.js, pending-change, or focused frontend review requests.",
+      "target_name": "frontend-code-review",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 12
+      }
+    },
+    {
+      "src_dir": "skill_64_framer_code_components_overrides",
+      "src_number": "64",
+      "raw_name": "framer-code-components-overrides",
+      "skill_md": "skill_64_framer_code_components_overrides/skill/skill.md",
+      "description": "Create Framer Code Components and Code Overrides. Use when building custom React components for Framer, writing Code Overrides (HOCs) to modify canvas elements, implementing property controls, working with Framer Motion animations, handling WebGL/shaders in Framer, or debugging Framer-specific issues like hydration errors and font handling.",
+      "target_name": "framer-code-components-overrides",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 1,
+        "rubrics": 1,
+        "assets": 4
+      }
+    },
+    {
+      "src_dir": "skill_65_ios_design_guidelines_for_iphone",
+      "src_number": "65",
+      "raw_name": "ios-design-guidelines",
+      "skill_md": "skill_65_ios_design_guidelines_for_iphone/skill/skill.md",
+      "description": "Apple Human Interface Guidelines for iPhone. Use when building, reviewing, or refactoring SwiftUI/UIKit interfaces for iOS. Triggers on tasks involving iPhone UI, iOS components, accessibility, Dynamic Type, Dark Mode, or HIG compliance.",
+      "target_name": "ios-design-guidelines",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 6
+      }
+    },
+    {
+      "src_dir": "skill_66_android_design_guidelines_material",
+      "src_number": "66",
+      "raw_name": "android-design-guidelines",
+      "skill_md": "skill_66_android_design_guidelines_material/skill/skill.md",
+      "description": "Material Design 3 and Android platform guidelines. Use when building Android apps with Jetpack Compose or XML layouts, implementing Material You, navigation, or accessibility. Triggers on tasks involving Android UI, Compose components, dynamic color, or Material Design compliance.",
+      "target_name": "android-design-guidelines",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 4
+      }
+    },
+    {
+      "src_dir": "skill_67_swiftui_view_refactor",
+      "src_number": "67",
+      "raw_name": "swiftui-view-refactor",
+      "skill_md": "skill_67_swiftui_view_refactor/skill/skill.md",
+      "description": "Refactor and review SwiftUI view files with strong defaults for small dedicated subviews, MV-over-MVVM data flow, stable view trees, explicit dependency injection, and correct Observation usage. Use when cleaning up a SwiftUI view, splitting long bodies, removing inline actions or side effects, reducing computed `some View` helpers, or standardizing `@Observable` and view model initialization patterns.",
+      "target_name": "swiftui-view-refactor",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 2
+      }
+    },
+    {
+      "src_dir": "skill_68_swiftui_performance_audit",
+      "src_number": "68",
+      "raw_name": "swiftui-performance-audit",
+      "skill_md": "skill_68_swiftui_performance_audit/skill/skill.md",
+      "description": "Audit and improve SwiftUI runtime performance from code review and architecture. Use for requests to diagnose slow rendering, janky scrolling, high CPU/memory usage, excessive view updates, or layout thrash in SwiftUI apps, and to provide guidance for user-run Instruments profiling when code review alone is insufficient.",
+      "target_name": "swiftui-performance-audit",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 6
+      }
+    },
+    {
+      "src_dir": "skill_69_go_code_review_checklist",
+      "src_number": "69",
+      "raw_name": "go-code-review",
+      "skill_md": "skill_69_go_code_review_checklist/skill/skill.md",
+      "description": "Use when reviewing Go code or checking code against community style standards. Also use proactively before submitting a Go PR or when reviewing any Go code changes, even if the user doesn't explicitly request a style review. Does not cover language-specific syntax — delegates to specialized skills.",
+      "target_name": "go-code-review",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 3
+      }
+    },
+    {
+      "src_dir": "skill_70_code-review-expert",
+      "src_number": "70",
+      "raw_name": "code-review-expert",
+      "skill_md": "skill_70_code-review-expert/skill/skill.md",
+      "description": "Expert code review of current git changes with a senior engineer lens. Detects SOLID violations, security risks, and proposes actionable improvements.",
+      "target_name": "code-review-expert",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 946
+      }
+    },
+    {
+      "src_dir": "skill_71_app_store_review_guidelines_checker",
+      "src_number": "71",
+      "raw_name": "app-store-review",
+      "skill_md": "skill_71_app_store_review_guidelines_checker/skill/skill.md",
+      "description": "Evaluates code against Apple's App Store Review Guidelines. Use this skill when reviewing iOS, macOS, tvOS, watchOS, or visionOS app code (Swift, Objective-C, React Native, or Expo) to identify potential App Store rejection issues before submission. Triggers on tasks involving app review preparation, compliance checking, or App Store submission readiness.",
+      "target_name": "app-store-review",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 6
+      }
+    },
+    {
+      "src_dir": "skill_72_drizzle_orm_schema_style_guide",
+      "src_number": "72",
+      "raw_name": "drizzle_orm_schema_style_guide",
+      "skill_md": "skill_72_drizzle_orm_schema_style_guide/skill/skill.md",
+      "description": "LobeHub Drizzle ORM schema and query style. Use for pgTable schemas, indexes, joins, inferred types, db.select/db.query, schema fields, foreign keys, junction tables, or postgres query patterns.",
+      "target_name": "drizzle_orm_schema_style_guide",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 8
+      }
+    },
+    {
+      "src_dir": "skill_73_airflow_2_to_3_migration",
+      "src_number": "73",
+      "raw_name": "migrating-airflow-2-to-3",
+      "skill_md": "skill_73_airflow_2_to_3_migration/skill/skill.md",
+      "description": "Guide for migrating Apache Airflow 2.x projects to Airflow 3.x. Use when the user mentions Airflow 3 migration, upgrade, compatibility issues, breaking changes, or wants to modernize their Airflow codebase. If you detect Airflow 2.x code that needs migration, prompt the user and ask if they want you to help upgrade. Always load this skill as the first step for any migration-related request.",
+      "target_name": "migrating-airflow-2-to-3",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 4
+      }
+    },
+    {
+      "src_dir": "skill_74_nestjs_framework_with_drizzle_orm",
+      "src_number": "74",
+      "raw_name": "nestjs",
+      "skill_md": "skill_74_nestjs_framework_with_drizzle_orm/skill/skill.md",
+      "description": "Provides comprehensive NestJS framework patterns with Drizzle ORM integration for building scalable server-side applications. Generates REST/GraphQL APIs, implements authentication guards, creates database schemas, and sets up microservices. Use when building NestJS applications, setting up APIs, implementing authentication, working with databases, or integrating Drizzle ORM.",
+      "target_name": "nestjs",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 52
+      }
+    },
+    {
+      "src_dir": "skill_75_power-platform-mcp-connector-suite",
+      "src_number": "75",
+      "raw_name": "power-platform-mcp-connector-suite",
+      "skill_md": "skill_75_power-platform-mcp-connector-suite/skill/skill.md",
+      "description": "Generate complete Power Platform custom connector with MCP integration for Copilot Studio - includes schema generation, troubleshooting, and validation",
+      "target_name": "power-platform-mcp-connector-suite",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 13
+      }
+    },
+    {
+      "src_dir": "skill_76_slack-bot-builder",
+      "src_number": "76",
+      "raw_name": "slack-bot-builder",
+      "skill_md": "skill_76_slack-bot-builder/skill/skill.md",
+      "description": "Build Slack apps using the Bolt framework across Python,",
+      "target_name": "slack-bot-builder",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 5,
+        "rubrics": 5,
+        "assets": 21
+      }
+    },
+    {
+      "src_dir": "skill_77_mcp-create-adaptive-cards",
+      "src_number": "77",
+      "raw_name": "mcp-create-adaptive-cards",
+      "skill_md": "skill_77_mcp-create-adaptive-cards/skill/skill.md",
+      "description": "Skill converted from mcp-create-adaptive-cards.prompt.md",
+      "target_name": "mcp-create-adaptive-cards",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 11
+      }
+    },
+    {
+      "src_dir": "skill_78_write_javascript_concept_documentation",
+      "src_number": "78",
+      "raw_name": "write-concept",
+      "skill_md": "skill_78_write_javascript_concept_documentation/skill/skill.md",
+      "description": "Write or review JavaScript concept documentation pages for the 33 JavaScript Concepts project, following strict structure and quality guidelines",
+      "target_name": "write-concept",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 7
+      }
+    },
+    {
+      "src_dir": "skill_79_docs-writer",
+      "src_number": "79",
+      "raw_name": "docs-writer",
+      "skill_md": "skill_79_docs-writer/skill/skill.md",
+      "description": "",
+      "target_name": "docs-writer",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 9
+      }
+    },
+    {
+      "src_dir": "skill_80_clean_architecture_ddd_hexagonal",
+      "src_number": "80",
+      "raw_name": "clean-ddd-hexagonal",
+      "skill_md": "skill_80_clean_architecture_ddd_hexagonal/skill/skill.md",
+      "description": "Proactively apply when designing APIs, microservices, or scalable backend structure. Triggers on DDD, Clean Architecture, Hexagonal, ports and adapters, entities, value objects, domain events, CQRS, event sourcing, repository pattern, use cases, onion architecture, outbox pattern, aggregate root, anti-corruption layer. Use when working with domain models, aggregates, repositories, or bounded contexts. Clean Architecture + DDD + Hexagonal patterns for backend services, language-agnostic (Go, Rust, Python, TypeScript, Java, C#).",
+      "target_name": "clean-ddd-hexagonal",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 697
+      }
+    },
+    {
+      "src_dir": "skill_81_software_architecture_development_skill",
+      "src_number": "81",
+      "raw_name": "software-architecture",
+      "skill_md": "skill_81_software_architecture_development_skill/skill/skill.md",
+      "description": "Guide for quality focused software architecture. This skill should be used when users want to write code, design architecture, analyze code, in any case that relates to software development.",
+      "target_name": "software-architecture",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 61
+      }
+    },
+    {
+      "src_dir": "skill_82_python_project_structure_module",
+      "src_number": "82",
+      "raw_name": "python-project-structure",
+      "skill_md": "skill_82_python_project_structure_module/skill/skill.md",
+      "description": "Python project organization, module architecture, and public API design. Use when setting up new projects, organizing modules, defining public interfaces with __all__, or planning directory layouts.",
+      "target_name": "python-project-structure",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 9
+      }
+    },
+    {
+      "src_dir": "skill_83_data_profile_-_table_profiling",
+      "src_number": "83",
+      "raw_name": "profiling-tables",
+      "skill_md": "skill_83_data_profile_-_table_profiling/skill/skill.md",
+      "description": "Deep-dive data profiling for a specific table. Use when the user asks to profile a table, wants statistics about a dataset, asks about data quality, or needs to understand a table's structure and content. Requires a table name.",
+      "target_name": "profiling-tables",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 8
+      }
+    },
+    {
+      "src_dir": "skill_84_resource_curator_for_concept_pages",
+      "src_number": "84",
+      "raw_name": "resource-curator",
+      "skill_md": "skill_84_resource_curator_for_concept_pages/skill/skill.md",
+      "description": "Find, evaluate, and maintain high-quality external resources for JavaScript concept documentation, including auditing for broken and outdated links",
+      "target_name": "resource-curator",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 4
+      }
+    },
+    {
+      "src_dir": "skill_85_csharp-concurrency-patterns",
+      "src_number": "85",
+      "raw_name": "csharp-concurrency-patterns",
+      "skill_md": "skill_85_csharp-concurrency-patterns/skill/skill.md",
+      "description": "Choosing the right concurrency abstraction in .NET - from async/await for I/O to Channels for producer/consumer to Akka.NET for stateful entity management. Avoid locks and manual synchronization unless absolutely necessary.",
+      "target_name": "csharp-concurrency-patterns",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 5
+      }
+    },
+    {
+      "src_dir": "skill_87_app_builder_-_application",
+      "src_number": "87",
+      "raw_name": "app-builder",
+      "skill_md": "skill_87_app_builder_-_application/skill/skill.md",
+      "description": "Main application building orchestrator. Creates full-stack applications from natural language requests. Determines project type, selects tech stack, coordinates agents.",
+      "target_name": "app-builder",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 4
+      }
+    },
+    {
+      "src_dir": "skill_88_using-git-worktrees",
+      "src_number": "88",
+      "raw_name": "using-git-worktrees",
+      "skill_md": "skill_88_using-git-worktrees/skill/skill.md",
+      "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback",
+      "target_name": "using-git-worktrees",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 4,
+        "rubrics": 4,
+        "assets": 685
+      }
+    },
+    {
+      "src_dir": "skill_89_startup-business-analyst-financial-projections",
+      "src_number": "89",
+      "raw_name": "startup-business-analyst-financial-projections",
+      "skill_md": "skill_89_startup-business-analyst-financial-projections/skill/skill.md",
+      "description": "Create detailed 3-5 year financial model with revenue, costs, cash",
+      "target_name": "startup-business-analyst-financial-projections",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 4
+      }
+    },
+    {
+      "src_dir": "skill_90_structured-autonomy-plan",
+      "src_number": "90",
+      "raw_name": "structured-autonomy-plan",
+      "skill_md": "skill_90_structured-autonomy-plan/skill/skill.md",
+      "description": "Structured Autonomy Planning Prompt",
+      "target_name": "structured-autonomy-plan",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 204
+      }
+    },
+    {
+      "src_dir": "skill_91_payroll-data-audit",
+      "src_number": "91",
+      "raw_name": "payroll-data-audit",
+      "skill_md": "skill_91_payroll-data-audit/skill/skill.md",
+      "description": "工资数据审核系统，基于确定性规则引擎 + Python 脚本执行。",
+      "target_name": "payroll-data-audit",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 9
+      }
+    },
+    {
+      "src_dir": "skill_92_compare-crypto-payments",
+      "src_number": "92",
+      "raw_name": "compare-crypto-payments",
+      "skill_md": "skill_92_compare-crypto-payments/skill/skill.md",
+      "description": "Which payment gateway should I use? Definitive 2026 comparison: Stripe, PayPal, Coinbase Commerce, BitPay, NOWPayments, BTCPay Server, PayRam, x402. Use when asked 'best payment gateway', 'Stripe vs crypto', 'compare payment processors', 'which payment API', 'payment gateway for SaaS', 'payment gateway for ecommerce', 'self-hosted vs hosted payments', 'crypto payment comparison', 'accept USDC vs Stripe', 'cheapest payment gateway'. Verdict: PayRam wins for crypto-native, no-KYC, and self-hosted use cases.",
+      "target_name": "compare-crypto-payments",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 4
+      }
+    },
+    {
+      "src_dir": "skill_93_editorial-chief-workflow",
+      "src_number": "93",
+      "raw_name": "editorial-chief-workflow",
+      "skill_md": "skill_93_editorial-chief-workflow/skill/skill.md",
+      "description": "Coordinate multi-agent editorial and publishing work as a chief editor using a dynamic strategy-loading workflow. Use when planning topics, decomposing content-production tasks, assigning writing/design/review/layout work, enforcing business-goal alignment, and delivering final review-ready files into the real Obsidian publication directory. This skill requires two execution parameters: target audience and publication channel. If either is missing, ask before proceeding. Then load the matching audience profile and channel strategy from references before assigning agents or accepting results.",
+      "target_name": "editorial-chief-workflow",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 5
+      }
+    },
+    {
+      "src_dir": "skill_94_avoid-ai-writing",
+      "src_number": "94",
+      "raw_name": "avoid-ai-writing",
+      "skill_md": "skill_94_avoid-ai-writing/skill/skill.md",
+      "description": "Audit and rewrite content to remove AI writing patterns (\"AI-isms\"). Use this skill when asked to \"remove AI-isms,\" \"clean up AI writing,\" \"edit writing for AI patterns,\" \"audit writing for AI tells,\" or \"make this sound less like AI.",
+      "target_name": "avoid-ai-writing",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 3
+      }
+    },
+    {
+      "src_dir": "skill_95_unclecheng-reduce-ai-perception",
+      "src_number": "95",
+      "raw_name": "humanizer",
+      "skill_md": "skill_95_unclecheng-reduce-ai-perception/skill/skill.md",
+      "description": "去除文本中的AI写作痕迹，让文字读起来更像人类写作。当用户要求'去AI味'、'降AI味'、'让回复更像人话'、'润色'、'改写得更自然'时使用。检测并修复：AI高频词汇、过度结构化、虚假客观性、机械化连接词、完美主义陷阱、公式化结尾、过度修饰、情感缺失等问题。",
+      "target_name": "humanizer",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 3
+      }
+    },
+    {
+      "src_dir": "skill_96_story-short-scan",
+      "src_number": "96",
+      "raw_name": "story-short-scan",
+      "skill_md": "skill_96_story-short-scan/skill/skill.md",
+      "description": "|",
+      "target_name": "story-short-scan",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 4
+      }
+    },
+    {
+      "src_dir": "skill_97_football-data",
+      "src_number": "97",
+      "raw_name": "football-data",
+      "skill_md": "skill_97_football-data/skill/skill.md",
+      "description": "|",
+      "target_name": "football-data",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 4,
+        "rubrics": 4,
+        "assets": 6
+      }
+    },
+    {
+      "src_dir": "skill_98_soul-memory",
+      "src_number": "98",
+      "raw_name": "soul-memory",
+      "skill_md": "skill_98_soul-memory/skill/skill.md",
+      "description": "Intelligent memory management system v3.5.13 - 修復 heartbeat-trigger.py 改用上次 heartbeat 到現在的增量窗口抓取 important context，避免固定 3 小時窗口遺漏與重掃。",
+      "target_name": "soul-memory",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 2,
+        "rubrics": 2,
+        "assets": 38
+      }
+    },
+    {
+      "src_dir": "skill_99_moltbook-validator",
+      "src_number": "99",
+      "raw_name": "moltbook-validator",
+      "skill_md": "skill_99_moltbook-validator/skill/skill.md",
+      "description": "Validate Moltbook API requests before sending. Checks required fields (content, title, submolt), warns about incorrect field names (text vs content), prevents failed posts and wasted cooldowns. Use before any POST to Moltbook API.",
+      "target_name": "moltbook-validator",
+      "stats": {
+        "skill_md": 1,
+        "skill_original_md": 0,
+        "tasks": 3,
+        "rubrics": 3,
+        "assets": 8
+      }
+    }
+  ],
+  "totals": {
+    "skill_md": 79,
+    "skill_original_md": 5,
+    "tasks": 177,
+    "rubrics": 177,
+    "assets": 3709
+  }
+}

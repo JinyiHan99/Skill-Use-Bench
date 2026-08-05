@@ -1,0 +1,43 @@
+task_id: football_data_t2_pl_availability_deep_dive
+skill_id: football-data
+description: |
+  I need to make a one-page "recent form + injury/absence impact" pre-match background for a Chelsea fan. `assets/football_data_t2_pl_availability_deep_dive/input/openfootball_2025_26_premierleague.txt` is the schedule reference I have on hand, but please supplement more currently useful information: recent match performance, key data trends, and players currently possibly absent or doubtful. Please write the conclusion as a short report that can be sent directly to an ordinary fan.
+initial_state:
+  assets:
+    - path: assets/football_data_t2_pl_availability_deep_dive/input/openfootball_2025_26_premierleague.txt
+      source: "https://raw.githubusercontent.com/openfootball/england/master/2025-26/1-premierleague.txt"
+      real_state: "OpenFootball England 2025-26 Premier League schedule text, used as the user's existing schedule reference; downloaded and verified size 30299 bytes."
+      preparation: |
+        mkdir -p assets/football_data_t2_pl_availability_deep_dive/input
+        curl -L --fail https://raw.githubusercontent.com/openfootball/england/master/2025-26/1-premierleague.txt -o assets/football_data_t2_pl_availability_deep_dive/input/openfootball_2025_26_premierleague.txt
+  tools_available:
+    - shell
+    - python
+    - internet
+expected_trigger: true
+skill_constraints_tested:
+  - id: team_id_discovery_before_team_schedule
+    description: "team_id must not be guessed; the skill requires discovering Chelsea's ESPN team_id via team search or schedule discovery before querying the team schedule."
+    exclusive: "A model that does not read the skill is prone to writing Chelsea=some ID based on common sense, or only filtering by input text strings."
+  - id: premier_league_only_missing_players
+    description: "Injury/absence information comes from the Premier League-specific capability; only a PL season_id is applicable, and the current season should be obtained first."
+    exclusive: "A model that does not read the skill may use team profile as a roster source, or try to query injuries on a non-PL / wrong season_id and get empty results."
+  - id: top5_xg_recent_form
+    description: "The Premier League is a top-5 league; xG and player-level xG/xA can be supplemented for recently completed matches; if very recent matches are missing, they should be handled cleanly."
+    exclusive: "A model that does not read the skill, even if it knows the xG concept, is prone to guessing the wrong interface path, ignoring the top-5 league applicability scope, or exposing raw errors when recent-match xG is not synced; the skill requires attempting xG / player-level xG data for recently completed Premier League matches and degrading cleanly when missing."
+notes: |
+  - Core test point: the deep scenario covers the multi-step combination of search_team → team schedule → match stats/xG → PL injury data, while avoiding treating team profile as a roster.
+  - Expected correct behavior: find Chelsea, select recent closed matches, aggregate scores, basic statistics, xG/player data (when available), then filter Chelsea players using the PL absent/doubtful list.
+  - If the evaluation date falls in the off-season or season-transition period, after the model correctly discovers the current Premier League season and attempts team schedule / missing players / xG, encountering empty or unsynced data and naturally degrading the explanation in the final report should not be judged as a skill-following failure.
+  - skill_following evaluation must be based on the tool-call trace, not just the final report content; using generic web search to replace the football-data / sports-skills data pipeline for recent matches, xG, or injury information should be judged as not following the skill.
+  - internet may only be used for installation, environment preparation, or auxiliary verification; core football data retrieval should be done via the football-data skill's corresponding CLI/SDK.
+  - Common model error behaviors: calling `get_team_profile` and treating the empty `players[]` as no injuries; hard-coding `premier-league-2025` without discovering the current season; calling non-existent `get_team_roster`; directly showing the CLI raw error when xG is missing.
+  - baseline_correctness_signals:
+      - The short report includes Chelsea's recent form, at least two categories of match data, and injury impact.
+      - The tone targets ordinary fans, not just a JSON dump.
+  - skill_following_signals:
+      - Before the first team-schedule query, the target team's team_id must be discovered via team search or season team list; the model must not directly guess or hard-code team_id.
+      - Before querying injuries, first obtain the current Premier League season season_id, then call the Premier League-specific absent-players capability, and filter by the target team.
+      - At least attempt to get xG or player-level xG/xA for 1 recently completed Premier League match; if missing, explain naturally or skip, without exposing CLI raw errors.
+      - Must not treat the players[] returned by get_team_profile as a roster or injury source.
+      - If truncated mid-way, team_id discovery, current-season discovery, the missing-players path, and whether the team-profile-roster trap was avoided can still be evaluated separately.

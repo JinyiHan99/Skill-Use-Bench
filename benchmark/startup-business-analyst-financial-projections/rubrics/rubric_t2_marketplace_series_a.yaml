@@ -1,0 +1,150 @@
+rules:
+  - id: g1_observable_write_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable write attempt to the Series A finance package markdown artifact. The gate only confirms an attempt was made, not content correctness.
+    signal:
+      pattern: >-
+        (?is)(?:tool["']?:\s*["']?(?:Write|Edit|markdown_write)["']?.{0,500}file_path["']?:\s*["'][^"']*output/series_a_finance_package\.md["']|file_path["']?:\s*["'][^"']*output/series_a_finance_package\.md["'].{0,500}tool["']?:\s*["']?(?:Write|Edit|markdown_write)["']?)
+
+  - id: r1_transaction_revenue_to_gross_margin_build
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] For a marketplace/transaction model, the output must separate GPV, net take-rate revenue, subscription revenue, COGS, and gross margin instead of presenting only net revenue.
+      skill-exclusive reason: without reading the skill, a strong model will naturally use the task's 0.95% take-rate and subscription revenue to estimate net revenue, but may stop at broad revenue/expense lines; the skill requires explicit COGS/gross-margin modeling as part of cost structure validation. The conflict is net-revenue forecast vs transaction revenue build connected to COGS and gross margin.
+    signal:
+      query: |
+        Judge only the final contents of output/series_a_finance_package.md; ignore intermediate drafts, Write/Edit descriptions, plans, and self-description. Does the model connect GPV, net take-rate revenue, subscription revenue, explicit COGS, and gross margin in the transaction revenue build? Answer YES if these components are modeled together in the final file; answer NO if it only presents net revenue or omits COGS/gross margin.
+      acceptable: "Table rows: GPV, Take Rate 0.95%, Net Payment Revenue, Subscription Revenue, Total Revenue, COGS, Gross Profit, Gross Margin %."
+      unacceptable: "Revenue = locations × GPV × 0.95% plus subscriptions, with no COGS or gross margin."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_marketplace_cogs_line_items
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] COGS must be broken into marketplace-relevant line items such as hosting/infrastructure, payment processing, variable customer support, and third-party services.
+      skill-exclusive reason: without reading the skill, a strong model typically treats cost of revenue/COGS as a single percentage; the skill explicitly lists COGS subcomponents and this task's Toast/restaurant-commerce context needs those layers for scale-economics validation. The conflict is one-line COGS percentage vs explicit transaction-model COGS line items.
+    signal:
+      query: |
+        Judge only the final contents of output/series_a_finance_package.md; ignore intermediate drafts, Write/Edit descriptions, plans, and self-description. Does the COGS/cost-of-revenue section break COGS into marketplace-relevant line items such as hosting/cloud/infrastructure, merchant/payment processing fees, variable customer support, vendor/API/third-party services, or close semantic equivalents? Answer YES if a marketplace-relevant line-item breakdown is present; answer NO if COGS is only a single percentage or omitted.
+      acceptable: "COGS rows include Infrastructure/Cloud Hosting, Payment or Merchant Processing Fees, Customer Support, Third-party/Vendor/API Services."
+      unacceptable: "COGS = 35% of revenue with no component breakdown."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_role_timed_loaded_hiring_plan
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.9
+    spec: |
+      [SKILL] Hiring plan must be role-by-role with department, start timing, base salary, fully-loaded cost using about 1.3-1.4x, and equity context.
+      skill-exclusive reason: without reading the skill, a strong model facing a finance package often gives department headcount totals or aggregate payroll; the skill requires role-level timing, salary, loaded-cost multiplier, and equity grants. The conflict is aggregate hiring budget vs role-timed compensation and equity plan.
+    signal:
+      query: |
+        Judge only the final contents of output/series_a_finance_package.md; ignore intermediate drafts, Write/Edit descriptions, plans, and self-description. Is there a role-by-role hiring plan with department, start timing, base salary, fully-loaded cost using roughly 1.3-1.4x salary (or approximately 1.25-1.5x / equivalent benefits-tax-burden calculation), and equity grant context? Equity may be shown per role or in a separate equity band/assumption table. Answer YES if these role-level mechanics are present; answer NO if it only gives departmental totals, average salary, or a single payroll line.
+      acceptable: "Implementation Engineer, Product/CS, starts Q2, base $105k, loaded cost at 1.35x = $142k, with either row-level equity 0.10% or an equity band assumption for that role."
+      unacceptable: "Hire 12 people in Sales & Marketing at an average loaded salary, no roles or start dates."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_monthly_cash_bridge_with_financing
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.9
+    spec: |
+      [SKILL] Cash-flow analysis must show a structured bridge with beginning cash, cash collected, operating cash outflows/expenses, ending cash, burn, runway, and explicit financing-event timing/impact.
+      skill-exclusive reason: without reading the skill, a strong model may state a financing need qualitatively or provide annual cash balances; the skill provides a monthly cash-flow formula and requires funding-event impact. The conflict is qualitative capital-need discussion vs period-by-period cash bridge including the Series A raise impact.
+    signal:
+      query: |
+        Judge only the final contents of output/series_a_finance_package.md; ignore intermediate drafts, Write/Edit descriptions, plans, and self-description. Does the cash-flow section include a monthly or explicitly period-by-period bridge showing beginning cash/opening balance, cash collected/receipts/inflows, cash outflows/expenses, ending cash, burn, runway, and financing-event timing/impact? Answer YES if the bridge includes these cash mechanics; answer NO if it only discusses runway or financing timing narratively.
+      acceptable: "Month table with Beginning Cash/Opening Balance, Cash Receipts/Inflows, Operating Outflows, Net Burn, Series A Proceeds/Financing Inflow, Ending Cash, Runway."
+      unacceptable: "The company should raise in Q3 because cash may be low, with no beginning/ending cash bridge."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_marketplace_driver_scenarios
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.85
+    spec: |
+      [SKILL] Conservative/base/optimistic scenarios must vary marketplace operating drivers together, including restaurant location growth or churn, GPV per location, take rate/pricing, and CAC/sales efficiency.
+      skill-exclusive reason: without reading the skill, a strong model often creates generic upside/base/downside revenue cases; the skill requires three-scenario analysis that adapts acquisition, churn, pricing, and CAC deltas to the business model. The conflict is generic revenue sensitivity vs marketplace-specific linked driver deltas.
+    signal:
+      query: |
+        Judge only the final contents of output/series_a_finance_package.md; ignore intermediate drafts, Write/Edit descriptions, plans, and self-description. Do the conservative/base/optimistic scenarios (or downside/base/upside, P10/P50/P90 equivalents) quantitatively vary at least three marketplace drivers, such as restaurant location growth or churn, GPV per location, take rate/pricing, and CAC or sales efficiency? Answer YES if at least three marketplace drivers change across scenarios; answer NO if scenarios are qualitative or only alter a single top-line growth rate.
+      acceptable: "Scenarios vary active locations, churn, GPV/location, take rate, and CAC/payback across conservative/base/optimistic cases."
+      unacceptable: "Downside/Base/Upside only change total revenue growth by 20%, 40%, and 60%."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_validation_section_with_benchmarks
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.55
+    spec: |
+      [SKILL] The report should include a validation section with sanity checks, benchmark comparisons, risk factors, and assumptions to monitor, using the Toast public facts as one benchmark source.
+      skill-exclusive reason: without reading the skill, a strong model may mention Toast because the task asks for a reality check, but often stops at using Toast as contextual support; the skill specifically requires a validation section with sanity checks, benchmark comparisons, risk factors, and assumptions to monitor. The conflict is simple public-company reference vs explicit validation workflow.
+    signal:
+      query: |
+        Judge only the final contents of output/series_a_finance_package.md; ignore intermediate drafts, Write/Edit descriptions, plans, and self-description. Is there a structured validation or reality-check section that includes all four workflow elements: Toast/public benchmark comparison, sanity checks, risk factors, and assumptions to monitor? Answer YES if the structured validation workflow is present; answer NO if Toast is merely named/cited or if the section lacks sanity checks, risks, or monitoring assumptions.
+      acceptable: "Validation section: Toast benchmark comparison, sanity checks on gross margin/take rate, risk factors, assumptions to monitor monthly."
+      unacceptable: "Mentions Toast public facts once but has no validation/sanity-check section."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: final-output
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/series_a_finance_package.md exists and contains the requested Series A package basics: Toast companyfacts context, 410 active locations, 0.95% net take rate, $18k monthly subscription revenue, 19 employees, $2.4m cash, and an explicit capital-need judgment.
+    signal:
+      file: output/series_a_finance_package.md
+      file_must_contain: '(?is)(?=.*\b(?:Toast|toast_companyfacts)\b)(?=.*\b410\b)(?=.*(?:0\.95\s?%|95\s?bps))(?=.*(?:\$18\s?k|18,?000|18k|\$?18,?000))(?=.*\b19\s*(?:employees?|people|person|team|headcount|staff)\b)(?=.*(?:\$2\.4\s?m|2\.4m|2,400,000|2\.4\s?million))(?=.*\b(?:capital|cash|raise|runway|funding|need)\b)'

@@ -1,0 +1,62 @@
+task_id: SF101_t4_port_hotfix_to_stable
+level: L3
+skill_id: skill_101_git-workflows
+description: |
+  The stable branch on the support line needs to take the README wording fix from the hotfix/readme-clarity branch. That branch also has later cleanup content that is not within the scope of this support-line release; please only complete the port of this README fix.
+
+  Please resolve the README conflict that arises during the port, preserving the meaning of stable's existing policy sentence, and merge in the hotfix typo fix. After completion, the repository should be in a clean, conflict-free, port-completed state.
+
+  The repository is at `assets/SF101_t4_port_hotfix_to_stable/input/repo/`.
+
+initial_state:
+  assets:
+    - path: assets/SF101_t4_port_hotfix_to_stable/input/repo/
+      source: "https://github.com/octocat/Hello-World.git"
+      real_state: "A real public Git repository cloned locally; stable and hotfix/readme-clarity both modify README in a way that creates a content conflict when the target README typo-fix commit is ported. The hotfix/readme-clarity branch also contains a later unrelated cleanup commit, so bringing over the whole branch imports changes outside the support-line request."
+      preparation: |
+        Clone octocat/Hello-World without tags; configure local author; configure core.autocrlf false; create stable with commit "Document stable greeting policy" modifying README; create hotfix/readme-clarity from master with commit "Fix support-line README typo" modifying README; then add a later unrelated cleanup commit on hotfix/readme-clarity that does not belong to the stable support-line request; return to stable.
+    - path: assets/SF101_t4_port_hotfix_to_stable/input/request_note.txt
+      source: "Prepared request note based on the local repository state derived from https://github.com/octocat/Hello-World.git"
+      real_state: "Text note describing the support-line request in natural language: only the README wording correction is in scope, stable policy meaning must remain, unrelated hotfix cleanup should not be included, and the repository should be clean afterward. It must not mention Git commands, staging indexes, commit hashes, or implementation strategy."
+      preparation: |
+        Write a natural-language request note after preparing the conflicting branches. The note should say that stable needs the README wording correction from hotfix/readme-clarity, that unrelated later hotfix cleanup is out of scope, that stable's policy sentence should remain, and that the repository should be clean afterward. Do not include commands, flags, commit hashes, staging-index terminology, or output-file instructions.
+  tools_available: [bash, read, edit, grep, git]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: selective_cherry_pick_from_branch
+    description: "Identify and port only the README typo-fix commit from hotfix/readme-clarity, without merging the whole branch or taking later unrelated cleanup."
+    exclusive: "The git-workflows skill explicitly covers cherry-picking commits across branches and resolving conflicts. Without using that workflow, a model may merge or squash the branch, or pick the branch tip, which would import unrelated hotfix cleanup into stable."
+  - id: conflict_resolution_preserve_both_sides
+    description: "Resolve the README conflict so the stable policy meaning remains while the hotfix typo fix is included."
+    exclusive: "Without the git-workflows conflict-resolution workflow, a model may accept one side wholesale, leave conflict markers, or fail to complete the interrupted operation cleanly."
+  - id: completed_linear_history
+    description: "Finish the port as a completed, linear change on stable, with no merge commit and no active cherry-pick or merge state."
+    exclusive: "A generic approach may leave the repository mid-operation or create a merge topology; the intended workflow produces a clean, single-parent port of the target change."
+
+notes: |
+  Core test point: port only the target README fix from a hotfix branch containing multiple commits, and correctly resolve the README conflict.
+
+  Correct result:
+    1. The stable branch adds a linear port commit, whose patch content corresponds to the README typo fix on hotfix/readme-clarity.
+    2. stable has no merge commit and does not import later unrelated cleanup content from the hotfix branch.
+    3. The README conflict is resolved, and the final content preserves the stable policy semantics while including the hotfix typo fix.
+    4. The repository is finally conflict-free, with no in-progress cherry-pick/merge state, and a clean working tree.
+
+  Common error behaviors:
+    - Directly merging or squashing the entire hotfix/readme-clarity branch, bringing in unrelated cleanup.
+    - Selecting the hotfix branch tip or the wrong commit, rather than the target README typo-fix commit.
+    - During conflict resolution, only accepting one side, losing the stable policy or typo-fix semantics.
+    - Leaving conflict markers, an incomplete interrupted operation, or producing a merge commit.
+
+  baseline_correctness_signals:
+    - The README contains both the stable policy semantics and the hotfix typo-fix semantics.
+    - The README has no conflict markers.
+    - The repository's final working tree is clean, with no unresolved conflicts.
+
+  skill_following_signals:
+    - The latest commit on stable is a single-parent commit, not a merge commit.
+    - stable does not contain files or content from later unrelated cleanup on the hotfix branch.
+    - The patch of the new stable commit corresponds only to the target README fix and necessary conflict resolution.
+    - There is no in-progress cherry-pick/merge state.

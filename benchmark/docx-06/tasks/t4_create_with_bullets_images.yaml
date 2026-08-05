@@ -1,0 +1,67 @@
+task_id: SF06_t4_create_with_bullets_images
+level: L2
+skill_id: skill_06_docx
+description: |
+  Help me create a product introduction Word document product_intro.docx that includes:
+  - Title "CloudSync Pro - Product Overview"
+  - Product logo image (use the image at assets/SF06_t4_bullets/assets/logo.png)
+  - A feature list (with proper bullet style):
+    - Real-time file synchronization
+    - End-to-end encryption
+    - Cross-platform support (Windows, macOS, Linux)
+    - Team collaboration with version history
+    - API access for enterprise integration
+  - Use A4 page size
+
+initial_state:
+  files:
+    - path: assets/SF06_t4_bullets/assets/logo.png
+      content: "[binary PNG file - 200x80 pixels product logo]"
+    - path: assets/SF06_t4_bullets/content.txt
+      content: |
+        Product: CloudSync Pro
+        Tagline: Seamless file sync for modern teams
+
+        Features:
+        - Real-time file synchronization
+        - End-to-end encryption
+        - Cross-platform support (Windows, macOS, Linux)
+        - Team collaboration with version history
+        - API access for enterprise integration
+    - path: package.json
+      content: |
+        {"name":"sf06-task","version":"1.0.0","private":true}
+    - path: validate.py
+      content: "# Provided helper script for validating .docx structure (see skill docs)"
+  tools_available: [bash, read, edit, grep]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: bullet_numbering_system
+    description: "Bullets must be implemented via the library's built-in numbering mechanism (abstract numbering + paragraph numbering reference), not by inserting bullet glyph characters into text runs"
+    exclusive: "Model uses Unicode bullet '•' characters in TextRun text, which renders inconsistently across Word processors"
+  - id: image_type_param
+    description: "The embedded image must declare its image format so the document references the correct content type and renders visibly"
+    exclusive: "Model omits the format declaration; depending on library version this either errors out or produces an image that does not render correctly"
+  - id: a4_page_size
+    description: "A4 page size must be explicitly configured on the section in the document's native length unit (not left as default, not US Letter)"
+    exclusive: "Model uses US Letter dimensions or omits page size entirely"
+  - id: separate_paragraphs_per_item
+    description: "Each bullet item must be its own list-paragraph element so it renders as a real list entry (not multiple lines glued by newline characters in one paragraph)"
+    exclusive: "Model puts all items in one paragraph with \\n separators which are silently dropped"
+  - id: use_docx_js
+    description: "Must use the document-creation library prescribed by the skill (the npm-based one), not the alternative ecosystem library"
+    exclusive: "Model picks the more popular alternative library, which produces a different XML structure"
+  - id: validate_output
+    description: "Must run the skill-prescribed structural validation step on the produced document before delivery"
+    exclusive: "Model delivers document without structural validation"
+
+notes: |
+  Core test points (high level):
+  1. The list must be a document-native list structure (numbering), not "bullets" pieced together from characters
+  2. The image must declare its format correctly to ensure rendering
+  3. The page must explicitly be A4 (not default Letter)
+  4. Each bullet is an independent list paragraph
+  5. Must use the creation library specified by the skill
+  6. Must perform the structural validation specified by the skill

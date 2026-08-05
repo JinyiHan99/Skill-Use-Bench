@@ -1,0 +1,86 @@
+rules:
+  - id: g1_observable_incident_intake_output
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trajectory contains an observable write, edit, or copy-generate attempt to the deliverable under output/incident_intake/."
+    signal:
+      pattern: '(?is)^(?:Write|Edit|Bash)\b[\s\S]{0,1200}?output/incident_intake/'
+
+  - id: r1_ack_before_slow_persistence
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Interactive handlers such as slash command and modal submission must ack() first; immediate-Slack-response calls like views_open() do not count as slow save/notification; potentially slow work such as saving the incident or sending a confirmation must be placed in a Bolt lazy listener, background thread, async task, queue/worker, or an equivalent non-blocking path.
+      Skill-exclusive rationale: the task only implies the user must not see a Slack timeout; the skill explicitly requires ack-first, and slow tasks must not block the interactive response path. The conflict point is that ack-first but still saving/DM-ing in the same synchronous handler can still block the Slack interaction path.
+    signal:
+      query: >
+        Based on the contents of the code files actually written to output/incident_intake/, not the agent's self-statements, answer YES/NO: do the interactive handlers call ack() first, and place potentially slow work such as saving the incident, calling external APIs, DB writes, DM/chat_postMessage into a lazy listener, threading/executor.submit, asyncio.create_task, queue/worker, or an equivalent background path after ack()? views_open() does not count as slow save/notification.
+        Answer YES if slash command/view/action handlers call ack() before slow work and slow save/notification work is launched after ack via lazy/background/async/queue/worker path.
+        Answer NO if save_incident/create_incident/database/API/chat_postMessage happens before ack(), ack() is omitted, or code does ack(); save_incident(); chat_postMessage() synchronously in the same blocking handler without offloading.
+      acceptable: "@app.view('incident_modal') calls ack() first, then executor.submit(process_incident, values, user_id); process_incident saves and DMs the user."
+      unacceptable: "handler calls ack(); save_incident(...); client.chat_postMessage(...) all synchronously in the same handler."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_typed_modal_state_extraction
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] On modal submission, values must be extracted via the block_id/action_id nested structure of view["state"]["values"] or body["view"]["state"]["values"], distinguishing plain_text_input's value from static_select's selected_option.value.
+      Skill-exclusive rationale: without reading the skill, models often treat modal data as a flat dict or only write pseudo-fields like body['title']; the skill's Block Kit/Bolt examples require precise reading by block_id/action_id and element type, and the conflict point is that the severity static_select cannot use the plain input value path.
+    signal:
+      query: >
+        Based on the contents of the code files actually written to output/incident_intake/, not the agent's self-statements, answer YES/NO: does the modal-submission code extract fields from view["state"]["values"] or body["view"]["state"]["values"] by specific block_id and action_id, directly or via a helper/schema parser/loop abstraction, using selected_option.value for static_select and value for text inputs?
+        Answer YES if the implementation uses the nested block/action structure directly or through helpers such as get_text(values, block, action) and get_select(values, block, action), with select values taken from selected_option.value.
+        Answer NO if values are read from flat body/command fields, generic key names with no block/action lookup, or severity/static_select is read as ["value"] only.
+      acceptable: "values = body['view']['state']['values']; get_select(values, 'severity_block', 'severity_select') returns values[block][action]['selected_option']['value']; get_text(...) returns ['value']."
+      unacceptable: "severity = body['severity'] or values['severity_block']['severity_select']['value']."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_no_full_slack_payload_logging
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Production code must not retain debug middleware/handler logs that print/record complete Slack body, payload, headers, request object, view, values, request_data, or json.dumps(body/request_data) and other complete Slack state/request objects.
+      Skill-exclusive rationale: without reading the skill, models are likely to copy @app.middleware or print/logger.debug(body) from official examples for debugging; the skill lists Slack token/payload leakage as a security anti-pattern and requires removing full payload logs, and the conflict point is that example debugging convenience is the opposite of production sensitive-data protection.
+    signal:
+      query: >
+        Based on the contents of the code files actually written to output/incident_intake/, not the agent's self-statements, answer YES/NO: does the code avoid recording complete Slack request objects or complex state objects, including full body, payload, headers, request object, view, values, request_data, json.dumps(body), json.dumps(request_data), or a full log_request middleware?
+        Answer YES if logging is absent or limited to selected non-sensitive fields like user_id, team_id, action_id, incident_id, severity.
+        Answer NO if any middleware or handler prints/logs full body/payload/headers/request/view/values/request_data or JSON dumps of those objects.
+      acceptable: "logger.info('incident submitted', extra={'user_id': user_id, 'team_id': team_id, 'severity': severity}) with no full body/payload/view/values."
+      unacceptable: "logger.info(json.dumps(request_data)); print(view); logger.debug(values); logger.debug(body)."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether output/incident_intake/ contains structurally complete, logically coherent incident-intake code, including slash command, modal fields, backend save path, and a DM confirmation to the submitter."
+    signal:
+      query: >
+        Based on the contents of the files actually written to output/incident_intake/, not the agent's self-statements, answer YES/NO: does the deliverable contain structurally complete, logically coherent incident-intake entry code that can open a modal via a Slack short command, collect title/service/severity/description, save or simulate saving the incident on submission, and DM the submitter a confirmation message containing the title and severity?
+        Answer YES only if these core task requirements are present in files under output/incident_intake/.
+        Answer NO if the output is missing, only documentation, or lacks the modal/submit/save/DM flow.
+      acceptable: "A Python Bolt app under output/incident_intake/ implements /incident, views_open modal, @app.view submission, save_incident, and client.chat_postMessage(channel=user_id, text includes title/severity)."
+      unacceptable: "Only copies the input example or writes a README without the incident modal and DM confirmation."

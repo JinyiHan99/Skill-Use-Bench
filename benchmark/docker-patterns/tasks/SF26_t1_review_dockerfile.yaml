@@ -1,0 +1,73 @@
+task_id: SF26_t1_review_dockerfile
+level: L2
+skill_id: skill_26_docker_patterns
+description: |
+  You have a Node.js Express API project at `assets/SF26_t1_review_dockerfile/`. The project includes a `Dockerfile`, `assets/SF26_t1_review_dockerfile/package.json`, and `assets/SF26_t1_review_dockerfile/server.js`.
+
+  The current Dockerfile has several issues that make it unsuitable for production deployment. Please:
+
+  1. Review the existing Dockerfile and identify all security and best-practice problems
+  2. Rewrite the Dockerfile to follow container security best practices, making it production-ready
+  3. Ensure the application can still be built and run correctly after your changes
+  4. Create a `.dockerignore` file appropriate for this project
+
+  The rewritten Dockerfile should produce a minimal, secure image suitable for production use.
+
+initial_state:
+  assets:
+    - path: assets/SF26_t1_review_dockerfile/Dockerfile
+      source: "Hand-crafted realistic anti-pattern Dockerfile for Express API"
+      real_state: "Single-stage Dockerfile using :latest tag, running as root, with hardcoded secrets in ENV"
+    - path: assets/SF26_t1_review_dockerfile/package.json
+      source: "Realistic Express API package.json"
+      real_state: "Standard package.json with express, pg, jsonwebtoken dependencies"
+    - path: assets/SF26_t1_review_dockerfile/server.js
+      source: "Realistic Express API server"
+      real_state: "Express server with health check, user API, and JWT auth endpoints"
+  tools_available: [bash, read, edit, write]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: no_latest_tag
+    description: "Skill requires pinning base images to specific version tags; :latest is forbidden"
+    exclusive: "Without skill, models commonly use :latest or generic tags like node:22 without OS variant"
+  - id: non_root_user
+    description: "Skill requires creating a dedicated non-root user with deterministic UID/GID 1001 and switching via USER before COPY/CMD"
+    exclusive: "Models may add USER but often skip deterministic UID/GID or place USER after COPY"
+  - id: no_secrets_in_env
+    description: "Skill forbids secrets in ENV/ARG/COPY; must refactor to env_file pattern with .env"
+    exclusive: "Models typically move secrets to ARG or multi-line ENV rather than the env_file + .env pattern specified by skill"
+  - id: multi_stage_build
+    description: "Skill requires multi-stage builds with named stages following the convention: deps, dev, build, production"
+    exclusive: "Models may use multi-stage builds but with arbitrary stage names, not the specific deps/dev/build/production convention"
+  - id: dockerignore
+    description: "Skill specifies a minimum set of entries that .dockerignore must include"
+    exclusive: "Models create .dockerignore but often miss several of the skill-mandated entries"
+  - id: healthcheck
+    description: "Skill requires production stage to include HEALTHCHECK instruction"
+    exclusive: "Models may omit HEALTHCHECK in Dockerfile, relying on compose-level health checks instead"
+
+notes: |
+  Core test: Dockerfile security review + rewrite.
+  The Dockerfile has 4 major issues mapping to skill constraints:
+  1. Uses :latest tag (violates image pinning rule)
+  2. Runs as root (violates non-root execution rule)
+  3. Has hardcoded secrets in ENV (violates no-secrets rule)
+  4. Single stage, no multi-stage build (violates multi-stage rule)
+  5. No .dockerignore (violates dockerignore rule)
+  6. No HEALTHCHECK (violates healthcheck rule)
+  
+  The strongest skill-exclusive signals are: specific stage naming convention (deps/dev/build/production),
+  deterministic UID/GID 1001, and the .dockerignore minimum entry set.
+
+  Evaluation boundary for no_secrets_in_env: This task has no docker-compose.yml, so the
+  env_file pattern is not directly testable here. The rubric should evaluate whether secrets
+  were REMOVED from the Dockerfile (not hardcoded in ENV/ARG). Acceptable alternatives:
+  runtime injection via `docker run -e`, Docker secrets, or placeholder comments.
+  The env_file + .env pattern is primarily tested in t2 (which has Compose).
+
+  Skill-exclusive weight guidance for rubric:
+  - HIGH weight: stage naming convention (deps/dev/build/production), UID/GID 1001
+  - MID weight: .dockerignore completeness, HEALTHCHECK
+  - LOW weight: no :latest tag (common best practice, weaker exclusive signal)

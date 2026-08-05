@@ -1,0 +1,102 @@
+rubric_id: skill_101_git_workflows_t1_recover_deleted_branch
+objective: Evaluate whether the model recovers a deleted local branch following the git-workflows reflog/local history recovery workflow.
+rules:
+  - id: g1_observable_git_recovery_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace contains an observable Git recovery/investigation action.
+    signal:
+      pattern: >-
+        (?s)\bBash\b.{0,800}\bgit\b.{0,300}\b(?:reflog|log\b.{0,120}(?:--walk-reflogs|-g)|rev-list\b.{0,120}--walk-reflogs|fsck|show)\b
+
+  - id: r1_use_reflog_or_walk_reflogs_for_deleted_branch
+    type: required-tool
+    provenance: skill
+    locus: trace
+    verifier: regex
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Deleted-branch recovery should first inspect Git local history records: git reflog, git reflog show, git log -g, git log --walk-reflogs, or rev-list --walk-reflogs.
+      skill-exclusive rationale: looking only at the task description, a strong model may first check git branch -a, git log --all, or remote branches, and look for similar README changes in ordinary visible history; git-workflows explicitly treats reflog as the safety net for lost commits/deleted branches. Default practice X = inspect visible refs / ordinary log, skill requires Y = check reflog/local HEAD movement, conflict point Z = the target commit is not in ordinary branch refs.
+    signal:
+      pattern: >-
+        (?s)\bBash\b.{0,1500}\bgit\b.{0,300}(?:\breflog\b|\blog\b.{0,120}\b(?:--walk-reflogs|-g)\b|\brev-list\b.{0,120}\b--walk-reflogs\b)
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_select_commit_from_docs_refresh_reflog_context
+    type: lesson
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The target commit should be determined from the docs-refresh branch movement/commit records in local history, rather than guessed from the most recent README change, dangling objects, or remote history.
+      skill-exclusive rationale: without reading the skill, a model may treat the most conspicuous README commit, a git fsck dangling commit, or a similar change in the ordinary log as the target; the skill's reflog recovery requires confirming the pre-deletion branch pointer from the HEAD movement/branch-history context. Default practice X = guess a README commit by content/time, skill requires Y = locate via docs-refresh checkout/commit records on reflog, conflict point Z = local history contains noise and similar README changes.
+    signal:
+      judge_context_window:
+        - serialized_steps
+        - tool_results_first_n: 8
+      query: |
+        Based on actual Bash tool calls and their outputs — not the agent's self-description — make a two-step closed judgment:
+        1. Does the trace contain output from git reflog, git log -g, git log --walk-reflogs, or rev-list --walk-reflogs, and does that output include docs-refresh-related checkout/commit/HEAD movement context?
+        2. Did the subsequent recovery action use a commit from that docs-refresh reflog/local-history context, rather than only guessing from README content, ordinary git log --all, remote branches, or a dangling object?
+        Answer YES only if both conditions are satisfied. Answer NO if the selected commit is not tied to docs-refresh reflog/local-history context.
+      acceptable: "reflog/walk-reflogs output shows docs-refresh checkout/commit/HEAD movement; then docs-refresh is restored based on the commit in that entry."
+      unacceptable: "Only uses git log --all -- README, current README, remote history, or a dangling commit to find a similar README change, then restores docs-refresh."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The recovery report exists and states that docs-refresh and the local README documentation change were restored.
+    signal:
+      file: output/recovery_report.md
+      query: |
+        Based only on the actual content written to output/recovery_report.md, not the agent's self-description: does the report state that docs-refresh was restored, and explain that the recovery basis comes from a README documentation change record in local history/reflog/HEAD movement? Answer YES or NO.
+      acceptable: "The report states that docs-refresh was restored, and abstractly explains that the relevant README documentation change was found via local history/reflog/HEAD@ records."
+      unacceptable: "The report only says recovery is complete, without mentioning docs-refresh, the README change, or the local-history basis."
+
+  - id: tc2_branch_ref_restored_to_target_commit
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The docs-refresh branch ref is restored to the target local commit in the prepared asset.
+    signal:
+      file: assets/SF101_t1_recover_deleted_branch/input/repo/.git/refs/heads/docs-refresh
+      file_must_contain: "^3502f352b9312db6fac97fd3ca4f388205457280$"
+
+  - id: tc3_clean_working_tree
+    type: task-completion
+    provenance: task
+    locus: trace
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The repository remains clean after recovery is complete.
+    signal:
+      judge_context_window:
+        - serialized_steps
+        - tool_results_first_n: 8
+      query: |
+        Based on actual Bash tool calls and their outputs — not the agent's self-description: does the final state have git status --porcelain or an equivalent status check showing the repository is clean, with no changes left by an incomplete recovery operation? Answer YES or NO.
+      acceptable: "Final git status --porcelain has no output, or git status shows working tree clean."
+      unacceptable: "Final state shows uncommitted changes to README/.git files, or there is no final-state evidence at all."

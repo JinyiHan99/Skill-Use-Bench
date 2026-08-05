@@ -1,0 +1,125 @@
+rules:
+  - id: g1_observable_asset_read
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable attempt to read the Dianzhong male-channel page archive."
+    signal:
+      pattern: '(?is)(?:recipient_name"\s*:\s*"functions\.Read"|toolName"\s*:\s*"Read"|\bfunctions\.Read\b|\bRead\b)[\s\S]{0,500}"file_path"\s*:\s*"(?:[^"]*/)?assets/story_short_scan_t1_dianzhong_male/input/dianzhong_male_browse_20260702\.html"'
+
+  - id: r1_no_direction_full_ranking_overview
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] When the user has not provided a genre direction, a full-chart overview should be done to find trends, not just focusing on 1-2 books or a single genre.
+      skill-exclusive reason: without reading the skill, a strong model may directly give a list of "directions worth writing", defaulting to picking a few prominent genres; the skill requires first organizing the entire page sample into a full-chart trend judgment. The conflict is that "local topic suggestions" cannot replace "full-chart overview + trends".
+    signal:
+      judge_context_window: [final_answer]
+      query: >
+        Does the final answer provide a full-chart overview based on the entire male-channel page sample, rather than only analyzing 1-2 books or a single genre?
+        Judgment basis: look only at the final answer text, not the agent's plan, self-report, or tool-call intent.
+        Checklist: (1) cite at least 5 real titles/entries from the asset; (2) cover multiple genres or emotion clusters; (3) summarize overall trends/opportunity landscape based on these samples, rather than just listing book recommendations.
+        Verifiable real titles include: 《觉醒灰毛鼠？我开局吞了女武神》《出海吧，浪会替我回答》《嫁谁谁反，假公主她不干了》《末世降临第三年，我发现了去年生产的零件》《当年养我的班花相亲被群嘲，我带千万资产去托底》《母亲想白嫖我百万黄金，我杀疯了》《下1份餐让我送100份餐，我反手请农民工兄弟免费吃饭》《榨干我的二百万彩礼给堂弟买房后，我选择断亲》《男邻居不肯给消防挪车后，他悔疯了》《发现自己是试婚新郎后，我远走他乡》.
+        Answer YES if all checklist items are satisfied. Answer NO if it only discusses one or two stories, only lists titles without trend synthesis, only gives generic writing advice, or does not show whole-sample coverage.
+      acceptable: "Cites 5+ samples such as 《觉醒灰毛鼠？我开局吞了女武神》《出海吧，浪会替我回答》《母亲想白嫖我百万黄金，我杀疯了》《男邻居不肯给消防挪车后，他悔疯了》《末世降临第三年，我发现了去年生产的零件》 and summarizes multiple emotion/genre opportunities."
+      unacceptable: "Only says 'male channel is suitable for fantasy power fantasy/revenge stories', or only lists a few book titles without covering multiple sample types and summarizing overall trends."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r2_emotion_delivery_mechanisms
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Chart-scanning analysis must center on short-story emotional delivery, extracting high-frequency emotions, trigger scenarios, and emotional outburst or spread points, rather than only recording genre names.
+      skill-exclusive reason: without reading the skill, the default approach is to classify by genre tags such as "fantasy/rebirth/revenge/family"; the skill requires explaining how emotions are triggered, erupt, and drive spread. The conflict is that "genre names" are insufficient to prove short-story market signals.
+    signal:
+      judge_context_window: [final_answer]
+      query: >
+        Does the final answer summarize at least three types of high-frequency emotional mechanisms, with each type explaining trigger scenarios and emotional outburst or spread points?
+        Judgment basis: look only at the final answer text, not the agent's plan, self-report, or tool-call intent.
+        Each emotional mechanism must cite at least one real title or synopsis detail from the asset as evidence, e.g., the school-district housing/bloodline quota/female war god misidentification in 《觉醒灰毛鼠？我开局吞了女武神》, the typhoon sea voyage/twenty-year bitter couple reckoning in 《出海吧，浪会替我回答》, the family-cutting mother/gold-store jewelry in 《母亲想白嫖我百万黄金，我杀疯了》, the fire-lane conflict in 《男邻居不肯给消防挪车后，他悔疯了》.
+        Answer YES if each emotion category goes beyond topic labels, cites real sample evidence, and names a concrete trigger scene plus an emotional payoff/share hook.
+        Answer NO if it mainly lists genres/topics, lacks real sample evidence, or does not explain trigger scenes and emotional payoff/shareability.
+      acceptable: "'Humiliation reversal: triggered by the school-district housing quota substitution in 《觉醒灰毛鼠？我开局吞了女武神》, the outburst is identity counter-kill and female war god misidentification; family reckoning: triggered by the jewelry freeloading in 《母亲想白嫖我百万黄金，我杀疯了》, the spread point is kinship boundaries and face-slapping satisfaction.'"
+      unacceptable: "'Fantasy, rebirth, and revenge are relatively hot.'"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_timebound_confidence_rescan
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Short-story genre signals have short validity periods; chart-scanning reports must annotate the sample date, trend confidence, and provide a signal validity period or next rescan time, and must not treat them as long-term trends.
+      skill-exclusive reason: without reading the skill, the default approach is to give definitive topic-selection conclusions; the skill requires binding conclusions to sample date and rescan cadence. The conflict is that short-term chart signals cannot be packaged as long-term judgments.
+    signal:
+      judge_context_window: [final_answer]
+      query: >
+        Does the final answer simultaneously include the sample date, trend confidence, and signal validity period or next rescan time?
+        Judgment basis: look only at the final answer text, not the agent's plan, self-report, or tool-call intent.
+        Answer YES only if all three are present: the 2026-07-02 sample date or equivalent expression such as "2026-07-02 / July 2 snapshot", an explicit confidence/strength label such as "medium confidence / medium certainty / low confidence", and a concrete validity window or next rescan timing such as "7-14 days / rescan next week".
+        Answer NO if any one of these three is missing or if the answer treats the finding as a long-term trend without qualification.
+      acceptable: "'Sample date: 2026-07-02; confidence: medium; recommend rescan within 7-14 days / rescan next week before deciding.'"
+      unacceptable: "'Long-term bullish on revenge stories.' or only writes 'for reference only' without date, confidence, and rescan time."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_risk_threshold_and_validation_actions
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Chart-scanning output should provide actionable risk thresholds, saturation reminders, or validation actions to help decide whether to continue pursuing a genre.
+      skill-exclusive reason: without reading the skill, the default approach is to directly recommend "directions worth writing"; the skill requires supplementing when to judge risk as too high and how to validate next. The conflict is that short-story trend judgments must be rescannable and stoppable.
+    signal:
+      judge_context_window: [final_answer]
+      query: >
+        Does the final answer provide at least one falsifiable specific risk/saturation condition or misjudgment condition, accompanied by at least one concrete follow-up validation action?
+        Judgment basis: look only at the final answer text, not the agent's plan, self-report, or tool-call intent.
+        Acceptable conditions include but are not limited to: next rescan showing declining share of similar titles, two consecutive weak scans, ratings below page average, test click/completion below target, supplementary samples not showing similar high-score entries; they need not be quantified but must be able to stop, downgrade, or continue based on them.
+        Answer YES if it states a falsifiable risk condition and a concrete validation/rescan/test action.
+        Answer NO if it only says "there are risks" "observe later" or "recommend validation" without actionable condition and action.
+      acceptable: "'If the share of similar titles in the next rescan decreases or ratings fall below the sample average, then downgrade; first use 3 titles/synopses for A/B testing to validate clicks.'"
+      unacceptable: "'Note risks, check again later.'"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    locus: final-output
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the topic-selection meeting conclusion based on this male-channel page sample was completed."
+    signal:
+      judge_context_window: [final_answer]
+      query: >
+        Does the final answer provide concrete candidate directions usable for topic-selection meeting discussion, and are they supported by real information from the page (such as real titles, ratings, word count/chapters/synopsis information)?
+        Lightweight gold: real titles include 《觉醒灰毛鼠？我开局吞了女武神》《出海吧，浪会替我回答》《母亲想白嫖我百万黄金，我杀疯了》《男邻居不肯给消防挪车后，他悔疯了》《末世降临第三年，我发现了去年生产的零件》 etc.; chart sample ratings are about 7.6-8.3, and Dianzhong short-story characteristics should be understood as about 8k-12k words/short-story samples. If these short stories are judged as hundreds of thousands/millions of words long stories or non-existent titles are fabricated, judge NO.
+        Answer YES if it provides concrete recommendations grounded in the asset.
+        Answer NO if it is generic, fabricated, uses long-story word-count judgments, or lacks actionable direction.
+      acceptable: "Provides 2-3 directions, citing real titles or page data as supporting evidence."
+      unacceptable: "Vaguely discusses short-story writing methods, or shows judgments of hundreds of thousands/millions of words that clearly indicate failure to read samples."

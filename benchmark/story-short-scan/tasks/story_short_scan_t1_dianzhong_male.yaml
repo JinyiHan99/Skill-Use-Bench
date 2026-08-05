@@ -1,0 +1,44 @@
+task_id: story_short_scan_t1_dianzhong_male
+skill_id: story-short-scan
+description: |
+  I am planning to start a short-story new project this week, and I only have this Dianzhong male-channel page archive: `assets/story_short_scan_t1_dianzhong_male/input/dianzhong_male_browse_20260702.html`.
+
+  First help me determine which direction is more worth writing in this batch of samples, and provide a conclusion that can be directly used for topic-selection meeting discussion. Base your analysis only on this page of samples; do not generalize about the industry as a whole.
+initial_state:
+  assets:
+    - path: assets/story_short_scan_t1_dianzhong_male/input/dianzhong_male_browse_20260702.html
+      source: "https://www.ishugui.com/browse"
+      real_state: "HTML of the Dianzhong Reading male-channel novel recommendation page crawled on 2026-07-02, containing page content such as book titles, synopses, authors, premium-story tags, completion status, word count, ratings, latest chapter dates, etc."
+      preparation: |
+        The original HTML was saved from the public webpage `https://www.ishugui.com/browse` without modifying content; only renamed to dianzhong_male_browse_20260702.html per the task directory.
+  tools_available:
+    - filesystem
+    - html_text_extraction
+expected_trigger: true
+skill_constraints_tested:
+  - id: no_direction_full_ranking_overview
+    description: "When the user has not provided a writing direction, the skill requires a full-chart overview and trend identification, rather than only focusing on a single genre."
+    exclusive: "Without reading the skill, a strong model may also produce a genre summary based on the entire page sample; the true distinguishing point is whether the entire page sample is organized into a multi-dimensional chart-scanning judgment, including multiple real sample evidence, emotional heat, genre opportunities, length/title and other data insights, as well as risk or saturation warnings."
+  - id: emotion_first_not_topic_name_only
+    description: "The skill requires extracting high-frequency emotions, trigger scenarios, emotional outburst points, and spread points, rather than only recording genre names."
+    exclusive: "Without reading the skill, the model typically makes coarse classifications by genre tags such as fantasy, realistic, family, and does not systematically distill emotional delivery mechanisms."
+  - id: sample_date_confidence_rescan
+    description: "The skill requires the chart-scanning report to annotate the sample date, trend confidence, and next rescan time, and must not treat short-term signals as long-term trends."
+    exclusive: "Without reading the skill, the model often gives definitive conclusions, lacking validity period, confidence, and rescan reminders."
+notes: |
+  - Core test point: whether the model can perform short-story market chart scanning from the real Dianzhong male-channel page sample, rather than giving generic writing advice.
+  - Expected correct behavior: read the real chart entries in the HTML, summarize emotional heat, genre opportunities, length ranges, title/opening patterns, spread risks around the current sample, and provide candidate directions and rescan time.
+  - Common model error behaviors: will classify `觉醒灰毛鼠？我开局吞了女武神` only as "fantasy power fantasy" without mentioning the emotional outburst of "humiliation reversal + identity substitution + female war god misidentification"; will classify `出海吧，浪会替我回答` only as "rebirth story" without mentioning the spread point of "twenty-year bitter couple reckoning + revenge letting go"; will ignore the page sample date of 2026-07-02 and directly write "long-term bullish".
+  - baseline_correctness_signals:
+      - Uses real titles, word counts, ratings, and synopsis information from the asset, without fabricating non-existent chart entries.
+      - Provides specific candidate directions usable for topic-selection meetings, rather than empty methodology.
+      - Accurately identifies the very-short-story length characteristics of this batch of samples, with popular entries concentrated at about 8k-12k words/around 10k words; if outputting judgments of hundreds of thousands or millions of words as long stories, it is considered failure to correctly read the sample.
+  - skill_following_signals:
+      - Covers full-chart overview and trend judgment in the no-direction scenario.
+      - Explicitly annotates sample date, trend confidence, signal validity period, or next rescan time.
+      - Organizes analysis around emotional delivery, trigger scenarios, emotional outburst points, and spread points, including risk thresholds or saturation reminders.
+      - The main skill-following signal prioritizes emotional mechanism analysis and timeliness annotation; "full-chart overview" serves only as an auxiliary signal.
+      - The full-chart overview should reference at least 5 different real entries, not just focus on 1-2 books or a single genre.
+      - The emotional mechanism analysis should summarize at least 3 types of high-frequency emotional mechanisms; each type must include trigger scenarios and emotional outburst points or spread points.
+      - Timeliness judgment cannot just say "for reference only"; strong satisfaction must simultaneously include sample date, trend confidence, signal validity period, or next rescan time.
+  - The sample size is about 10 entries; reviewers should check whether the model over-extrapolates this page sample into a long-term industry trend; opportunity judgments are allowed but must preserve sample boundaries.

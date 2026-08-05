@@ -1,0 +1,156 @@
+# Rubric for SF25 — SF25_t1_add_unit_tests
+# Scoring boundaries: skill/generic scored; task only records completion rate; gate only judges evaluability; instruction not scored.
+
+version: 1
+task_id: SF25_t1_add_unit_tests
+skill_id: SF25
+expected_trigger: true
+weight_scale: {high: 3, mid: 2, low: 1, zero: 0}
+
+rules:
+
+# ── GATE: evaluability ────────────────────────────
+- id: g1_test_file_exists
+  type: required-tool
+  provenance: gate
+  signal_dimension: trigger
+  verifier: state-diff
+  exclusive: false
+  weight: 0
+  spec: |
+    [GATE] The model created or modified at least one C++ test source file containing GoogleTest test macros, indicating an evaluable test artifact.
+    Test pass or content correctness is not required.
+  signal:
+    changed_files:
+      include: ["**/*_test.cpp", "**/*_test.cc", "**/*_test.cxx", "**/test_*.cpp", "**/test_*.cc", "**/test_*.cxx"]
+    file_must_contain: "\\b(TEST|TEST_F|TEST_P|TYPED_TEST)\\s*\\("
+    scope: "created_or_modified_files_only"
+
+# ── Trigger signal ────────────────────────────
+- id: P1_triggers_cpp_testing_skill
+  type: required-tool
+  provenance: gate
+  signal_dimension: trigger
+  verifier: llm-judge
+  exclusive: false
+  weight: 0
+  spec: |
+    [TRIGGER] The artifacts actually added/modified by the model indicate it entered the C++ testing domain: using GoogleTest/GoogleMock test code, with CMake/CTest integration.
+  signal:
+    judge_question: |
+      Based only on files actually created or modified by the agent, not explanatory text:
+      Did the agent add or modify C++ GoogleTest/GoogleMock test code AND CMake/CTest integration?
+      Acceptable evidence: a changed C++ test file includes <gtest/gtest.h>, "gtest/gtest.h", <gmock/gmock.h>, or "gmock/gmock.h" and contains TEST/TEST_F/TEST_P/TYPED_TEST macros; plus a changed CMakeLists.txt/.cmake config wires the test target into GoogleTest/CTest.
+      Unacceptable: only pre-existing repository files contain gtest/CMake; the agent merely mentions GoogleTest; or it creates tests without CMake/CTest integration.
+      Answer YES only if both changed test code and changed CMake/CTest integration are present. Answer NO otherwise.
+
+# ── Must do: skill-derived behavior ─────────────────────
+- id: r1_test_file_in_unit_dir
+  type: order
+  provenance: skill
+  signal_dimension: following
+  verifier: llm-judge
+  exclusive: true
+  weight: high
+  spec: |
+    [SKILL] New/modified unit test files must be placed in the tests/unit/ subdirectory, not in the tests/ root or other locations.
+    The skill explicitly states "Test files should not be placed directly in the tests/ root".
+    Skill-exclusive rationale: models that do not read the skill often place tests in the tests/ root or project root; the skill requires placing them in tests/unit/ by scope.
+  signal:
+    judge_question: |
+      Examine only C++ test source files created or modified by the agent that contain GoogleTest macros.
+      Are ALL such unit test source files under a tests/unit/ directory?
+      Acceptable: every changed C++ unit test file with TEST/TEST_F/TEST_P/TYPED_TEST is under tests/unit/.
+      Unacceptable: any changed C++ unit test file is directly under tests/, under the project root, or in any path other than tests/unit/.
+      Answer YES only if ALL changed GoogleTest unit test files are under tests/unit/. Answer NO otherwise.
+
+- id: r2_gtest_discover_tests
+  type: required-tool
+  provenance: skill
+  signal_dimension: following
+  verifier: state-diff
+  exclusive: true
+  weight: high
+  spec: |
+    [SKILL] CMakeLists.txt/.cmake must use gtest_discover_tests() to register tests, and must not add new add_test() registrations for GoogleTest tests.
+    The skill states "Register test executables using gtest_discover_tests() rather than the older add_test() approach".
+    Skill-exclusive rationale: models that do not read the skill often use the simpler add_test(NAME ... COMMAND ...); the skill requires discovery-based registration.
+  signal:
+    changed_files:
+      include: ["**/CMakeLists.txt", "**/*.cmake"]
+    file_must_contain: "(?i)\\bgtest_discover_tests\\s*\\("
+    file_must_not_contain: "(?i)\\badd_test\\s*\\("
+    scope: "created_or_modified_cmake_files_only"
+
+- id: r3_fetchcontent_pinned_version
+  type: required-tool
+  provenance: skill
+  signal_dimension: following
+  verifier: llm-judge
+  exclusive: true
+  weight: mid
+  spec: |
+    [SKILL] GoogleTest must be obtained via FetchContent with a pinned version tag, release archive URL, or fixed commit.
+    The skill states "Always fetch GoogleTest via FetchContent with a pinned version tag".
+    Skill-exclusive rationale: models that do not read the skill may use find_package, system packages, FetchContent without a specified version, or main/master/HEAD.
+  signal:
+    judge_question: |
+      Examine only CMakeLists.txt/.cmake files created or modified by the agent.
+      Did the changed CMake configure GoogleTest via FetchContent_Declare(googletest ...) with a pinned version?
+      Acceptable: FetchContent_Declare for googletest using a fixed version tag such as v1.17.0, a release archive URL containing a fixed tag/version, or a specific commit SHA.
+      Unacceptable: find_package(GTest), git submodule only, FetchContent without a version, or any branch-like/unpinned reference such as main, master, HEAD, latest, or a moving branch.
+      Answer YES only if FetchContent_Declare(googletest ...) and a pinned tag/release URL/commit are both present in the agent's changed CMake files. Answer NO otherwise.
+
+- id: r4_expect_over_assert
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: llm-judge
+  exclusive: true
+  weight: high
+  spec: |
+    [SKILL] Test code should mainly use EXPECT_* macros, and use ASSERT_* only at preconditions.
+    The skill states "Use ASSERT_* macros only for preconditions... Use EXPECT_* for all other checks".
+    Skill-exclusive rationale: models that do not read the skill often use ASSERT_EQ/ASSERT_TRUE for ordinary value comparisons; the skill requires EXPECT_* for non-preconditions.
+  signal:
+    judge_question: |
+      Examine only the final C++ test files created or modified by the agent.
+      Are ASSERT_* macros limited to true preconditions while ordinary value/behavior checks use EXPECT_*?
+      Acceptable: EXPECT_EQ/EXPECT_TRUE/EXPECT_FALSE are used for normal parse/serialize result checks; ASSERT_TRUE(optional.has_value()) or ASSERT_NE(ptr, nullptr) is used only before dereference or when later checks would be meaningless.
+      Unacceptable: ASSERT_EQ/ASSERT_TRUE is used for ordinary value comparisons, success flags, or every assertion by default; in a small test sample, ASSERT_* appears for non-precondition checks.
+      Answer YES if EXPECT_* is used for regular checks and ASSERT_* is reserved for preconditions. Answer NO otherwise.
+
+- id: r5_build_verification_step
+  type: order
+  provenance: skill
+  signal_dimension: following
+  verifier: llm-judge
+  exclusive: true
+  weight: mid
+  spec: |
+    [SKILL] After writing tests and before first modifying any production code, the model should run the build and CTest/test binary and observe a RED/failure or non-green state.
+    The skill requires RED -> GREEN -> REFACTOR, and verifies before RED to GREEN that the test will compile and fail.
+    Skill-exclusive rationale: models that do not read the skill often write tests and production code and only do final verification; the skill requires observing RED first.
+  signal:
+    judge_question: |
+      Based only on actual file edit order and executed command outputs, not the agent's explanation:
+      After the agent added or modified the test, and before its first production-code fix, did it run both a build and CTest/test binary and observe a RED/non-green result?
+      Acceptable: after saving the test, the agent runs cmake --build plus ctest or the relevant test binary; the output shows compile failure, failing test, or other non-green result before production code is changed.
+      Unacceptable: the agent only runs tests after changing production code; only mentions that it would run tests; runs build without tests; or sees only a final all-passing run.
+      Answer YES only if this RED verification sequence occurred. Answer NO otherwise.
+
+# ── Task completion: only records 0/1, not scored ─────────────────
+- id: tc1_tests_compile_and_pass
+  type: task-completion
+  provenance: task
+  signal_dimension: task_completion
+  verifier: llm-judge
+  exclusive: false
+  weight: 0
+  spec: |
+    [TASK — not counted toward skill-following] New/modified tests contain real parse/serialize assertions, the project compiles, and the relevant tests pass.
+  signal:
+    judge_question: |
+      Based on final changed files and real command outputs, not the agent's explanation:
+      Answer YES only if all are true: (1) changed C++ test files contain TEST/TEST_F macros with substantive parse and serialize assertions, not empty smoke tests; (2) cmake --build or equivalent build succeeded; (3) ctest or the relevant test binary reported passing tests.
+      Answer NO otherwise.

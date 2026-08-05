@@ -1,0 +1,47 @@
+task_id: architecture_patterns_t3_ecommerce_contexts
+level: L3
+skill_id: skill_61_architecture_patterns
+description: |
+  We plan to first organize an evolvable minimal skeleton for the order-related modeling in this e-commerce backend. Here are model files from the same real project: `assets/architecture_patterns_t3_ecommerce_contexts/input/order_models.py`, `assets/architecture_patterns_t3_ecommerce_contexts/input/account_models.py`, and `assets/architecture_patterns_t3_ecommerce_contexts/input/checkout_models.py`.
+
+  Based on these materials, provide a split plan and land a minimal code skeleton. The order side needs to express core rules that "an order belongs to a buyer, an order can enter a fulfillment-ready state, and other systems can be notified after the order completes key steps"; after the split, each area's package can be developed independently, and the order area does not need to start the account or checkout database tables in its own unit tests. Please include unit-test examples that reflect the core order rules and cross-module collaboration.
+initial_state:
+  assets:
+    - path: assets/architecture_patterns_t3_ecommerce_contexts/input/order_models.py
+      source: "https://github.com/saleor/saleor/blob/master/saleor/order/models.py"
+      real_state: "The order model file of the Saleor open-source e-commerce project, containing dependencies in multiple directions such as order status, fulfillment, payment, discount, and account."
+      preparation: |
+        Downloaded directly from the Saleor GitHub repository master branch, content unmodified.
+    - path: assets/architecture_patterns_t3_ecommerce_contexts/input/account_models.py
+      source: "https://github.com/saleor/saleor/blob/master/saleor/account/models.py"
+      real_state: "The account model file of the Saleor open-source e-commerce project."
+      preparation: |
+        Downloaded directly from the Saleor GitHub repository master branch, content unmodified.
+    - path: assets/architecture_patterns_t3_ecommerce_contexts/input/checkout_models.py
+      source: "https://github.com/saleor/saleor/blob/master/saleor/checkout/models.py"
+      real_state: "The checkout model file of the Saleor open-source e-commerce project."
+      preparation: |
+        Downloaded directly from the Saleor GitHub repository master branch, content unmodified.
+  tools_available: ["read", "write", "edit", "bash"]
+expected_trigger: true
+skill_constraints_tested:
+  - id: bounded_contexts_no_shared_model
+    description: "Order, account, and checkout should be modeled as independent boundaries; the order side can only hold lightweight identities and value objects from its own context language."
+    exclusive: "Without following the skill, a common implementation directly imports external User or Checkout models as field types in the order core logic, or extracts a global shared/common entity layer; following the skill, the order core only keeps concepts from its own context, such as CustomerId, OrderId, CheckoutReference, without introducing external Django entities."
+
+  - id: anti_corruption_boundary
+    description: "Cross-business-area collaboration should be completed through explicit interfaces or translation layers, avoiding external concepts polluting the order core model."
+    exclusive: "Without following the skill, a common implementation passes account or checkout objects directly into the order core model or order service, causing context leakage; following the skill, cross-area collaboration is completed through explicit interfaces, gateways, translators, or equivalent boundary objects."
+
+  - id: aggregate_and_domain_event
+    description: "Core order rules should be expressed around aggregate boundaries, and domain events should record state changes that can be subscribed to."
+    exclusive: "Without following the skill, a common implementation writes anemic data classes and service functions, or directly calls external notification, messaging, email, and other infrastructure in core logic; following the skill, the order expresses state rules as an aggregate and records key state changes as domain event objects, handled by outer-layer processes."
+notes: |
+  - Core test points are structural signals rather than business completeness:
+    1. Whether the order core module avoids directly depending on the account/checkout ORM or external domain models;
+    2. Whether order-context local identities/value objects appear, such as CustomerId, OrderId;
+    3. Whether cross-area collaboration is expressed through explicit interfaces, translators, gateways, or equivalent boundary objects;
+    4. Whether state changes first appear as domain fact/event objects, rather than directly calling external notifications inside entity methods;
+    5. Whether unit tests can run without ORM and without real database dependencies, using in-memory doubles or equivalent test doubles.
+  - If the model only partially implements, skill-following signals can still be evaluated based on directory dependency direction, type dependency direction, test-double design, and event representation, without using final business run-through as the sole criterion.
+  - Common mistakes: creating shared/models.py; order core directly referencing account.User or checkout.Checkout; event publishing written into infrastructure calls instead of first expressed as domain facts.

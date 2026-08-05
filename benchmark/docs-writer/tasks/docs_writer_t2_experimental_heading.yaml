@@ -1,0 +1,68 @@
+task_id: docs_writer_t2_experimental_heading
+skill_id: docs-writer
+description: |
+  The Plan Mode page in `assets/docs_writer_t2_experimental_heading/input/docs/cli/plan-mode.md`
+  has grown into the main place where users learn the feature, and the sidebar
+  already presents it as a feature page. Please refresh the page so it reads like
+  a polished feature guide for the current product state.
+
+initial_state:
+  assets:
+    - path: assets/docs_writer_t2_experimental_heading/input/docs/cli/plan-mode.md
+      source: "https://github.com/google-gemini/gemini-cli/blob/ae0a3aa7b928cc73bb09604bb9c2c020e6b647db/docs/cli/plan-mode.md"
+      real_state: "Real Gemini CLI Plan Mode documentation page with multiple headings, examples, and deep-link targets."
+      preparation: |
+        Cloned google-gemini/gemini-cli at commit ae0a3aa7b928cc73bb09604bb9c2c020e6b647db and copied this file without content changes.
+    - path: assets/docs_writer_t2_experimental_heading/input/docs/cli/tutorials/plan-mode-steering.md
+      source: "https://github.com/google-gemini/gemini-cli/blob/ae0a3aa7b928cc73bb09604bb9c2c020e6b647db/docs/cli/tutorials/plan-mode-steering.md"
+      real_state: "Real tutorial page that links to Plan Mode and contains an experimental-feature note."
+      preparation: |
+        Cloned google-gemini/gemini-cli at commit ae0a3aa7b928cc73bb09604bb9c2c020e6b647db and copied this file without content changes.
+    - path: assets/docs_writer_t2_experimental_heading/input/docs/sidebar.json
+      source: "https://github.com/google-gemini/gemini-cli/blob/ae0a3aa7b928cc73bb09604bb9c2c020e6b647db/docs/sidebar.json"
+      real_state: "Real Gemini CLI documentation sidebar with Plan Mode navigation entries and feature badges."
+      preparation: |
+        Cloned google-gemini/gemini-cli at commit ae0a3aa7b928cc73bb09604bb9c2c020e6b647db and copied this file without content changes.
+    - path: assets/docs_writer_t2_experimental_heading/input/packages/cli/src/ui/settingsSchema.ts
+      source: "https://github.com/google-gemini/gemini-cli/blob/ae0a3aa7b928cc73bb09604bb9c2c020e6b647db/packages/cli/src/config/settingsSchema.ts"
+      real_state: "Real settings schema containing current Plan Mode setting labels and defaults."
+      preparation: |
+        Cloned google-gemini/gemini-cli at commit ae0a3aa7b928cc73bb09604bb9c2c020e6b647db and copied the schema file into a shorter path for the task bundle.
+  tools_available:
+    - read_file
+    - list_directory
+    - grep_search
+    - replace
+    - write_file
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: experimental_note_after_intro
+    description: "The skill requires adding the standard experimental note immediately after the introductory paragraph only when a feature is clearly noted as experimental. Since the Plan Mode page is not marked experimental in the supplied sidebar or settings schema, the refreshed main page must not add an experimental note."
+    exclusive: "A general documentation editor may copy the experimental framing from the Plan Mode steering tutorial or add a generic warning, while the skill's conditional rule requires checking whether the main feature page is clearly marked experimental before adding the note."
+  - id: heading_deep_link_audit
+    description: "When changing headings, the skill requires checking for deep links to that heading in other pages and updating them."
+    exclusive: "Without the skill, a model may improve headings locally but leave links like `../plan-mode.md#custom-plan-directory-and-policies` stale."
+  - id: heading_overview_paragraphs
+    description: "Every heading must be followed by an introductory overview paragraph before lists or sub-headings."
+    exclusive: "General Markdown editing often places a bullet list or step list immediately after a heading if the source already used that pattern."
+  - id: project_name_exactness
+    description: "The skill requires referring to the project as `Gemini CLI`, not `the Gemini CLI`."
+    exclusive: "A fluent editor often adds the natural article before product names, which conflicts with the skill's naming rule."
+
+notes: |
+  - Core test point: The task forces a docs refresh that touches a title/heading-sensitive page and requires auditing related docs and navigation assets.
+  - Expected correct behavior: The model reads `plan-mode.md`, `plan-mode-steering.md`, `sidebar.json`, and the Plan Mode entries in `settingsSchema.ts`; then edits the documentation to match current setting labels and experimental status.
+  - Common wrong behavior: The model renames headings such as `Custom plan directory and policies` but leaves internal links in `plan-mode.md` pointing to old anchors such as `#custom-plan-directory-and-policies`, `#collaborative-plan-editing`, `#custom-planning-with-skills`, or `#custom-policies`.
+  - Common wrong behavior: The model incorrectly adds an experimental note or callout to the main Plan Mode page after copying the status from the Plan Mode steering tutorial, even though the main page is not marked experimental in `sidebar.json` or `settingsSchema.ts`.
+  - Common wrong behavior: The model writes "the Gemini CLI lets you..." in the refreshed introduction, violating the project naming rule.
+  - baseline_correctness_signals:
+      - The Plan Mode page remains valid Markdown and still explains how users enter, use, and leave the feature.
+      - Any changed headings have matching local or cross-page references updated.
+      - The settings mentioned on the page match the current labels and defaults in the supplied settings schema.
+  - skill_following_signals:
+      - The main Plan Mode page does not add an experimental callout, because the supplied sidebar and settings schema do not clearly mark Plan Mode as experimental.
+      - Every heading in modified sections is followed by a prose overview before any list or subheading.
+      - If the model changes any heading text, corresponding same-page anchors and any supplied-doc links to those headings are audited and updated.
+      - The edited text uses `Gemini CLI` exactly and avoids `the Gemini CLI`.

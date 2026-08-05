@@ -1,0 +1,28 @@
+line	title_or_context	url	status	final_url	note
+33	- How [`var`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/var	200	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/var	
+33	- How [`var`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/let	200	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/let	
+33	- How [`var`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/const	200	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/const	
+48	**[Scope](https://developer.mozilla.org/en-US/docs/Glossary/Scope)** is the curr	https://developer.mozilla.org/en-US/docs/Glossary/Scope	200	https://developer.mozilla.org/en-US/docs/Glossary/Scope	
+111	When a scope ends, variables declared in that scope can be [garbage collected](h	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Memory_management#garbage_collection	200	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Memory_management	redirected to final URL
+168	In browsers, global variables become properties of the [`window`](https://develo	https://developer.mozilla.org/en-US/docs/Web/API/Window	200	https://developer.mozilla.org/en-US/docs/Web/API/Window	
+168	In browsers, global variables become properties of the [`window`](https://develo	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/globalThis	200	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/globalThis	
+271	Unlike `var`, variables declared with `let` and `const` are not initialized unti	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ReferenceError	200	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ReferenceError	
+399	The [`setTimeout()`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout	https://developer.mozilla.org/en-US/docs/Web/API/setTimeout	200	https://developer.mozilla.org/en-US/docs/Web/API/Window/setTimeout	redirected to final URL
+534	A **[closure](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Clos	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Closures	200	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Closures	
+672	This pattern works great with the [Fetch API](https://developer.mozilla.org/en-U	https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API	200	https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API	
+700	Closures are essential for maintaining state in asynchronous code. When you use 	https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener	200	https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener	
+879	When you're done with a closure, explicitly break the reference. Use [`removeEve	https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener	200	https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener	
+1170	Closures — JavaScript.Info	https://javascript.info/closure	200	https://javascript.info/closure	
+1177	You Don't Know JS Yet: Scope & Closures — Kyle Simpson	https://github.com/getify/You-Dont-Know-JS/tree/2nd-ed/scope-closures	200	https://github.com/getify/You-Dont-Know-JS/tree/2nd-ed/scope-closures	
+1184	Var, Let, and Const – What's the Difference?	https://www.freecodecamp.org/news/var-let-and-const-whats-the-difference/	200	https://www.freecodecamp.org/news/var-let-and-const-whats-the-difference/	
+1187	JavaScript Scope and Closures	https://css-tricks.com/javascript-scope-closures/	200	https://css-tricks.com/javascript-scope-closures/	
+1190	whatthefuck.is · A Closure	https://whatthefuck.is/closure	200	https://whatthefuck.is/closure	
+1193	I never understood JavaScript closures	https://medium.com/dailyjs/i-never-understood-javascript-closures-9663703368e8	ERROR	https://medium.com/dailyjs/i-never-understood-javascript-closures-9663703368e8	HTTPError: HTTP Error 403: Forbidden
+1196	The Difference Between Function and Block Scope	https://medium.com/@josephcardillo/the-difference-between-function-and-block-scope-in-javascript-4296b2322abe	ERROR	https://medium.com/@josephcardillo/the-difference-between-function-and-block-scope-in-javascript-4296b2322abe	HTTPError: HTTP Error 403: Forbidden
+1199	Closures: Using Memoization	https://dev.to/steelvoltage/closures-using-memoization-3597	200	https://dev.to/bbarbour/closures-using-memoization-3597	redirected to final URL
+1206	JavaScript Tutor — Visualize Code Execution	https://pythontutor.com/javascript.html	200	https://pythontutor.com/javascript.html	
+1212	JavaScript: Understanding the Weird Parts (First 3.5 Hours)	https://www.youtube.com/watch?v=Bv_5Zv5c-Ts	200	https://www.youtube.com/watch?v=Bv_5Zv5c-Ts	
+1219	JavaScript The Hard Parts: Closure, Scope & Execution Context	https://www.youtube.com/watch?v=XTAzsODSCsM	200	https://www.youtube.com/watch?v=XTAzsODSCsM	
+1222	Closures in JavaScript	https://youtu.be/qikxEIxsXco	200	https://www.youtube.com/watch?v=qikxEIxsXco&feature=youtu.be	redirected to final URL
+1225	Closures — Fun Fun Function	https://www.youtube.com/watch?v=CQqwU2Ixu-U	200	https://www.youtube.com/watch?v=CQqwU2Ixu-U	
+1228	Learn Closures In 7 Minutes	https://www.youtube.com/watch?v=3a0I8ICR1Vg	200	https://www.youtube.com/watch?v=3a0I8ICR1Vg	

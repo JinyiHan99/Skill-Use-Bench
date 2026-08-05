@@ -1,0 +1,45 @@
+task_id: SF102_t2_champion_systems
+level: L3
+skill_id: skill_102_eternal-haven-lore-pack
+description: |
+  Our small engineering group is reading the Eternal Haven page at `assets/SF102_t2_champion_systems/input/eternalhaven_homepage.html` and wants a short team note about distributed cognition.
+
+  Write it in ÆTHERIS’ voice as a Champion lens, not as one of the saga’s in-universe characters. Open from concrete details you find on the page, then build toward practical guidance for people designing collaborative software systems. Weave in structural concepts such as shared state, accord-like protocols, feedback loops, or ledgers alongside the mythic language.
+initial_state:
+  assets:
+    - path: assets/SF102_t2_champion_systems/input/eternalhaven_homepage.html
+      source: "https://eternalhaven.ca/"
+      real_state: "HTML captured from the public Eternal Haven series homepage. It includes the four-book saga overview and a Δ9 LYGO Haven / Champion Hub section."
+      preparation: |
+        Reused the same public homepage capture process for this task-specific input folder. The file is an unchanged download of the public Eternal Haven homepage.
+  tools_available:
+    - filesystem
+    - text_editor
+expected_trigger: true
+skill_constraints_tested:
+  - id: champion_meta_archetype_boundary
+    description: "The response must frame ÆTHERIS as a Champion lens, voice, or archetypal persona rather than as one of the saga’s in-universe characters or a peer of the heroes."
+    exclusive: "Without the skill, a model may treat ÆTHERIS as a generic fantasy persona or literal in-universe being, or fail to make the Champion-lens versus story-character boundary explicit."
+  - id: anchor_first_then_soar
+    description: "The response must open from concrete Eternal Haven page details, such as the four-book saga overview and the Δ9 LYGO Haven / Champion Hub, before expanding into metaphor or systems guidance."
+    exclusive: "Without the skill, a model may mention the page only generically or begin with abstract philosophy / network metaphor rather than first grounding the note in specific Eternal Haven and Champion Hub details."
+  - id: mythos_with_math_and_systems
+    description: "The response must connect mythic language to practical distributed-systems structures, using concepts such as shared state, feedback loops, accord-like protocols, ledgers, seals, or coordination rules."
+    exclusive: "Without the skill, a model may satisfy the software-systems angle with generic terms like nodes, teams, or coordination, but miss the lore-aligned structural metaphors such as accords, ledgers, seals, or Δ9-style ordered coordination."
+notes: |
+  - Core test point: this should activate both Eternal Haven lore mode and Champion/persona integration, not generic fantasy prose.
+  - Expected correct behavior: answer in a mythic ÆTHERIS-adjacent voice while explicitly preserving the boundary that ÆTHERIS is a Champion lens / archetypal persona, not a book character; tie distributed cognition to concrete system ideas such as shared state, ledgers, accord-like protocols, feedback loops, and coordination.
+  - Common wrong behavior examples:
+      - The model writes as if ÆTHERIS is literally an in-universe Eternal Haven character or hero.
+      - The model says "I am ÆTHERIS" in a way that implies a story-character identity rather than a voice/lens.
+      - The model produces generic mystical prose about minds, stars, or networks without concrete Eternal Haven page details.
+      - The model gives ordinary software collaboration advice with no mythic/lore-aligned structural language such as accords, ledgers, seals, or Champion Hub context.
+  - baseline_correctness_signals:
+      - The response is a short team note about distributed cognition for collaborative software builders.
+      - The tone is mythic/poetic enough to match the user’s stated preference.
+      - The response uses the supplied Eternal Haven homepage as context.
+  - skill_following_signals:
+      - Maintains the Champion/meta-archetype versus in-universe character distinction with explicit lens/persona framing.
+      - Opens from concrete Eternal Haven/Champion Hub context before expanding into metaphor.
+      - Connects mythic language to practical systems or mathematical structure rather than free-floating mysticism.
+      - Uses lore-aligned structural concepts such as accord-like protocols, ledgers, seals, shared state, feedback loops, or Δ9-style ordered coordination.

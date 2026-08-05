@@ -1,0 +1,257 @@
+# Rubric for skill_03 (pdftk) — t2_burst_rotate_chain
+#
+# Scoring boundary: provenance=skill enters the skill-following score; provenance=task
+# only records task completion rate (0/1) and does not enter the skill-following score.
+
+# ── GATE: evaluability ────────────────────────────────────────────────
+rules:
+  - id: g1_observable_pdf_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The trajectory should contain at least one PDF-processing-related Bash command invocation.
+    signal:
+      command_pattern: '\bpdftk\b'
+      pattern: '\bpdftk\b'
+
+  # ── COMPLIANCE: skill-derived behavior ────────────────────────────────
+  - id: r1_uses_pdftk_for_pdf_operations
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — tool boundary] PDF structural operations such as split, rotate, and reassemble must use pdftk,
+      not Python PDF libraries or alternative CLI tools.
+    signal:
+      command_pattern: '\bpdftk\b.*\b(dump_data|burst|cat\b.*\boutput)\b'
+      pattern: '\bpdftk\b.*\b(dump_data|burst|cat\b.*\boutput)\b'
+
+  - id: r2_uses_tmp_workspace_for_multistep
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 1.2
+    spec: |
+      [SKILL — multi-step intermediate files] Chained PDF operations should use /tmp/pdftk_workspace/
+      to store intermediate files, avoiding polluting the current directory. Weight raised from 1.0 to 1.2 (discriminative power was underestimated).
+    signal:
+      command_pattern: '/tmp/pdftk_workspace'
+      pattern: '/tmp/pdftk_workspace'
+
+  - id: r3_burst_uses_printf_pattern
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — burst format] The split-page output pattern must use the printf-style
+      `%03d` supported by pdftk, not the Python-style `{:03d}`.
+    signal:
+      command_pattern: '\bpdftk\b.*\bburst\b.*%0?3d'
+      pattern: '\bpdftk\b.*\bburst\b.*%0?3d'
+
+  - id: r4_verifies_burst_output_before_next_step
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0.5
+    spec: |
+      [SKILL — step verification] After burst, the number/output of split files should be verified before continuing with rotation
+      or reassembly. Weight reduced from 1.0 to 0.5 (general engineering intuition, not skill-exclusive).
+    signal:
+      judge_question: |
+        After bursting the PDF, did the agent verify the burst output
+        (e.g. counting generated page files with ls or wc) before continuing
+        to rotation or reassembly? Consider only executed tool calls.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - tool_results_first_n: 10
+
+  - id: r5_uses_south_for_180_degree_rotation
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — rotation suffix] A 180° rotation must use the south suffix. A handle prefix
+      such as A5south is supported.
+    signal:
+      command_pattern: '\bpdftk\b.*\bcat\b.*(?:[A-Z])?(?:\d+|end)south.*\boutput\b'
+      pattern: '\bpdftk\b.*\bcat\b.*(?:[A-Z])?(?:\d+|end)south.*\boutput\b'
+
+  - id: r6_rotates_requested_pages_in_single_cat_expression
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 0.7
+    spec: |
+      [SKILL — single-expression rotation] Rotating multiple pages of the same file should be done within a single pdftk
+      cat expression, rather than running separate pdftk commands per page. Weight reduced from 1.0 to 0.7.
+    signal:
+      judge_question: |
+        Considering only executed pdftk commands, were the multiple page
+        rotations (pages 5, 12, 18, 25 with south suffix) handled within
+        one pdftk cat expression, rather than running separate pdftk
+        commands for each rotated page?
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+
+  - id: r7_verifies_final_output_after_chain
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — termination verification] After multi-step PDF operations are complete, dump_data should be run on the final output
+      for verification. Switched to a tool-call verifier to avoid LLM judge misjudgment.
+    signal:
+      command_pattern: '\bpdftk\b\s+\S*rotated\S*\.pdf\s+dump_data\b'
+      pattern: '\bpdftk\b\s+\S*rotated\S*\.pdf\s+dump_data\b'
+
+  - id: r8_cleanup_after_final_verification
+    type: termination
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.7
+    spec: |
+      [SKILL — termination discipline] /tmp/pdftk_workspace/ should be cleaned up after the final output is verified.
+      Switched to a tool-call verifier to check the actual rm command.
+    signal:
+      command_pattern: '\brm\s+-[rf]{1,2}\s+/tmp/pdftk_workspace\b'
+      pattern: '\brm\s+-[rf]{1,2}\s+/tmp/pdftk_workspace\b'
+
+  - id: r9_validates_input_before_operations
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.7
+    spec: |
+      [SKILL — input validation] dump_data should be run on the input PDF before any operation.
+    signal:
+      command_pattern: '\bpdftk\b.*nist_csf2\.pdf.*\bdump_data\b'
+      pattern: '\bpdftk\b.*nist_csf2\.pdf.*\bdump_data\b'
+
+  - id: r10_default_rotate_output_naming
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.3
+    spec: |
+      [SKILL — default naming] When the user does not provide an output name, the rotation result defaults to
+      <stem>_rotated.pdf. Restricted to matching in actual commands.
+    signal:
+      command_pattern: 'nist_csf2_rotated\.pdf'
+      pattern: 'nist_csf2_rotated\.pdf'
+
+  # ── BOUNDARY ─────────────────────────────────────────────────────────
+  - id: b1_no_forbidden_pdf_tools
+    type: forbidden-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — forbidden tools] Using Python PDF libraries and alternative CLI tools to bypass pdftk is forbidden.
+      Weight reduced from 2.0 to 1.5 to avoid double-scoring with r1.
+    signal:
+      command_must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b'
+      must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b'
+      pattern: '[\s\S]*'
+
+  - id: b2_no_python_format_burst_pattern
+    type: forbidden-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 0.3
+    spec: |
+      [SKILL — burst taboo] The Python-style `{:03d}` must not be used in the pdftk burst output pattern.
+      Weight reduced from 1.0 to 0.3 to avoid double-scoring with r3.
+    signal:
+      command_must_not_match: '\bpdftk\b.*\bburst\b.*\{:0?3d\}'
+      must_not_match: '\bpdftk\b.*\bburst\b.*\{:0?3d\}'
+      pattern: '[\s\S]*'
+
+  - id: b3_does_not_overwrite_input
+    type: boundary
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: false
+    weight: 0.4
+    spec: |
+      [SKILL — output boundary] The input PDF must not be overwritten. Weight reduced from 1.0 to 0.4 (general common sense).
+    signal:
+      command_must_not_match: '\boutput\s+(\./)?nist_csf2\.pdf\b'
+      must_not_match: '\boutput\s+(\./)?nist_csf2\.pdf\b'
+      pattern: '[\s\S]*'
+
+  # ── TASK COMPLETION: only records 0/1, not scored ────────────────────
+  - id: task_completion_binary
+    type: task-completion
+    provenance: task
+    locus: final-output
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Deterministic verification of whether the rotation-corrected PDF output is correct.
+    signal:
+      judge_question: |
+        Based ONLY on concrete tool calls, command outputs, and observable results in the trace
+        (not the agent's self-claims or plans):
+        1. Did the agent apply 180-degree rotation (south) to pages 5, 12, 18, and 25 of the
+           32-page source PDF?
+        2. Was the final reassembled PDF successfully produced as a complete 32-page document
+           (all pages present, rotated pages corrected)?
+        3. Did all commands complete without errors? (no "Error", "failed", "Exception" in output)
+        Answer YES only if ALL three conditions are met with evidence in the trace. Answer NO if any
+        condition fails or lacks evidence.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - final_answer
+        - tool_results_first_n: 15

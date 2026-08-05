@@ -1,0 +1,43 @@
+task_id: story_short_scan_t2_dianzhong_channel_compare
+skill_id: story-short-scan
+description: |
+  I already have a general direction: realistic reversal/revenge. Here are two Dianzhong channel page archives: `assets/story_short_scan_t2_dianzhong_channel_compare/input/dianzhong_male_browse_20260702.html` and `assets/story_short_scan_t2_dianzhong_channel_compare/input/dianzhong_female_browse_20260702.html`.
+
+  Please look only at what can actually be confirmed in these two pages, and separately judge how the male and female channels each suit this direction, and also tell me how confident you are in each judgment. Finally, give a cut that is more suitable for validation first, and what the biggest misjudgment risk is right now; if a page's information is insufficient to make a judgment, say directly what data still needs to be supplemented, do not make things up.
+initial_state:
+  assets:
+    - path: assets/story_short_scan_t2_dianzhong_channel_compare/input/dianzhong_male_browse_20260702.html
+      source: "https://www.ishugui.com/browse"
+      real_state: "HTML of the Dianzhong Reading male-channel novel recommendation page crawled on 2026-07-02, containing multiple short-story/premium-story chart-style entries."
+      preparation: |
+        The original HTML was saved from the public webpage `https://www.ishugui.com/browse` and copied to this task's input directory without modifying content.
+    - path: assets/story_short_scan_t2_dianzhong_channel_compare/input/dianzhong_female_browse_20260702.html
+      source: "https://www.ishugui.com/browse/on3"
+      real_state: "HTML of the Dianzhong Reading female-channel novel recommendation page crawled on 2026-07-02; the page title and channel/category information are visible, but in this crawl result books is empty, unable to support chart-level book list comparison."
+      preparation: |
+        The original HTML was saved from the public webpage `https://www.ishugui.com/browse/on3` without modifying content; its real parseable state is preserved for evaluating whether the model handles insufficient samples honestly.
+  tools_available:
+    - filesystem
+    - html_text_extraction
+expected_trigger: true
+skill_constraints_tested:
+  - id: existing_direction_deep_scan
+    description: "When the user already has a direction, the skill requires deep chart scanning around that direction and judging writable cuts based on samples."
+    exclusive: "Without reading the skill, the model tends to skip the chart samples and directly write a trope checklist for 'realistic reversal/revenge'."
+  - id: platform_or_channel_comparison
+    description: "When the user wants to compare different channels/platforms, the skill requires comparative analysis to find audience differences and transferable/non-transferable emotional mechanisms."
+    exclusive: "Without reading the skill, the model may merge the two pages into one overall conclusion, or ignore one of the samples' insufficient information."
+  - id: weak_data_confidence_handling
+    description: "The skill emphasizes real data support; when samples are insufficient, trend confidence should be lowered and rescan should be noted, without fabricating chart entries."
+    exclusive: "Without reading the skill, the model often fabricates female-channel hot words or average distributions in order to complete the comparison."
+notes: |
+  - Core test point: existing direction + channel comparison + weak sample handling, verifying whether the model incorporates data confidence into conclusions per the short-story chart-scanning process.
+  - Expected correct behavior: the male-channel page uses real entries to distill emotional hooks for realistic reversal/revenge; the female-channel page, if lacking parseable entries, is marked as sample-insufficient; the conclusion provides a priority validation cut, risk threshold, and rescan action.
+  - Common model error behaviors: will fabricate "CEO revenge, harem intrigue, period drama proportions" for the female-channel page even when only the channel title is clearly parseable; will directly apply the public-issue face-slapping mechanisms from male-channel samples such as `母亲想白嫖我百万黄金，我杀疯了` and `男邻居不肯给消防挪车后，他悔疯了` to the female-channel conclusion; will only write "revenge is hot" without noting that sample thinness reduces confidence.
+  - baseline_correctness_signals:
+      - References the real parseable state of both assets separately.
+      - Outputs a realistic reversal/revenge cut that can be validated first, and explains why it is prioritized.
+  - skill_following_signals:
+      - Performs deep chart scanning for the existing direction, rather than full-scope generalization.
+      - Reflects channel comparison, and lowers conclusion strength for the channel with insufficient information.
+      - Includes sample date, trend confidence, next rescan or supplementary collection action, and saturation/misjudgment risk.

@@ -1,0 +1,53 @@
+task_id: SF14_t1_edit_pdf
+level: L2
+skill_id: skill_14_pdf_editing
+description: |
+  You are given a PDF file at `./assets/SF14_t1_edit_pdf/input.pdf` and a text file at `./assets/SF14_t1_edit_pdf/input.txt` containing natural language instructions and updated information.
+  Your task is to update this PDF using the latest information provided in the text file and follow all the instructions in it.
+
+  Use the text file as the source of truth. If the document already contains correct information, do not add it again.
+  If it has wrong/outdated information, please edit it to make sure the information matches with the text file.
+  When editing the PDF, you MUST NOT cover or obscure unrelated text, form labels, lines, or boxes. Only the specific outdated values being corrected may be replaced in their original location.
+  When you fill in the blank or the form, make sure you are putting it in the right place, for example, you need to put the answer in the form, and if it is a text box, make sure your text is on the lines in the box.
+
+  Follow any privacy or masking instructions provided in the text file.
+  Return the edited PDF document as the final output at `./output/output.pdf`.
+initial_state:
+  assets:
+    - path: input.pdf
+      source: "skillsbench/tasks/edit-pdf/environment/input/input.pdf"
+      description: "UCSD SHIP WAIVER APPEAL APPLICATION form with some incorrect values"
+    - path: input.txt
+      source: "skillsbench/tasks/edit-pdf/environment/input/input.txt"
+      description: "Text file with correct personal information and editing instructions"
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+skill_constraints_tested:
+  - id: no_rasterize
+    description: "Must not rasterize or flatten PDF to images"
+    exclusive: "Model may convert PDF to images for easier manipulation"
+  - id: use_pymupdf
+    description: "Final PDF must retain a vector text layer (no rasterized/flattened pages) and remain searchable"
+    exclusive: "Model may use pdf-lib, reportlab, or other libraries"
+  - id: cover_then_replace
+    description: "Must replace outdated values in their original position such that the old text is no longer visible or extractable, without leaving artifacts"
+    exclusive: "Model may try to directly edit text or use strikethrough"
+  - id: true_redaction_for_sensitive
+    description: "Sensitive information flagged for redaction must be truly removed from the PDF (not recoverable via text extraction or content stream inspection), not merely visually hidden"
+    exclusive: "Model may only visually cover sensitive data without actually removing it from PDF structure"
+  - id: no_strikethrough
+    description: "Must never use strikethrough lines to cross out text"
+    exclusive: "Model may use strikethrough to indicate replaced text"
+  - id: preserve_labels
+    description: "Must not cover or remove original form labels"
+    exclusive: "Model may accidentally cover labels when replacing nearby values"
+notes: |
+  This task tests the model's ability to:
+  1. Parse structured text input to extract personal information
+  2. Compare existing PDF content against a source-of-truth text file
+  3. Correct outdated values in-place without disturbing surrounding labels or structure
+  4. Properly remove sensitive information so it cannot be recovered from the document
+  5. Fill in empty form fields at the correct location
+  6. Preserve the original form layout
+
+  Source: skillsbench/tasks/edit-pdf

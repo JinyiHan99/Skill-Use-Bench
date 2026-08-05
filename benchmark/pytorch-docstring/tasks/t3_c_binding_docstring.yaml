@@ -1,0 +1,79 @@
+task_id: SF04_t3_c_binding_docstring
+level: L2
+skill_id: skill_04_pytorch_docstring
+description: |
+  We added several low-level linear algebra operations; the Python side currently only has placeholder documentation.
+  Please look at src/ops/_custom_ops.py, and complete the docstrings for these public functions following the project's existing PyTorch API documentation style.
+
+  Reference expected signatures: randomized_svd(input, q, niter=2, oversampling=10) -> (U, S, Vh);
+  truncated_eigh(input, k, largest=True) -> (eigenvalues, eigenvectors);
+  sparse_cholesky(input, upper=False) -> Tensor.
+
+initial_state:
+  files:
+    - path: src/ops/_custom_ops.py
+      content: |
+        import torch
+        from torch._C import _add_docstr
+
+
+        # Low-rank matrix approximation via randomized SVD
+        randomized_svd = _add_docstr(
+            torch._C._linalg.randomized_svd,
+            """TODO: add docstring""",
+        )
+
+
+        # Truncated eigendecomposition for symmetric matrices
+        truncated_eigh = _add_docstr(
+            torch._C._linalg.truncated_eigh,
+            """TODO: add docstring""",
+        )
+
+
+        # Sparse Cholesky factorization
+        sparse_cholesky = _add_docstr(
+            torch._C._linalg.sparse_cholesky,
+            """TODO: add docstring""",
+        )
+
+    - path: src/ops/__init__.py
+      content: |
+        from ._custom_ops import randomized_svd, truncated_eigh, sparse_cholesky
+
+        __all__ = ["randomized_svd", "truncated_eigh", "sparse_cholesky"]
+
+  tools_available: [bash, read, edit, grep]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: add_docstr_signature_first_line
+    description: "C-binding docstrings attached with _add_docstr must start with the public function signature line"
+    exclusive: "Model replaces TODO with a summary paragraph and omits the signature because the Python assignment already names the function"
+  - id: raw_string_prefix
+    description: "C-binding docstring literals must use r\"\"\" for LaTeX-safe PyTorch documentation"
+    exclusive: "Model keeps the existing plain triple-quoted TODO literal style"
+  - id: math_formula_block
+    description: "Mathematical formulations use .. math:: directive blocks"
+    exclusive: "Model writes matrix equations inline or as plain ASCII prose"
+  - id: tensor_shape_math
+    description: "Tensor shapes use :math: with \\text{} for named dimensions"
+    exclusive: "Model writes shapes such as (*, m, n) or (n, n) as plain text"
+  - id: section_ordering
+    description: "Present sections preserve PyTorch ordering: signature → description/extended details → math → Args → Returns → Examples"
+    exclusive: "Model places the Args block before the .. math:: block (the common Google/NumPy ordering), or places Examples immediately after the description without intervening Args/Returns"
+  - id: examples_format
+    description: "Examples use Examples:: with doctest prompts, imports, and realistic random tensors"
+    exclusive: "Model omits 'import torch', uses single-colon 'Examples:' heading, writes pseudo-code, or constructs example tensors via torch.zeros/torch.ones instead of torch.randn"
+  - id: default_value_double_backticks
+    description: "Optional parameter defaults use double-backtick format such as Default: ``None``"
+    exclusive: "Model writes 'Default: None' as plain text or '(default=None)' inline"
+  - id: cross_reference_sphinx_role
+    description: "References to other torch functions use the :func:`...` Sphinx role"
+    exclusive: "Model writes ``torch.linalg.svd`` in single backticks or as a markdown link"
+
+notes: |
+  Design intent: a positive-example task, examining whether the model can identify C-binding docstring formatting conventions by combining the _add_docstr code form with the skill.
+
+  Asset verification: the YAML only retains the two files that exist in assets/SF04_t3_c_binding/; the old docs/source/ops.rst has been removed. The authenticity of the low-level operation names still requires manual supplementary verification.

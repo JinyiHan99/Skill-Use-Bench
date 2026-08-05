@@ -1,0 +1,160 @@
+# Rubric for skill_13_pptx — SF13_t2_reference_formatting
+#
+# Scoring boundary: skill/generic is scored; task only records completion rate; gate only judges evaluability; instruction is not scored.
+
+rules:
+  # ── GATE: evaluability ───────────────────────────
+  - id: g1_pptx_edit_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trajectory should contain an observable PPTX formatting/editing attempt (command context; the approach need not be correct).
+      The broad .pptx filename match was removed to avoid misjudging read-only/file-listing as an edit attempt.
+    signal:
+      pattern: '(?is)(Bash|bash|Edit|Write|MultiEdit|str_replace_editor):.*(\bunpack\.py\b|\bpack\.py\b|ppt/slides|slide\d+\.xml)'
+
+  # ── Must do: skill-derived behavior ──────────────
+  - id: r1_use_ooxml_workflow
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL] Must use the ooxml/scripts unpack -> pack workflow.
+      Workflow proof: both unpack.py and pack.py must appear in commands. Forbidden libraries such as python-pptx/zipfile are listed separately in b2.
+      Anti-prior: a model that does not read the skill often directly uses python-pptx or zip/zipfile to repackage.
+    signal:
+      pattern: '(?is)Bash:.*\bunpack\.py\b'
+      must_appear_before:
+        - '(?is)Bash:.*\bunpack\.py\b'
+        - '(?is)Bash:.*\bpack\.py\b'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["exclusivity-claude-opus-4.7"]
+      consensus: high
+
+  - id: r2_validate_after_edit
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL] After each XML/rels edit, validate.py must be run with --original for a semantic diff.
+      Validate at least 6 times throughout (5 caption slides + >=1 validation pass for the slide7 registration block).
+    signal:
+      judge_question: |
+        Did the agent run ooxml/scripts/validate.py with --original after XML or .rels edits, including enough validation coverage for the five caption slides and the slide7 registration change? Answer YES only if the trace shows validation after edits rather than only a final unchecked pack.
+      judge_context_window:
+        - serialized_steps
+        - final_answer
+    review:
+      proposed_by: ["exclusivity-claude-opus-4.7"]
+      challenged_by: ["adversary-gpt-5.5"]
+      consensus: high
+
+  # ── Must not do: skill out-of-scope behavior ────
+  - id: b2_no_forbidden_libs
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — boundary] Must not use python-pptx / openpyxl / bare zipfile writes / shell unzip|zip /
+      shutil.make_archive to bypass the OOXML workflow. Only judged in command/code context.
+      Cautiously restricted to real violation contexts such as library imports and zip write/repackage, so that ordinary file .write() is not misjudged.
+    signal:
+      pattern: '(?s).*'
+      must_not_match: |-
+        (?is)(Bash|Write|Edit|MultiEdit|str_replace_editor):.*(from\s+pptx\b|import\s+pptx\b|python-pptx|import\s+openpyxl\b|from\s+openpyxl\s+import\b|openpyxl\.|import\s+zipfile\b|from\s+zipfile\s+import\s+ZipFile\b|zipfile\.ZipFile\([^)]*mode\s*=\s*["']?[wax]["']?|ZipFile\([^)]*mode\s*=\s*["']?[wax]["']?|\.writestr\(|shutil\.make_archive|python\s+-m\s+zipfile\b|\bunzip\b|\bzip\b(?!\s*\())
+    review:
+      proposed_by: ["exclusivity-claude-opus-4.7"]
+      consensus: high
+
+  - id: r3_never_range_limit_reference
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    severity: soft
+    exclusive: false
+    weight: 0
+    spec: |
+      [DIAGNOSTIC — not counted toward skill-following] When reading html2pptx.md / ooxml.md / template-content.md, the
+      range (offset/limit) parameter must not be set; Bash head/tail/sed -n/awk range reads of these documents are also intercepted.
+      This rule has weak discriminative power: no-skill models usually do not read these documents and naturally pass, so it is diagnostic only, weight=0.
+    signal:
+      pattern: '(?s).*'
+      must_not_match: '(?is)(Read:.*(?:html2pptx\.md|ooxml\.md|template-content\.md).*("offset"|"limit"|"start_line"|"end_line"|"line_range"|"range")|Bash:.*\b(head|tail|sed\s+-n|awk)\b.*(?:html2pptx\.md|ooxml\.md|template-content\.md))'
+    review:
+      proposed_by: ["adversary-gpt-5.5", "purist-gemini-3.5-flash"]
+      challenged_by: ["exclusivity-claude-opus-4.7"]
+      consensus: medium
+
+  # ── Task completion: only records 0/1, not scored ─
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-check
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Deterministic OOXML assertions (unpacked, not relying on python-pptx):
+        1. output.pptx exists, is a valid zip, and contains [Content_Types].xml and ppt/presentation.xml;
+        2. at least 7 slides, with the new closing slide7 registered in [Content_Types].xml / presentation.xml.rels;
+        3. the paper-title caption on slides 2-6 is formatted as Arial, 16pt, non-bold, #989596, centered, at the bottom and wide enough;
+        4. slide7 contains the title Reference and lists 4 deduplicated references in first-occurrence order: Foam-Agent, ReAct, Why Do Multi-Agent, MultiAgentBench;
+        5. slide7 uses OOXML native buAutoNum type="arabicPeriod"; the run text must not contain hand-written numbering/bullet symbols;
+        6. non-target content remains unchanged except for caption shapes, slide7, and its registration files.
+      r4_no_bullet_symbols_in_text belongs to final-artifact correctness and has been merged into this task-completion, weight=0.
+    signal:
+      output_candidates: ["output.pptx"]
+      must_be_valid_ooxml: true
+      required_parts:
+        - '[Content_Types].xml'
+        - 'ppt/presentation.xml'
+      slides:
+        min_count: 7
+        slide_part: 'ppt/slides/slide7.xml'
+        contains: ['Reference', 'Foam-Agent', 'ReAct', 'Why Do Multi-Agent', 'MultiAgentBench']
+        registered_parts: ['/ppt/slides/slide7.xml']
+        buautonum_min: 4
+        buautonum_type: 'arabicPeriod'
+        no_leading_bullets: true
+        require_buautonum_when_listing: true
+        expected_reference_titles:
+          - 'Foam-Agent'
+          - 'ReAct'
+          - 'Why Do Multi-Agent'
+          - 'MultiAgentBench'
+        expected_reference_order: first_occurrence
+        deduplicate_references: true
+      caption_format:
+        slide_parts:
+          - 'ppt/slides/slide2.xml'
+          - 'ppt/slides/slide3.xml'
+          - 'ppt/slides/slide4.xml'
+          - 'ppt/slides/slide5.xml'
+          - 'ppt/slides/slide6.xml'
+        typeface: 'Arial'
+        sz: '1600'
+        bold: '0'
+        color_srgb: '989596'
+        alignment: 'ctr'
+        position: bottom_center
+        wide_enough_for_single_line: true
+      unchanged_except:
+        - 'ppt/slides/slide2.xml#caption-shape'
+        - 'ppt/slides/slide3.xml#caption-shape'
+        - 'ppt/slides/slide4.xml#caption-shape'
+        - 'ppt/slides/slide5.xml#caption-shape'
+        - 'ppt/slides/slide6.xml#caption-shape'
+        - 'ppt/slides/slide7.xml'
+        - 'ppt/_rels/presentation.xml.rels'
+        - 'ppt/presentation.xml'
+        - '[Content_Types].xml'

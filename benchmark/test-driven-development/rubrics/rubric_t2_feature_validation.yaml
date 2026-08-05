@@ -1,0 +1,251 @@
+# Rubric for SF29_t2_feature_validation
+# Skill: Test-Driven Development (TDD) — Multi-feature addition scenario
+# Core question: Does the model follow incremental RED→GREEN cycles for each validation rule?
+
+# ── GATE ──
+- id: g1_observable_attempt
+  type: required-tool
+  provenance: gate
+  verifier: regex
+  weight: 0
+  signal:
+    pattern: "Write|Edit"
+  spec: "[GATE] The trace contains an observable file write/edit tool call"
+
+# ── Skill-Following rules (scored) ──
+
+- id: r1_test_before_implementation
+  type: order
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] TDD skill requires writing a failing test BEFORE implementing the corresponding production code.
+    skill-exclusive reason: without reading the skill, a strong model's instinctive reaction to "add 4 validation rules" is to directly implement all validation logic in src/registration.py,
+    then write tests to verify; the skill requires writing tests first, then implementation.
+  signal:
+    query: >
+      Based on the actual tool calls (Write/Edit) in the execution trace, did the model
+      write or edit the test file (tests/test_registration.py) to add at least one new test function
+      for a validation rule BEFORE making any edit to the production file (src/registration.py)
+      that implements validation logic?
+
+      Judgment basis: look only at the temporal order of Write/Edit tool calls, not at the agent's text describing its intent.
+      Focus on: first new test addition to tests/test_registration.py vs first validation
+      logic addition to src/registration.py.
+
+      Answer YES if: the first Write/Edit adding a new test for any validation rule in
+      tests/test_registration.py appears BEFORE the first Write/Edit adding validation
+      logic to src/registration.py.
+      Answer NO if: validation logic in src/registration.py was implemented first,
+      or all tests were written after all implementation was done.
+    acceptable: "Edit tests/test_registration.py (adding def test_register_..._invalid_...) → later → Edit src/registration.py (adding validation)"
+    unacceptable: "Edit src/registration.py (adding all validation) → later → Edit tests/test_registration.py"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+- id: r2_incremental_cycles
+  type: order
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] TDD skill requires one RED-GREEN cycle per behavior: write test → run pytest (fail) → implement → run pytest (pass), repeated for each rule.
+    skill-exclusive reason: without reading the skill, the model's instinct is to batch implement — either writing all tests first then implementing all,
+    or implementing all first then writing tests; the skill requires cycling per behavior, no batching.
+  signal:
+    query: >
+      Based on the actual tool calls in the execution trace, did the model follow
+      an incremental cycle pattern where it alternated between writing tests and
+      implementing production code, rather than batching all tests first or all
+      implementation first?
+
+      Judgment basis: look only at the alternating pattern of Write/Edit and Bash(pytest) calls, not at the agent's self-report.
+      Look for the pattern: [edit test] → [pytest fail] → [edit production] → [pytest pass],
+      repeated for multiple validation rules.
+
+      Minimum acceptable: At least 2 distinct RED-GREEN cycles visible in the trace
+      (i.e., the pattern test-write → pytest-fail → impl-write → pytest-pass appears
+      at least twice for different validation rules).
+
+      Answer YES if: there are at least 2 distinct cycles where test addition and
+      implementation alternated (not all tests written first, then all implementation).
+      Answer NO if: all tests were written in one batch, then all implementation in another;
+      or all implementation was done first then tests; or only 1 cycle was performed for all 4 rules.
+    acceptable: "test(username) → pytest(FAIL) → impl(username) → pytest(PASS) → test(email) → pytest(FAIL) → impl(email) → pytest(PASS)"
+    unacceptable: "test(all 4 rules) → impl(all 4 rules) → pytest; or impl(all) → test(all) → pytest"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+- id: r3_pytest_at_red_transitions
+  type: order
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.75
+  spec: |
+    [SKILL] TDD skill requires running pytest after writing each new test to observe it fail (RED checkpoint).
+    skill-exclusive reason: without reading the skill, the model typically only runs pytest once after implementation is complete to verify;
+    the skill requires running pytest after writing each new test to see it fail.
+  signal:
+    query: >
+      Based on the actual Bash tool calls in the execution trace, did the model run
+      pytest after writing new test(s) but before implementing the corresponding
+      production code, and did those pytest runs show test failures?
+
+      Judgment basis: look only at the pytest commands in Bash tool calls, their output, and their temporal relationship with Write/Edit calls.
+      Do not look at the agent's self-report.
+
+      Count the number of times pytest was run in a RED position (after test write,
+      before production write) and showed failures (FAILED, AssertionError, not SyntaxError/ImportError).
+
+      Answer YES if: pytest was run at least 2 times in a RED position showing valid failures
+      (AssertionError or behavioral failure, not SyntaxError/ImportError).
+      Answer NO if: pytest was never run before implementation, or fewer than 2 RED checkpoints exist,
+      or the failures were SyntaxError/ImportError.
+    acceptable: "pytest output showing 'FAILED test_register_...' with AssertionError between test-write and impl-write"
+    unacceptable: "No pytest between test writes and implementation; or only SyntaxError failures"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+- id: r4_pytest_at_green_transitions
+  type: order
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.75
+  spec: |
+    [SKILL] TDD skill requires running pytest after each implementation to confirm tests pass (GREEN checkpoint).
+    skill-exclusive reason: without reading the skill, the model may only run pytest once after all implementation is complete;
+    the skill requires running pytest after each implementation to confirm all pass.
+  signal:
+    query: >
+      Based on the actual Bash tool calls in the execution trace, did the model run
+      pytest after implementing production code and see all tests pass (GREEN checkpoint)?
+
+      Judgment basis: look only at the pytest commands and their output in Bash tool calls, not at the agent's self-report.
+
+      Answer YES if: pytest was run at least 2 times after production code edits and
+      showed all tests passing (no failures) — demonstrating GREEN checkpoints for
+      multiple cycles.
+      Answer NO if: pytest was run only once total after all implementation, or GREEN
+      checkpoints showed failures.
+    acceptable: "After implementing username validation: pytest shows all passed. After implementing email validation: pytest shows all passed."
+    unacceptable: "One single pytest run at the very end after all 4 rules implemented"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+- id: r5_test_naming_convention
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.5
+  spec: |
+    [SKILL] TDD skill requires test names follow pattern test_<behavior>_<condition>_<expected>.
+    skill-exclusive reason: without reading the skill, the model typically uses short names like test_invalid_username, test_validation,
+    test_bad_email; the skill requires three-segment naming conveying behavior+condition+expected.
+  signal:
+    query: >
+      Based on the actual Write/Edit tool calls that modified tests/test_registration.py,
+      do the newly added test function names (not the 3 pre-existing ones) follow the pattern
+      test_<behavior>_<condition>_<expected> (three or more descriptive segments after 'test_')?
+
+      Judgment basis: look only at the new function names actually written in Write/Edit tool calls, not at the agent's self-report.
+      Ignore the 3 pre-existing tests (test_register_user_returns_success,
+      test_registered_user_can_be_retrieved, test_exists_by_email_after_registration).
+      The pattern requires at least three semantic segments describing behavior, condition, and expected outcome.
+
+      Answer YES if: majority (>50%) of newly added test names have 3+ descriptive segments like
+      test_register_short_username_returns_error, test_register_missing_at_email_fails.
+      Answer NO if: majority of new test names are short/vague like test_bad_username,
+      test_validation_email, test_invalid, or only have 1-2 segments.
+    acceptable: "def test_register_username_too_short_returns_error, def test_register_email_missing_at_returns_error"
+    unacceptable: "def test_invalid_username, def test_bad_email, def test_validation"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: medium
+
+- id: r6_single_behavior_per_test
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.5
+  spec: |
+    [SKILL] TDD skill requires each test to verify a single logical behavior.
+    skill-exclusive reason: without reading the skill, the model tends to write a large test function verifying multiple rules at once
+    (e.g., one test_validation checking username, email, password); the skill requires each test to verify only one behavior category.
+  signal:
+    query: >
+      Based on the actual Write/Edit tool calls that modified tests/test_registration.py,
+      does each newly added test function verify only a single validation rule/behavior?
+
+      Judgment basis: look only at the test function content actually written in Write/Edit tool calls, not at the agent's self-report.
+      A test verifying username-too-short is fine. A test verifying username-too-short AND
+      email-missing-@ together violates this rule. However, @pytest.mark.parametrize across
+      boundary values of the SAME rule (e.g. username too-short / too-long / invalid-char)
+      is acceptable.
+
+      Answer YES if: each new test function tests only one validation category (username OR
+      email OR password OR duplicate), not mixing different categories in one function.
+      Answer NO if: a single test function checks multiple unrelated validation categories
+      (e.g., testing both username AND email validation in one function).
+    acceptable: "def test_register_short_username_returns_error: only tests username length"
+    unacceptable: "def test_all_validations: checks username, email, and password in one function"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: medium
+
+- id: r7_red_failure_is_behavioral
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.25
+  spec: |
+    [SKILL] TDD skill requires RED phase failures to be assertion/behavioral failures, not SyntaxError/ImportError.
+    skill-exclusive reason: without reading the skill, the model may write tests referencing non-existent functions causing ImportError,
+    or have syntax errors — this does not count as a valid RED; the skill explicitly requires failures to be assertion errors indicating missing behavior.
+  signal:
+    query: >
+      Based on the pytest output in the Bash tool calls during RED phases (pytest runs
+      that show failures before implementation), were the failures behavioral/assertion-based
+      rather than SyntaxError or ImportError?
+
+      Judgment basis: look only at the error types in the pytest output in Bash tool calls, not at the agent's self-report.
+      Valid RED failures: AssertionError, comparison failures, unexpected return values,
+      or the test detecting wrong behavior (e.g., function returns success when it should fail).
+      Invalid RED failures: SyntaxError, ImportError, NameError, ModuleNotFoundError.
+
+      Answer YES if: the RED-phase pytest failures are primarily assertion/behavioral errors.
+      Answer NO if: the RED-phase pytest failures are primarily SyntaxError/ImportError/NameError.
+    acceptable: "FAILED test_register_short_username_returns_error - AssertionError: assert {'success': True...} == {'success': False...}"
+    unacceptable: "ERROR test_register... - ImportError: cannot import name 'validate_username'"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: medium
+
+# ── Task completion record (not scored) ──
+- id: tc1_task_done
+  type: task-completion
+  provenance: task
+  verifier: state-diff
+  weight: 0
+  spec: "[TASK — not counted toward SF] Validation logic implemented: register_user returns success=False for invalid input"
+  signal:
+    file: "assets/SF29_t2_feature_validation/src/registration.py"
+    file_must_contain: "success.*False|False.*success"

@@ -1,0 +1,47 @@
+task_id: api_security_t2_auth_otp_jwt
+skill_id: api-security-best-practices
+description: |
+  We are about to launch the new account recovery and login flow. Please help review `assets/api_security_t2_auth_otp_jwt/input/AuthController.java`, `assets/api_security_t2_auth_otp_jwt/input/OtpServiceImpl.java`, `assets/api_security_t2_auth_otp_jwt/input/JwtProvider.java`, and `assets/api_security_t2_auth_otp_jwt/input/SignUpForm.java`. Conduct a pre-launch API security review and output a prioritized issue list. For each issue, describe the affected code location, the risk reason, the fix recommendation, and how to perform regression verification after the fix.
+initial_state:
+  assets:
+    - path: assets/api_security_t2_auth_otp_jwt/input/AuthController.java
+      source: "https://github.com/OWASP/crAPI/blob/main/services/identity/src/main/java/com/crapi/controller/AuthController.java"
+      real_state: "OWASP crAPI auth controller source with login, signup, password reset, token verification, and OTP validation routes."
+      preparation: |
+        Cloned OWASP/crAPI main branch with git and copied this source file unchanged into the task asset directory.
+    - path: assets/api_security_t2_auth_otp_jwt/input/OtpServiceImpl.java
+      source: "https://github.com/OWASP/crAPI/blob/main/services/identity/src/main/java/com/crapi/service/Impl/OtpServiceImpl.java"
+      real_state: "OWASP crAPI OTP service implementation containing password reset OTP generation and validation logic."
+      preparation: |
+        Cloned OWASP/crAPI main branch with git and copied this source file unchanged into the task asset directory.
+    - path: assets/api_security_t2_auth_otp_jwt/input/JwtProvider.java
+      source: "https://github.com/OWASP/crAPI/blob/main/services/identity/src/main/java/com/crapi/config/JwtProvider.java"
+      real_state: "OWASP crAPI JWT provider source containing token generation and validation logic."
+      preparation: |
+        Cloned OWASP/crAPI main branch with git and copied this source file unchanged into the task asset directory.
+    - path: assets/api_security_t2_auth_otp_jwt/input/SignUpForm.java
+      source: "https://github.com/OWASP/crAPI/blob/main/services/identity/src/main/java/com/crapi/model/SignUpForm.java"
+      real_state: "OWASP crAPI signup request model with validation annotations for name, password, email, and phone number."
+      preparation: |
+        Cloned OWASP/crAPI main branch with git and copied this source file unchanged into the task asset directory.
+  tools_available:
+    - read_file
+    - edit_file
+    - run_tests
+expected_trigger: true
+skill_constraints_tested:
+  - id: auth_endpoint_throttling
+    description: "The skill requires rate limiting and stricter limits for authentication endpoints to prevent brute force and abuse."
+    exclusive: "Without the skill, a model may provide generic retry-limit advice for one endpoint. A skill-aligned response should apply request-level abuse controls across login, password-recovery/OTP generation, and OTP validation, including per-user and per-IP limits, throttling/quotas, lockout or backoff behavior, and suspicious-activity monitoring."
+  - id: jwt_validation_hardening
+    description: "The skill requires strong token authentication, short-lived tokens, issuer/audience validation, and avoiding weak token verification behavior."
+    exclusive: "Without the skill, a model may stop at generic expiration or signature-check advice. A skill-aligned response should perform a complete token-trust review: reject unsigned/plain JWTs, prevent algorithm confusion, avoid trusting externally supplied key material such as unvalidated JKU headers, validate issuer and audience, and ensure generated tokens are short-lived with an appropriate refresh/revocation strategy."
+notes: |
+  - Positive task. The correct response should combine authentication, input validation, rate limiting, token trust hardening, data protection, and concrete security regression testing rather than focusing on a single bug.
+  - Observable signals:
+    - Rate limiting: covers login, password-recovery/OTP generation, and OTP validation; includes per-user and per-IP limits, throttling or quotas, lockout/backoff behavior, and monitoring for suspicious activity.
+    - JWT hardening: identifies concrete token trust flaws such as parsing claims before signature verification, accepting PlainJWT/unsigned tokens, algorithm confusion, externally supplied JKU key trust, missing issuer/audience validation, and token lifetime/revocation concerns.
+    - Password and error hygiene: identifies weak password requirements and account-existence leakage or overly specific recovery/login errors; recommends sanitized, consistent responses.
+    - Verification: proposes regression tests for each risk class, including abuse-rate tests for authentication flows, forged/unsigned/JKU/algorithm-confusion token tests, password-policy tests, and account-enumeration response tests.
+  - Priority guidance: token trust bypass and unauthenticated account takeover paths should be ranked above password-policy hardening and generic hygiene issues.
+  - Common mistakes: only changing the OTP attempt counter, only checking JWT expiration, giving generic "add validation" advice without code-specific token trust analysis, suggesting long-lived API keys without revocation, or exposing whether an email is registered.

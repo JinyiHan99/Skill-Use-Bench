@@ -1,0 +1,60 @@
+task_id: SF25_t1_add_unit_tests
+level: L2
+skill_id: SF25
+description: |
+  We have a lightweight JSON parsing library that currently has no tests. Recently, when integrating it into another project, we found that some edge-case inputs cause incorrect behavior — in particular, strings containing special escape characters are inconsistent after parsing and re-serialization, and some malformed inputs are not correctly rejected.
+
+  The code is under ./assets/SF25_t1_add_unit_tests/, containing a header file include/json_parser.h and an implementation src/json_parser.cpp. The build configuration does not yet include tests.
+
+  Please add unit tests for this library, covering common scenarios and edge-case issues in the core parse and serialize flows, fix the implementation defects exposed by the tests, and wire the tests into the build process, ensuring that all tests can finally build and pass.
+
+initial_state:
+  source: "Hand-written for evaluation, inspired by lightweight recursive-descent C++ JSON parsers (e.g., PicoJSON API style). Contains intentional edge-case bugs in serialize() and parse() for TDD evaluation."
+  assets:
+    - path: ./assets/SF25_t1_add_unit_tests/CMakeLists.txt
+      description: "CMake build file with only a library target, no test configuration"
+    - path: ./assets/SF25_t1_add_unit_tests/include/json_parser.h
+      description: "JSON parser library header file, defining the Value class and parse/serialize interfaces"
+    - path: ./assets/SF25_t1_add_unit_tests/src/json_parser.cpp
+      description: "Full implementation of the JSON parser library"
+
+tools_available: [bash, read, edit, write]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: tdd_red_phase_verify
+    description: "The skill requires running CTest after writing tests to verify the test infrastructure is usable (compiles, CTest can discover and run tests); before fixing production code, there should be at least one build+test run record. The code contains real bugs (serialize omits \\b/\\f escaping, parse does not validate trailing garbage); a model following the skill should run CTest once before modifying json_parser.cpp and observe the relevant test failures"
+    exclusive: "The model's default behavior is to write tests and implementation fixes together and run them once at the end to confirm pass, rather than running CTest once before modifying production code"
+  - id: test_file_placement
+    description: "The skill requires test files to be placed in the tests/unit/ subdirectory, not in the tests/ root"
+    exclusive: "The model will by default place tests in the tests/ root or alongside source code"
+  - id: gtest_discover_tests
+    description: "The skill requires using gtest_discover_tests() to register tests rather than add_test()"
+    exclusive: "The model tends to use the simpler and more direct add_test(NAME ... COMMAND ...) approach"
+  - id: assert_vs_expect
+    description: "The skill requires using ASSERT_* only for preconditions, and EXPECT_* for the rest to get richer diagnostic information"
+    exclusive: "The model by default uses ASSERT_EQ/ASSERT_TRUE for all assertions, because once one fails subsequent checks are meaningless"
+  - id: fetchcontent_pinned
+    description: "The skill requires obtaining GoogleTest via FetchContent + pinned version tag"
+    exclusive: "The model may use find_package or git submodule"
+
+pip_packages: []
+apt_packages: [cmake, g++, make]
+
+notes: |
+  Positive task: the model needs to add unit tests for an existing C++ library. The core test point is whether the model follows the skill's constraints on TDD flow, file organization (tests/unit/), CMake configuration (gtest_discover_tests), assertion strategy (ASSERT vs EXPECT), etc.
+
+  The following real bugs already exist in the code and can serve as natural trigger points for the RED phase:
+  1. serialize() omits escaping for \b and \f (parse_string handles them correctly, but serialize's switch only covers " \ \n \t \r), causing inconsistent roundtrip for strings containing \b/\f.
+     Location: json_parser.cpp lines 204-210.
+  2. parse() does not check trailing garbage characters; parse("123abc") will successfully return Value(123) instead of throwing an exception.
+     Location: json_parser.cpp lines 182-186.
+  3. In serialize(), Object keys are concatenated without escaping; keys containing " or \ will produce invalid JSON.
+     Location: json_parser.cpp line 232.
+
+  A model following the skill should write tests first, run them first to confirm failures exist (using the above bugs), then fix the implementation and pass all tests. A model not following the skill will write tests and fixes all at once and then run.
+
+  The evaluation environment must ensure:
+  - assets are mapped to the runtime cwd path ./assets/SF25_t1_add_unit_tests/
+  - network is available or a GoogleTest FetchContent cache is pre-provisioned (the skill requires FetchContent download)

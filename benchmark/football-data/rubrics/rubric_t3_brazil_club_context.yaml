@@ -1,0 +1,104 @@
+# Rubric for skill_97_football-data — football_data_t3_brazil_club_context
+
+rules:
+  - id: g1_observable_football_data_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable football-data/sports-skills real CLI or Python SDK query attempt."
+    signal:
+      pattern: '(?i)(sports-skills\s+football\s+get_\w+\b|from\s+sports_skills(?:\.football)?\s+import\s+\w+|from\s+sports_skills\s+import\s+football|football\.get_\w+\s*\()'
+
+  - id: r1_search_corinthians_in_brazil_context
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Corinthians's team_id, competition_id=serie-a-brazil, and season should be confirmed via team-discovery capabilities such as search_team(query="Corinthians") or get_current_season(competition_id="serie-a-brazil") + get_season_teams, rather than only using clubs.txt to write a static introduction.
+      skill-exclusive rationale: without reading the skill, a model can directly write an encyclopedic program script from local clubs.txt / common sense; the skill explicitly states that Serie A Brazil is within coverage and search_team/get_season_teams can return team/competition/season. The conflict point is "static material introduction" vs "football-data team discovery connecting to current matches".
+    signal:
+      query: |
+        Based only on actual tool-call evidence and outputs, did the agent use football-data team discovery to identify Corinthians with serie-a-brazil competition context and a team_id/season?
+        Answer YES if the trace shows search_team(query="Corinthians") returning serie-a-brazil context, or get_current_season(competition_id="serie-a-brazil") followed by get_season_teams that locates Corinthians.
+        Answer NO if it only reads br_brazil_clubs.txt, uses generic web search, or assumes an ID/league without discovery.
+      acceptable: "sports-skills football search_team --query=Corinthians returns competition id serie-a-brazil and team id; or get_current_season serie-a-brazil then get_season_teams returns Corinthians"
+      unacceptable: "reads clubs.txt and writes about Corinthians history with no football-data discovery call"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps]
+
+  - id: r2_use_team_schedule_and_event_timeline_for_current_context
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] After discovering Corinthians, use get_team_schedule or get_season_schedule + team filter to get recent schedule/results, and when an event_id is available, use get_event_timeline to get the most recent verifiable key event; if there is no usable recent/completed event_id, do not fabricate key events.
+      skill-exclusive rationale: without reading the skill, a model may stay on the local club material fragment or web summaries; the skill example for Corinthians explicitly gives the search_team → get_team_schedule → get_event_timeline chain. The conflict point is "static / web recent status" vs "skill's schedule/event timeline chain".
+    signal:
+      query: |
+        Based only on actual football-data tool calls, command outputs, and final answer, after discovering Corinthians did the agent call get_team_schedule for the discovered team/serie-a-brazil context, or get_season_schedule and filter to Corinthians, and when an event_id was available for a recent completed match, call get_event_timeline for match events?
+        Answer YES if the schedule call is present and timeline is attempted when a recent/completed event_id exists.
+        Also answer YES if no usable recent/completed event_id was returned and the final answer cleanly says key events could not be verified instead of inventing them.
+        Answer NO if no schedule is queried, or if key events are invented/generic without event_timeline when an event_id was available.
+      acceptable: "search_team Corinthians; get_team_schedule --team_id=<id> --competition_id=serie-a-brazil; get_event_timeline --event_id=<recent match>"
+      unacceptable: "final lists goals/cards but no event_timeline call or event data source appears despite an available event_id"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps, final_answer]
+
+  - id: r3_no_brazil_xg_call_and_acknowledge_boundary
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Brazil Serie A is not in the top 5; must not call get_event_xg for Corinthians/serie-a-brazil events, and should state in the output that xG / similar Understat-style advanced stats cannot be forcibly supplemented.
+      skill-exclusive rationale: without reading the skill, when facing "advanced statistics", a model often defaults to attempting / fabricating xG; the skill explicitly states that get_event_xg only applies to EPL, La Liga, Bundesliga, Serie A, Ligue 1. The conflict point is "also apply xG to Brasileirao" vs "recognize top-5 boundary and refuse to force-supplement".
+    signal:
+      query: |
+        Based on actual tool calls and final answer, did the agent avoid calling get_event_xg for a serie-a-brazil/Corinthians match and state that xG/Understat-style advanced stats are not reliably available for Brazil Serie A through this skill?
+        Accept equivalent caveats such as "Brazil Serie A xG advanced stats are not supported/reliable here and should not be forced"; do not require the exact word Understat.
+        Answer YES if both the no-call boundary and the final caveat are satisfied.
+        Answer NO if get_event_xg is called for Brazil Serie A, if concrete xG is invented, or if the final answer omits the boundary caveat.
+      acceptable: "No get_event_xg call; final says xG is top-5 only and should not be forced for Brazil Serie A."
+      unacceptable: "sports-skills football get_event_xg --event_id=<Corinthians event> or final gives Corinthians xG values"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps, final_answer]
+
+  - id: r4_no_pl_only_paths_for_corinthians
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Must not use PL-only get_missing_players or get_season_leaders for Corinthians/Brazil Serie A; player status/leaderboards must not apply Premier League FPL conventions to the Brasileirao.
+      skill-exclusive rationale: without reading the skill, a model may misuse the injury/leaders interface for "player status" and interpret empty results as no injuries / no leaderboard; the skill explicitly states that these two commands are Premier League-only, and non-PL returns empty. The conflict point is "apply PL-only capabilities to Brasileirao" vs "explicitly cannot apply".
+    signal:
+      query: |
+        Based only on actual tool calls, did the agent avoid calling get_missing_players or get_season_leaders for Corinthians, serie-a-brazil, or a Brazil Serie A season at all?
+        Answer YES only if no such PL-only call is made for Brazil/Corinthians.
+        Answer NO if get_missing_players or get_season_leaders is called for Corinthians / serie-a-brazil / a Brazil Serie A season, regardless of whether the result is used in the final answer.
+      acceptable: "Final says FPL missing players/leaders are Premier League-only and cannot verify Corinthians availability that way; no PL-only call is made for Brazil."
+      unacceptable: "sports-skills football get_season_leaders --season_id=serie-a-brazil-2025, or get_missing_players --season_id=serie-a-brazil-2025, even if final does not cite it."
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps]
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the final program script includes Corinthians's current competition, recent schedule/results, key events, and data-boundary explanation."
+    signal:
+      query: |
+        Based on serialized_steps and final_answer, did the response identify Corinthians, describe its current competition context, include recent fixture/result information supported by tool evidence, include at least one match key event or a clean unable-to-verify statement, and clearly list data types that should not be forced for this league?
+        Answer YES only if all these task-output elements are present and the final answer does not present unsupported invented recent events as facts.
+      acceptable: "Final cites Corinthians in Serie A Brazil, recent schedule/result, a timeline-derived key event or says key events could not be verified, and states xG/FPL boundaries."
+      unacceptable: "Final gives plausible goals/cards or recent events with no supporting schedule/timeline evidence."
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps, final_answer]

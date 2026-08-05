@@ -1,0 +1,35 @@
+task_id: k8s_security_policies_t2_secure_dnsutils
+skill_id: k8s-security-policies
+description: |
+  This small troubleshooting utility Pod used to run in the development environment; the team now wants to migrate it into a shared cluster and keep it long-term. Based on `assets/k8s_security_policies_t2_secure_dnsutils/input/dnsutils.yaml`, deliver a complete deployment manifest that complies with the shared cluster's security baseline. Save the output to `output/dnsutils-secure.yaml`.
+initial_state:
+  assets:
+    - path: assets/k8s_security_policies_t2_secure_dnsutils/input/dnsutils.yaml
+      source: "https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/admin/dns/dnsutils.yaml"
+      real_state: "The minimal dnsutils Pod example from the Kubernetes website repository, located in the default namespace, containing basic Pod metadata, container name, image, pull policy, and restart policy, without the namespace isolation, identity, RBAC, security context, resource governance, and network policy configuration required by a shared cluster."
+      preparation: |
+        Save the YAML content from the public repository directly, without rewriting business fields.
+  tools_available: [read, write, edit]
+expected_trigger: true
+skill_constraints_tested:
+  - id: no_default_namespace_or_service_account
+    description: "The workload should be placed in a dedicated namespace with restricted security labels, using an explicitly created ServiceAccount and binding."
+    exclusive: "Without reading the skill, a strong model may also create a custom namespace and ServiceAccount; the real distinguishing point is whether it fills in the restricted Pod Security namespace labels, automountServiceAccountToken: false, and an explicit least-privilege Role/RoleBinding."
+  - id: explicit_runtime_restrictions
+    description: "The Pod and containers must explicitly declare restricted-level runtime limits, including non-root, RuntimeDefault seccomp, forbidding privilege escalation, dropping all capabilities, and a read-only root filesystem."
+    exclusive: "In ordinary Kubernetes completion tasks, the model often does not add the full restricted configuration for a debugging Pod."
+  - id: dns_only_network_isolation
+    description: "The namespace must first have a default-deny network policy, then allow only the UDP/TCP 53 egress traffic this Pod needs to reach cluster DNS."
+    exclusive: "Without reading the skill, the model often omits the NetworkPolicy, writes a loose allow-all egress, or forgets to add the DNS exception after default-deny; the skill more reliably produces default-deny + DNS-only allow."
+  - id: explicit_resource_governance
+    description: "The container must set CPU/memory requests and limits."
+    exclusive: "In the scenario of long-term retention in a shared cluster, a strong model often adds resource governance even without reading the skill, so this is more of a correctness constraint and should not serve as the main skill-exclusive signal."
+notes: |
+  - Positive example: migrating, reviewing, and hardening an existing Pod manifest to the shared cluster security baseline should trigger the skill.
+  - Negative example: if the task only explains the dnsutils Pod's purpose, updates the image tag, or renames a single field from default without involving shared-cluster security governance, the skill should not be triggered.
+  - Observable signal: the output file no longer references the default namespace; it contains Namespace, Pod, ServiceAccount, Role, RoleBinding, NetworkPolicy.
+  - Observable signal: the Namespace has restricted pod-security labels, including enforce, audit, warn.
+  - Observable signal: the ServiceAccount is explicitly created with automountServiceAccountToken: false; if the Pod does not need to access the Kubernetes API, the Role should keep empty permissions (rules: []) or equivalent least privilege; unjustified read/write permissions should be judged as wrong.
+  - Observable signal: the Pod/container explicitly sets non-root, RuntimeDefault seccomp, drop ALL capabilities, forbids privilege escalation, read-only root filesystem, and adds emptyDir mounts (e.g., /tmp) for temporary writes under the read-only root filesystem.
+  - Observable signal: a default-deny NetworkPolicy exists, and only the UDP/TCP 53 egress traffic from this Pod to cluster DNS is additionally allowed.
+  - Common errors: not handling the temporary writable paths the tool may need under the read-only root filesystem; granting overly broad RBAC permissions; writing a full egress allow or only a default-deny that makes DNS unavailable.

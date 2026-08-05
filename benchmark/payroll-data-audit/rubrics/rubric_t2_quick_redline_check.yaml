@@ -1,0 +1,115 @@
+task_id: SF91_t2_quick_redline_check
+skill_id: skill_91_payroll-data-audit
+rubric_id: rubric_t2_quick_redline_check
+rules:
+  - id: g1_observable_redline_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable attempt to read the target payroll history, execute the red-line step, or write red-line results."
+    signal:
+      pattern: "(?i)((tool(?:_name)?|tool|name)\\s*[:=]\\s*[\"']?(Read|Bash|Write|Edit|Grep)[\"']?.{0,500}(payroll_history_2024\\.csv|--step\\s+red_lines|redline_findings\\.md)|file_path\\s*[:=]\\s*[\"']?[^\"'\\n]*(payroll_history_2024\\.csv|redline_findings\\.md))"
+
+  - id: r1_quick_redline_scope_only
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] A "quick pre-payroll hard-blocker / blocking-rules check" should be routed to the quick red-line validation scope, judging only blocking items, without expanding into full audit, trend analysis, yellow/blue lines, or archive report pipelines.
+      Skill-exclusive rationale: Without reading the skill, a strong model treats the request as a generic payroll anomaly review and expands into more analysis; the skill requires the quick red_lines branch. The conflict point is "only do blocking red lines, do not run the full report pipeline."
+    signal:
+      query: |
+        Based on actual tool calls and final/written content, not the agent's self-description, does the model limit this task to a quick red-line/blocking check, without expanding into a full audit/report/trend/archive pipeline, yellow/blue-line analysis, or budget trend analysis?
+        Answer YES if it stays within blocking red-line scope; a detailed red-line list or a brief suggestion to fix data and rerun a full audit later is acceptable. Answer NO if it runs or produces a broad audit package/report, trend/budget analysis, yellow/blue-line analysis, or archival delivery outputs.
+      acceptable: "Only lists whether payroll can continue, the RL/BLOCK hard-blocker list, and a brief suggestion to rerun a full audit after correction."
+      unacceptable: "Also generates a full audit report, dashboard, annual budget trend, and department pay-structure analysis."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_redline_framed_as_system_blocking_decision
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Red-line findings should be framed as BLOCK / rule-blocked / cannot-continue-payroll under system rules, rather than as ordinary "anomalies to watch."
+      Skill-exclusive rationale: Without reading the skill, a strong model naturally points out negative net pay or high overtime but may not give a "system block" conclusion; the skill explicitly requires that a red-line trigger means BLOCK. The conflict point is "finding a severe anomaly must be converted into a rule-based blocking decision."
+    signal:
+      file: "redline_findings.md"
+      file_must_contain: "(?i)(BLOCK|system red line|rule block|RL-00[0-9]|block|cannot continue payroll)"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_rule_grounded_employee_evidence
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The red-line list should give affected employee, period/date, actual value, expected condition, and rule identity or severity per rule; all listed BLOCK items, or at least each core BLOCK category, must satisfy this.
+      Skill-exclusive rationale: Without reading the skill, a strong model usually lists suspicious rows; the skill requires organizing evidence by rule ID/threshold/severity. The conflict point is "anomaly rows must become rule-based audit evidence."
+    signal:
+      query: |
+        Looking only at the actual red-line results file or final reply, do all listed BLOCK items (or each core BLOCK category) include employee identifier, pay_period/pay_date/pay period or date, actual abnormal value, expected condition or threshold, and rule ID/red-line identity/BLOCK severity?
+        Answer YES only if the listed blocking findings are rule-grounded with those evidence elements or clear equivalents. Answer NO if only one item is complete while other listed BLOCK findings lack employee, period/date, value, threshold, or rule/severity framing.
+      acceptable: "E004 James O'Brien, 2024-09-15, net_pay=-270.00, expected > 0, RL-001/BLOCK; E001 Sarah, overtime=52, threshold <= 36, RL-002/BLOCK."
+      unacceptable: "James's net pay is negative (with detail), Sarah has a lot of overtime (no period, threshold, or rule)."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_no_normal_report_when_blocked
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] After finding red lines, the model should stop at the blocking list and not continue to output ordinary release semantics such as "overall can pass / payroll can proceed / approval can continue."
+      Skill-exclusive rationale: Without reading the skill, a strong model may list anomalies while continuing to give a full summary; the skill requires that after a red-line block, no release conclusion be generated. The conflict point is "after a blocking item appears, the process terminates."
+    signal:
+      query: |
+        Based only on the final reply and red-line results content, not judging whether files were generated: after listing red-line blocking items, does the model avoid normal-pass, payroll-can-proceed, approval-can-continue release semantics?
+        Answer YES if the final semantics remain blocked/remediate-first. Answer NO if it says approval/payroll can proceed, overall passed, or otherwise releases the payroll despite red lines.
+      acceptable: "After outputting the BLOCK list, require correction and do not say payroll can continue."
+      unacceptable: "After the red-line list, still write 'overall audit passed, payroll can proceed'."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_no_normal_report_files_when_blocked
+    type: termination
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] After a red-line block, ordinary audit report files should not be generated; file-level verification is separated from r4's release-semantics judgment.
+      Skill-exclusive rationale: the skill explicitly requires that a red-line trigger means block and no ordinary report is generated; a default model may continue to produce report.md/report.html/master_report.html.
+    signal:
+      must_not_match: '(?i)(Write|Edit):.*file_path["'']?\s*[:=]\s*["'']?[^"''\n]*(?:report\.md|report\.html|master_report\.html|06_master_report\.html)'
+    review:
+      proposed_by: ["aggregator"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] Generate redline_findings.md containing a blocking conclusion and at least one core blocking evidence item (employee and abnormal value appearing together)."
+    signal:
+      file: "redline_findings.md"
+      file_must_contain: "(?is)(?=.*(BLOCK|block|cannot continue payroll))(?=.*(E004|James O['’]?Brien|E001|Sarah))(?=.*(-270(?:\\.00)?|52|net_pay|overtime))"

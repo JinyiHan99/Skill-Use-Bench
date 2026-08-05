@@ -1,0 +1,105 @@
+rules:
+  - id: g1_read_target_code
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable attempt to read the target Swift file."
+    signal:
+      pattern: '(?:"file_path"|"path")\s*:\s*"[^"]*assets/swiftui_performance_audit_t1_feed_jank/input/ContentView\.swift"'
+
+  - id: r1_code_suspicion_not_trace_backed_root_cause
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] When code review cannot fully explain runtime frame drops, the visualEffect/rotation3DEffect in the active code must be judged as code-level suspicion, not a trace-backed root cause.
+      skill-exclusive reason: without reading the skill, a strong model often directly asserts scroll geometry reading or 3D rotation as the jank root cause; the skill requires code-first review but distinguishing suspicion from trace-backed evidence when evidence is insufficient. The conflict is "whether to over-assert the root cause".
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer explicitly downgrade the visualEffect, rotation3DEffect, or scroll-position-driven transform in the active code to code-level suspicion, risk, hypothesis, suspect, or unverified risk, rather than a definite root cause proven by trace? Answer YES only if the active visualEffect/rotation3DEffect path is framed as suspicion/risk/hypothesis or otherwise not proven by source alone. Answer NO if the answer first states or strongly implies that visualEffect/rotation3DEffect/proxy.frame/layout thrash is the definite root cause of the jank, even if it later says to profile or verify.
+      acceptable: "The per-frame 3D rotation calculation based on scroll position in `visualEffect` is the primary suspect, but source code alone cannot prove it causes frame drops; runtime evidence is needed for confirmation."
+      unacceptable: "The root cause of the jank is the visualEffect/rotation3DEffect at ContentView.swift:184-187 reading scroll position every frame and triggering layout thrash; fixing it will resolve the issue."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_request_specific_swiftui_profiling_evidence
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] For SwiftUI scrolling jank that code review cannot conclusively determine, SwiftUI timeline and Time Profiler runtime evidence for the same interaction should be requested.
+      skill-exclusive reason: without reading the skill, a strong model may only give fix suggestions or vaguely say "check with Instruments"; the skill explicitly requires requesting SwiftUI timeline and Time Profiler when evidence is insufficient. The conflict is the specificity of profiling intake.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer request the user to provide SwiftUI timeline, SwiftUI performance trace, SwiftUI instrument capture, or view body evaluation trace for the same fast horizontal scrolling interaction, and simultaneously request Time Profiler, CPU profiler, or CPU call tree/call tree evidence? Answer YES if both a SwiftUI-specific timeline/performance capture and a CPU/Time Profiler call tree are requested for the same horizontal scrolling interaction. Answer NO if it only says "profile with Instruments" generically, requests only one evidence type, or does not tie them to the same interaction.
+      acceptable: "Please record the same fast left-right swipe on a real device and provide a SwiftUI performance trace and Time Profiler call tree."
+      unacceptable: "Suggest analyzing with Instruments."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_collect_device_build_repro_context
+    type: lesson
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] Profiling intake should also collect device/OS, Debug or Release build configuration, and precise reproduction steps.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer request supplementary device or OS information, Debug/Release build configuration, and precise reproduction steps or recording instructions for the same interaction — these three categories of context? Answer YES only if all three categories are present. Answer NO if it only asks for generic "more environment information" or omits any category.
+      acceptable: "Also need device model/iOS version, real device or simulator, Debug/Release, and reproduction steps for fast left-right swiping."
+      unacceptable: "Please provide more runtime environment information and performance data."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_do_not_treat_commented_geometryreader_as_active_cause
+    type: forbidden-arg
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] Code-first review should be based on the currently active code, not treating commented-out GeometryReader examples as the current root cause.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer avoid describing the commented-out GeometryReader/per-row GeometryReader/old ScrollView examples as the currently running root cause? Answer YES if it either ignores those commented snippets or explicitly says they are commented out/not active. Answer NO if it identifies the commented GeometryReader code as the active cause of the current jank.
+      acceptable: "Lines 137-172 are commented-out experimental code; the current active path is the visualEffect at lines 174-194."
+      unacceptable: "Each item has a GeometryReader, so the root cause of the current horizontal list jank is per-item GeometryReader."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: "[TASK — not counted toward SF] Whether the answer completed a performance review of the feed jank code."
+    signal:
+      query: >
+        Looking only at the final answer content: does the answer provide root cause/risk analysis, fix or investigation suggestions around the horizontal scrolling jank in assets/swiftui_performance_audit_t1_feed_jank/input/ContentView.swift, and analyze the active implementation ContentView.swift:174-194, including at least one valid source code line number reference within the 174-194 range? Answer YES if these task-completion elements are present. Answer NO if it gives generic SwiftUI advice, cites only commented code, or only cites lines outside the active implementation.
+      acceptable: "References ContentView.swift:174-194, analyzes horizontal ScrollView/visualEffect risk and provides fix or diagnostic steps."
+      unacceptable: "Only gives generic SwiftUI performance advice, or only references commented-out GeometryReader line numbers."

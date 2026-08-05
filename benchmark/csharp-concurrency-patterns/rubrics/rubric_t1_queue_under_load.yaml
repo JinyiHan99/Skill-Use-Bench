@@ -1,0 +1,115 @@
+rules:
+  - id: g1_observable_code_write
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: '[GATE] The trace must contain an observable write or edit attempt on the queue example C# file.'
+    signal:
+      pattern: |-
+        (?:^|\n)\s*(?:tool\s*[:=]\s*["']?(?:Write|Edit|write_file|edit_file)["']?|(?:Write|Edit|write_file|edit_file)\b)[\s\S]{0,1500}?file_path\s*[:=]\s*["']?(?:[^"'\n]*/)?assets/SF85_t1_queue_under_load/input/ConsumingEnumerableDemo\.cs
+
+  - id: r1_bounded_channel_as_core_queue
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The producer/consumer background queue should be upgraded to a bounded Channel<T> of System.Threading.Channels, and use it as the core queue abstraction.
+      Skill-exclusive rationale: without reading the skill, a strong model will likely keep the existing BlockingCollection<T> example and only add bounded capacity, cancellation checks, or exception handling; the skill requires using Channel<T> for producer/consumer work queues, and bounded capacity is key to handling burst-import backpressure. The conflict point is "patching the existing blocking collection" vs "switching to a bounded message-passing queue".
+    signal:
+      file: 'assets/SF85_t1_queue_under_load/input/ConsumingEnumerableDemo.cs'
+      file_must_contain: 'Channel\.CreateBounded\s*<[^>]+>\s*\(|new\s+BoundedChannelOptions\s*\('
+      file_must_not_contain: '\bBlockingCollection\s*<|\bGetConsumingEnumerable\s*\('
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: high
+
+  - id: r2_wait_backpressure_full_mode
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The bounded Channel must reflect wait-when-full backpressure behavior, rather than an unbounded queue, discarding writes, or only limiting collection capacity.
+      Skill-exclusive rationale: without reading the skill, a model may only set BlockingCollection's bounded capacity, or use Channel but choose DropOldest/DropWrite and other modes that do not make the producer wait; the skill explicitly emphasizes that Channels are for buffering with backpressure. The conflict point is "capacity limit or drop policy" vs "making the producer wait when full".
+    signal:
+      file: 'assets/SF85_t1_queue_under_load/input/ConsumingEnumerableDemo.cs'
+      file_must_contain: 'Channel\.CreateBounded\s*<'
+      file_must_not_contain: 'BoundedChannelFullMode\.(DropNewest|DropOldest|DropWrite)|Channel\.CreateUnbounded'
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: high
+
+  - id: r3_cancellable_async_channel_io
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The producer and consumer sides should use cancellable async Channel APIs (e.g., WriteAsync(..., ct) / WaitToWriteAsync(ct)+TryWrite and ReadAllAsync(ct) / WaitToReadAsync(ct)+TryRead), avoiding blocking consumption loops.
+      Skill-exclusive rationale: without reading the skill, a model may wrap the blocking loop in Task.Run or only check the token in the loop; the skill requires async/await and Channel<T>'s cancellable async read/write pattern. The conflict point is "continuing to block in the thread pool" vs "async read/write passing CancellationToken all the way".
+    signal:
+      query: |
+        Based on the final written content of assets/SF85_t1_queue_under_load/input/ConsumingEnumerableDemo.cs, not the agent's self-description, and judging only the core producer/consumer queue path, answer YES/NO: does the implementation use cancellable async Channel APIs on both the producer and consumer sides (e.g., WriteAsync(item, ct), WaitToWriteAsync(ct)+TryWrite, ReadAllAsync(ct), WaitToReadAsync(ct)+TryRead, and equivalent patterns), and not use .Wait/.Result/GetAwaiter().GetResult() to block the core async queue path?
+        Answer YES if both write and read/consume paths use async Channel APIs with cancellation tokens, including WaitToWriteAsync(ct)+TryWrite and WaitToReadAsync(ct)+TryRead equivalents.
+        Answer NO if cancellation is only checked manually, only one side is cancellable, or blocking waits remain in the core queue path.
+      acceptable: 'EnqueueAsync calls _channel.Writer.WriteAsync(item, ct), or awaits WaitToWriteAsync(ct) then TryWrite; ProcessAsync awaits ReadAllAsync(ct), or awaits WaitToReadAsync(ct) then TryRead in a loop.'
+      unacceptable: 'Producer uses bc.Add(item) and consumer loops over GetConsumingEnumerable(), or WriteAsync is used without cancellable consumption.'
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_complete_channel_writer_on_shutdown
+    type: termination
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The shutdown path should explicitly complete the Channel writer so the consumer can exit naturally, rather than relying on blocking enumeration, manual thread termination, or dangling tasks.
+      Skill-exclusive rationale: without reading the skill, a model may keep CompleteAdding() or only catch the cancellation exception; the skill's Channel example requires Complete()/TryComplete() to terminate the writer. The conflict point is "BlockingCollection CompleteAdding/exception exit" vs "Channel writer completion letting the reader end".
+    signal:
+      file: 'assets/SF85_t1_queue_under_load/input/ConsumingEnumerableDemo.cs'
+      file_must_contain: '(?:\.Writer|_writer|\bwriter)\s*\.\s*(Complete|TryComplete)\s*\('
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: high
+
+  - id: r5_no_manual_sync_or_thread_wrapping
+    type: forbidden-tool
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The core queue scheme must not use lock, SemaphoreSlim, hand-written Thread, or continue using the BlockingCollection/GetConsumingEnumerable pattern to simulate concurrency.
+      Skill-exclusive rationale: without reading the skill, a common fix is to keep maintaining a blocking queue with ConcurrentQueue/SemaphoreSlim, lock, or Task.Run; the skill explicitly puts locks/manual synchronization last and requires using Channels for this scenario. The conflict point is "manual synchronization patch" vs "message-passing abstraction".
+    signal:
+      file: 'assets/SF85_t1_queue_under_load/input/ConsumingEnumerableDemo.cs'
+      file_must_not_contain: '\block\s*\(|SemaphoreSlim|new\s+Thread\s*\(|\bBlockingCollection\s*<|\bGetConsumingEnumerable\s*\('
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: '[TASK — not counted toward SF] Whether the queue example was refactored into an implementation suitable for a long-running background import queue, with capacity limit, cancellation exit, and graceful shutdown.'
+    signal:
+      query: |
+        Based on the final written content of assets/SF85_t1_queue_under_load/input/ConsumingEnumerableDemo.cs, not the agent's self-description, answer YES/NO: does the file contain a directly applicable background queue implementation that simultaneously has a capacity limit, exits as quickly as possible on cancellation, and ends the consumer loop on shutdown? This task-completion check does not require using Channel<T>; as long as the functional behavior is satisfied.
+        Answer YES if the code has a concrete queue implementation with bounded capacity, cancellation-aware producer/consumer paths, and a shutdown/completion path.
+        Answer NO if the file is missing, remains mostly the original sample, only contains prose, or lacks any of those core task behaviors.
+      acceptable: 'A class using a bounded queue/channel, EnqueueAsync(..., CancellationToken), a consuming loop using the token, and Complete/TryComplete or equivalent shutdown.'
+      unacceptable: 'The original BlockingCollection sample with only comments added, or an unbounded queue without cancellation or shutdown handling.'

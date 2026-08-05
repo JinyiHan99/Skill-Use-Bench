@@ -1,0 +1,57 @@
+task_id: SF91_t1_full_audit_with_prior
+level: L3
+skill_id: skill_91_payroll-data-audit
+description: |
+  We are about to close the December 2024 payroll run; please help me review it as the pre-payroll review owner.
+
+  The payroll register is at `assets/SF91_t1_full_audit_with_prior/input/payroll_register_dec2024.csv`, and the prior-period history for this year is at `assets/SF91_t1_full_audit_with_prior/input/payroll_history_2024.csv`, provided for your reference.
+
+  Just give me the conclusion after reviewing: block what should be blocked, pass what should pass.
+initial_state:
+  assets:
+    - path: assets/SF91_t1_full_audit_with_prior/input/payroll_register_dec2024.csv
+      source: "https://github.com/gabrielagurdian/payroll-automation-suite/blob/main/payroll_register.csv"
+      real_state: "Public payroll register sample with employee_id, name, gross_pay, deductions, net_pay, and pay_date for 2024-12-31; 8 employee rows."
+      preparation: |
+        Cloned the public GitHub repository `gabrielagurdian/payroll-automation-suite` and copied payroll_register.csv unchanged, renaming it to reflect the December 2024 register context.
+    - path: assets/SF91_t1_full_audit_with_prior/input/payroll_history_2024.csv
+      source: "https://github.com/gabrielagurdian/payroll-automation-suite/blob/main/payroll_history.csv"
+      real_state: "Public payroll history sample covering 2024 pay periods, including regular, bonus, duplicate, off-cycle, overtime-heavy, and negative-net-pay records."
+      preparation: |
+        Cloned the public GitHub repository `gabrielagurdian/payroll-automation-suite` and copied payroll_history.csv unchanged.
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+expected_outputs:
+  - path: audit_summary.md
+skill_constraints_tested:
+  - id: mandatory_data_scan_gate
+    description: "A full payroll audit must begin with data scanning and user confirmation before formal audit/report generation."
+    exclusive: "Without the skill, a model may provide an ad-hoc data overview or final audit directly. With the skill, it must proactively perform the mandatory data scan gate before formal audit/report generation, output a structured scan summary, and wait for user confirmation."
+  - id: prior_period_required_for_full_audit
+    description: "Full audit should use the current payroll file together with prior-period data for cross-period comparison and person-level analysis."
+    exclusive: "Without the skill, a model may use the history file only as ad-hoc background. With the skill, it should use the prior/history data for systematic cross-period comparison and person-level trend analysis under payroll audit rules."
+  - id: redline_block_before_report
+    description: "If red-line violations appear, the process must stop before generating a final report and list concrete employee-level evidence."
+    exclusive: "Without the skill, a model may mention severe anomalies inside a normal audit summary. With the skill, red-line evidence must trigger a blocking gate before final report generation, with employee-level evidence and blocking status stated explicitly."
+  - id: data_supported_conclusions
+    description: "Every pass/fail conclusion must include counts, thresholds, concrete values, and affected employee identifiers where applicable."
+    exclusive: "A default model may summarize qualitatively, e.g. 'looks mostly fine', without audit-grade data support."
+notes: |
+  Core test points:
+  - Real payroll register + history, with the user context being pre-payroll review; should trigger payroll-data-audit.
+  - `payroll_history_2024.csv` row 27 (including header) contains `net_pay=-270.00`, which should serve as red-line blocking evidence; row 15 (including header) contains `overtime_hours=52`, which can serve as overtime-over-limit evidence.
+  - The revised description no longer explicitly requires "scan first / wait for confirmation / stop on severe issues first"; these behaviors should be proactively triggered by the skill.
+  - The current-month register has only 6 basic payroll columns, lacking complex dimensions like overtime or department; the evaluation focus is whether the model follows the skill's process gating and data-supported format, not whether the script can fully run all rules.
+  - `audit_summary.md` is evaluated only after the evaluator simulates confirmation and blocking issues are resolved/allowed to continue; if a red-line block has not yet been cleared, the model should not produce a final audit report.
+
+  baseline_correctness_signals:
+    - Reads both declared input files.
+    - Produces a basic qualitative summary of the current register and history context.
+    - Identifies at least one major anomaly if it inspects the history file.
+
+  skill_following_signals:
+    - Data scan precedes formal audit conclusions and is initiated by the skill, not by an explicit user instruction.
+    - The model explicitly waits for confirmation before formal audit/report generation.
+    - Prior/history data is used for cross-period or person-level analysis rather than ignored or only summarized casually.
+    - Red-line evidence includes employee id/name, abnormal value, expected condition, and blocking status before any final report.
+    - Conclusions include checked counts/pass counts/thresholds or concrete exception rows.

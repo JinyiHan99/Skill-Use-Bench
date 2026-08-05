@@ -1,0 +1,43 @@
+task_id: moltbook_validator_t2_comment_reply
+skill_id: moltbook-validator
+description: |
+  I drafted a Moltbook response in `assets/moltbook_validator_t2_comment_reply/input/reply_draft.json`. Please turn it into the exact JSON payload I should send next and save it to `output/final_reply.json` so I can send it without wasting the attempt.
+
+initial_state:
+  assets:
+    - path: assets/moltbook_validator_t2_comment_reply/input/source_pep8.rst
+      source: "https://raw.githubusercontent.com/python/peps/main/peps/pep-0008.rst"
+      real_state: "Raw public PEP 8 source text downloaded from the Python PEPs repository."
+      preparation: |
+        Downloaded unchanged as source material for a reply excerpt.
+    - path: assets/moltbook_validator_t2_comment_reply/input/reply_draft.json
+      source: "Manually constructed; body text extracted from https://raw.githubusercontent.com/python/peps/main/peps/pep-0008.rst"
+      real_state: "Comment draft JSON with a real PEP 8 excerpt and a target post id, but using the draft author's body key."
+      preparation: |
+        Extracted a short PEP 8 excerpt into a reply draft. The body text comes from the real source; the JSON wrapper models a user's pre-reply draft.
+  tools_available:
+    - filesystem
+expected_trigger: true
+skill_constraints_tested:
+  - id: comment_payload_requires_content
+    description: "Before a Moltbook comment is sent, the payload must include a non-empty content body."
+    exclusive: "Without the skill, a model may assume the draft's body key is acceptable or may preserve extra post metadata as the request body."
+  - id: comment_payload_minimal_shape
+    description: "For Moltbook comments, the API reference only requires the comment body; post_id is part of the target route rather than the JSON body, and posts-only fields such as title/submolt do not belong in a comment payload."
+    exclusive: "Without the skill, a model may preserve draft metadata such as `post_id` or reuse the draft body key directly, instead of producing the minimal comment body object required by the API."
+notes: |
+  - Core test: distinguish the comment endpoint shape from the post endpoint shape while still applying pre-send validation: the final JSON body should use `content` for the reply text and should not retain draft routing metadata such as `post_id`.
+  - Expected behavior: `output/final_reply.json` is a valid final comment body object with non-empty content derived from the PEP 8 excerpt, without draft metadata fields.
+  - Common wrong behavior: model writes `{"text": ...}` to `output/final_reply.json`, which follows the draft key but fails Moltbook's required body field.
+  - Common wrong behavior: model creates `title` or `submolt` fields for a comment because it treats every Moltbook send like a top-level post.
+  - Common wrong behavior: model preserves `post_id` in the final JSON payload even though the comment endpoint body only accepts the comment content object.
+  - baseline_correctness_signals:
+      - `output/final_reply.json` exists and is valid JSON.
+      - The JSON root value is an object.
+      - The reply text included in the object is non-empty and derived from `source_pep8.rst`/`reply_draft.json`.
+      - The output is data only, not a prose explanation.
+  - skill_following_signals:
+      - The output object contains `content` as the key for the reply text.
+      - The output object does not rely on `text`, `body`, or `message` as the comment body field.
+      - The output object does not include routing or draft metadata fields such as `post_id`.
+      - The output object does not add post-only fields such as `title` or `submolt`.

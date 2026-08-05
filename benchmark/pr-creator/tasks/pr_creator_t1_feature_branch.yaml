@@ -1,0 +1,38 @@
+task_id: pr_creator_t1_feature_branch
+skill_id: pr-creator
+description: |
+  I finished the settings-sync change and need it ready for review. Please use the repository snapshot at `assets/pr_creator_t1_feature_branch/input/repo_snapshot` as the project context, open a pull request for it, and make sure issue #224713 is referenced in the PR write-up.
+initial_state:
+  assets:
+    - path: assets/pr_creator_t1_feature_branch/input/repo_snapshot/.github/pull_request_template.md
+      source: "https://raw.githubusercontent.com/microsoft/vscode/main/.github/pull_request_template.md"
+      real_state: "Real Visual Studio Code pull request template containing HTML comment guidance followed by Description and Checklist sections, stored in the standard lowercase template location."
+      preparation: |
+        Downloaded directly from the upstream raw GitHub URL without content modification.
+    - path: assets/pr_creator_t1_feature_branch/input/repo_snapshot/package.json
+      source: "https://raw.githubusercontent.com/microsoft/vscode/main/package.json"
+      real_state: "Real Visual Studio Code package manifest with many npm scripts including a top-level preflight script that runs eslint and typecheck-client."
+      preparation: |
+        Downloaded directly from the upstream raw GitHub URL without content modification.
+  tools_available:
+    - git
+    - gh
+    - npm
+expected_trigger: true
+skill_constraints_tested:
+  - id: branch_safety_before_work
+    description: "The workflow must verify the current branch before staging, committing, or publishing, and must not proceed from main/master without creating an appropriate non-default branch."
+    exclusive: "A model that has not read the skill may immediately stage and publish from the current checkout, especially when the user says the change is already finished."
+  - id: preserve_repository_template
+    description: "The located pull request template must be read and its structure preserved when drafting the request body."
+    exclusive: "A generic model may ignore a very short hidden-comment template and write a fresh two-section summary instead."
+  - id: issue_link_and_body_file
+    description: "The body should include the related issue link syntax and be supplied from a temporary file rather than passed inline."
+    exclusive: "A generic model may paste a multi-line body inline, risking shell escaping problems and losing the required issue linkage."
+  - id: run_preflight_checks
+    description: "The workflow must run the repository's preflight checks before pushing the branch or creating the pull request."
+    exclusive: "A model that has not read the skill is unlikely to proactively inspect the package scripts and run the repository-specific preflight command before publishing the pull request."
+notes: |
+  - Positive trigger: the user asks to get a completed change ready for review by opening a pull request.
+  - Observable signals: branch check occurs before staging/commit/publish; template file is inspected; body preserves the repository template structure; related issue appears in PR body using appropriate GitHub issue reference syntax; PR body is supplied from a temporary file; repository preflight checks are run before publishing.
+  - Common failure modes: creating from default branch without an initial branch check, skipping the template because it mostly contains comments, using an inline multi-line description, omitting preflight checks, or only mentioning the issue informally.

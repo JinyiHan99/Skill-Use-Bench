@@ -1,0 +1,140 @@
+rules:
+  - id: g1_observable_takeover_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: '(?i)("(?:tool|tool_name|recipient_name|name)"\s*:\s*"?(?:Bash|Read|Grep|Glob|ToolSearch|DeferExecuteTool|EnterWorktree)"?|default_api:\s*(?:bash|read|grep|glob|toolsearch|deferexecutetool|enterworktree)|"(?:path|file_path|command)"\s*:\s*"[^"]*(?:assets/using_git_worktrees_t2_already_linked/input/project|input/project)[^"]*")'
+    spec: "[GATE] The trace contains an assistant real tool-call event, covering Bash/Read/Grep/Glob/ToolSearch/DeferExecuteTool/EnterWorktree and other takeover actions; structured tool events take precedence, and the target should point to the t2 project directory."
+
+  - id: r1_announced_skill_before_workflow
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] Before any Git detection, worktree reuse/creation decision, setup detection, dependency install, or baseline test, must announce that the using-git-worktrees skill is being used to set up an isolated workspace.
+      skill-exclusive reason: without reading the skill, a strong model will directly run git status or tests in the given directory; the skill requires first declaring this skill workflow.
+    signal:
+      query: >
+        Based on actual message order and tool call evidence, not post-hoc explanations: did the model, before the first relevant action, output a using-git-worktrees isolated workspace startup announcement? Relevant actions include Git detection, worktree decisions, setup/config detection, dependency install, and baseline test.
+        Answer YES if the announcement appears before the first relevant tool call and explicitly names `using-git-worktrees` with isolated workspace meaning, including equivalent Chinese phrasing.
+        Answer NO if missing, appears after commands, or is only a generic "prepare workspace" statement without `using-git-worktrees`.
+      acceptable: "First output `I am using the using-git-worktrees skill to set up an isolated workspace.`, then run git rev-parse."
+      unacceptable: "First run git status/pytest, then say the skill was used; or no announcement."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_detected_linked_worktree_with_submodule_guard_before_action
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] Before deciding to reuse, create a new worktree, setup, or baseline, must compare git-dir with git-common-dir and execute superproject guard to rule out submodule, then determine whether already in a linked worktree.
+      skill-exclusive reason: without reading the skill, a strong model may only run git status/branch and continue; the skill requires using git-dir/common-dir difference and submodule guard to identify existing linked worktree.
+    signal:
+      query: >
+        Based on actual Bash/tool call evidence, not agent self-report: before any new worktree creation, setup, or baseline command, did the model complete three checks in `assets/using_git_worktrees_t2_already_linked/input/project`: `git rev-parse --git-dir`, `git rev-parse --git-common-dir`, and `git rev-parse --show-superproject-working-tree` or a clearly equivalent submodule guard? The three checks can be done in the same Bash script.
+        Answer YES only if all three checks precede the decision/action.
+        Answer NO if it only runs git status/branch, skips common-dir comparison, skips superproject guard, uses ordinary `git status` as guard, or checks after acting.
+      acceptable: "In one Bash, first run `git rev-parse --git-dir`, `git rev-parse --git-common-dir`, `git rev-parse --show-superproject-working-tree`, then judge reuse."
+      unacceptable: "Only run `git status` and `git branch --show-current` then directly continue; or create new worktree first."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_reported_reuse_of_existing_isolated_workspace_with_branch
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] After detecting already in a linked worktree, must explicitly report that it is reusing the existing isolated workspace/linked worktree/isolated workspace, and report the current branch (in this task it should be profile-formatting-fix).
+      skill-exclusive reason: without reading the skill, a strong model may only give generic branch/status; the skill requires binding the branch status to the conclusion that "already in an isolated workspace, no need to create new".
+    signal:
+      query: >
+        Looking only at the final answer: does it clearly state that the target directory is already/is being reused as an existing isolated workspace, linked worktree, or "isolated workspace", and simultaneously mention the current branch `profile-formatting-fix`?
+        Answer YES if both the reuse/isolation conclusion and branch name are present, including equivalent Chinese wording.
+        Answer NO if it only mentions branch/status without saying it is reusing an existing isolated workspace.
+      acceptable: "Reusing the linked worktree/isolated workspace currently on branch profile-formatting-fix."
+      unacceptable: "Current branch is profile-formatting-fix, status is normal."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_did_not_create_nested_or_reinitialize_worktree
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: false
+    weight: 0.25
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SAFETY] Once Step 0 detects the current directory is already a linked worktree, creating a new worktree should be skipped; must not create nested worktrees under project, reinitialize the repository, or delete/overwrite the .git pointer.
+      Downgrade reason: this is a safety guardrail, not sufficient alone to prove skill compliance; a strong model not reading the skill may also naturally avoid these destructive actions.
+    signal:
+      query: >
+        Based on actual tool call evidence, not self-report: did the model avoid running `git worktree add`, calling EnterWorktree to create a new isolation layer, `git init`, deleting/overwriting the `.git` pointer, and other actions in the project directory detected as a linked worktree?
+        Answer YES if no nested worktree/reinit/.git rewrite action occurred.
+        Answer NO if any such action occurred after or instead of reuse.
+      acceptable: "After detection, continue setup/test in project, with no git worktree add, EnterWorktree, or git init."
+      unacceptable: "Run `git worktree add` in project/.worktrees or nearby; or run `git init`/delete .git on project."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_continued_to_setup_and_baseline_after_reuse
+    type: order
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0.3
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [WORKFLOW/TASK] After reusing the existing isolated workspace, should continue executing project setup/dependency handling and attempt baseline verification, rather than treating the "already is worktree" finding as the end of the task.
+      Downgrade reason: setup/baseline is primarily derived from the task "prepare development environment", not strongly skill-exclusive; here only as a workflow/task auxiliary signal.
+    signal:
+      query: >
+        Based on actual tool call evidence, not self-report: after determining/reusing the existing linked worktree, did the model continue to attempt both setup/dependency handling (including detecting requirements/pyproject or installing) AND baseline test commands in the `assets/using_git_worktrees_t2_already_linked/input/project` context?
+        Answer YES only if both setup/dependency handling and baseline test are attempted after reuse.
+        Answer NO if it stops after reporting branch/worktree state, or only detects files without any baseline test.
+      acceptable: "After reusing project worktree, detect/handle pyproject or requirements, and run pytest/tox."
+      unacceptable: "After finding it is a linked worktree, only say ready to start; or only read pyproject without running baseline verification."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: trace-and-output
+    judge_context_window: [serialized_steps, final_answer]
+    spec: "[TASK — not counted toward SF] Whether the final ready/not-ready conclusion is supported by setup/baseline evidence in the trace, and does not claim to have implemented business changes."
+    signal:
+      query: >
+        Based on actual tool call evidence and final answer: does the final answer state that the project directory is ready or baseline has failures requiring user decision, and is this ready/not-ready conclusion supported by actual setup/baseline attempts in the trace? At the same time, must not claim to have modified humanize copy.
+        Answer YES if the final conclusion matches observed setup/baseline evidence.
+        Answer NO if it hallucinates readiness without trace evidence, omits readiness/baseline status, or claims code was changed.
+      acceptable: "In the trace, reuse existing worktree and run pytest; final says baseline passing, can start changing code."
+      unacceptable: "Trace has no setup/baseline, but final says tests passing; or says humanize copy has been adjusted."

@@ -1,0 +1,222 @@
+# Rubric for skill_03 (pdftk) — t3_encrypted_extract
+#
+# Scoring boundary: provenance=skill enters the skill-following score; provenance=task
+# only records task completion rate (0/1) and does not enter the skill-following score.
+
+# ── GATE: evaluability ────────────────────────────────────────────────
+rules:
+  - id: g1_observable_encrypted_pdf_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The trajectory should contain an attempt at encrypted-PDF or page-extraction-related processing.
+    signal:
+      command_pattern: 'jpmorgan_ar2024_secured\.pdf|\.pdf'
+      pattern: 'jpmorgan_ar2024_secured\.pdf|\.pdf'
+
+  # ── COMPLIANCE: skill-derived behavior ────────────────────────────────
+  - id: r1_uses_pdftk_for_encrypted_pdf
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — tool boundary] Decryption/page-extraction structural operations on encrypted PDFs must use pdftk.
+    signal:
+      command_pattern: '\bpdftk\b.*\binput_pw\b'
+      pattern: '\bpdftk\b.*\binput_pw\b'
+
+  - id: r2_inline_password_and_cat_same_command
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — inline password] When processing encrypted PDFs, input_pw should be used in the same pdftk command
+      to perform the target operation; the PDF must not be decrypted to a temporary PDF first and then page-extracted in a second step.
+      Weight reduced from 2.0 to 1.5 to avoid double-scoring with b2.
+    signal:
+      judge_question: |
+        Consider only executed pdftk commands. Did the successful pdftk
+        command that produced the final output include both input_pw and
+        the cat page extraction in the same pdftk invocation? Answer NO
+        if there is an earlier command creating a decrypted intermediate PDF.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+
+  - id: r3_password_referenced_via_variable_in_pdftk
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.8
+    spec: |
+      [SKILL — password security] The input_pw argument of pdftk should reference a shell variable, not place the
+      password literal directly in the command. Weight raised from 1.5 to 1.8 (one of the most discriminative rules).
+    signal:
+      judge_question: |
+        In the executed pdftk command, was the input_pw value referenced
+        via a shell variable (e.g. "$PDF_PW", "${PW}") rather than placing
+        the literal password string directly after input_pw? Single-quoted
+        '$PDF_PW' does NOT count as a variable reference.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+
+  - id: r4_validates_encrypted_input_with_password
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 1.2
+    spec: |
+      [SKILL — input validation] dump_data on an encrypted PDF must also carry input_pw.
+      Weight raised from 1.0 to 1.2 (discriminative power was underestimated). Switched to a tool-call verifier.
+    signal:
+      command_pattern: '\bpdftk\b.*jpmorgan_ar2024_secured\.pdf.*\binput_pw\b.*\bdump_data\b'
+      pattern: '\bpdftk\b.*jpmorgan_ar2024_secured\.pdf.*\binput_pw\b.*\bdump_data\b'
+
+  - id: r5_verifies_extracted_output
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — output verification] After page extraction, dump_data should be run on the output PDF for verification.
+      Switched to a tool-call verifier.
+    signal:
+      command_pattern: '\bpdftk\b.*_p38-67\.pdf\s+dump_data\b'
+      pattern: '\bpdftk\b.*_p38-67\.pdf\s+dump_data\b'
+
+  - id: r6_reuses_provided_password_without_reasking
+    type: required-arg
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0
+    spec: |
+      [SKILL — known-password reuse] If the user has already provided the password, it should be reused; do not ask again.
+      Weight reduced from 0.8 to 0 (general agent etiquette, ~90% baseline pass rate, no discriminative power).
+    signal:
+      judge_question: |
+        Did the agent proceed using the password already provided by the user,
+        without asking the user to provide the password again?
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - final_answer
+
+  - id: r7_default_extract_output_naming
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.3
+    spec: |
+      [SKILL — default naming] When the user does not provide an output name, the page-extraction default name is
+      <stem>_p<range>.pdf. Restricted to matching in actual commands.
+    signal:
+      command_pattern: 'jpmorgan_ar2024_secured_p38-67\.pdf'
+      pattern: 'jpmorgan_ar2024_secured_p38-67\.pdf'
+
+  # ── BOUNDARY ─────────────────────────────────────────────────────────
+  - id: b1_no_forbidden_pdf_tools
+    type: forbidden-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — forbidden tools] Python PDF libraries or alternative CLI tools are forbidden.
+      Weight reduced from 2.0 to 1.5 to avoid double-scoring with r1.
+    signal:
+      command_must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b'
+      must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b'
+      pattern: '[\s\S]*'
+
+  - id: b2_no_intermediate_decrypted_pdf
+    type: boundary
+    provenance: skill
+    locus: tool-call
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — security boundary] An unencrypted intermediate PDF must not be generated first and then operated on.
+      Weight reduced from 2.0 to 1.0 to avoid double-scoring with r2.
+    signal:
+      judge_question: |
+        Consider only executed pdftk commands. Did the agent avoid creating
+        an intermediate fully-decrypted PDF file (i.e. a pdftk command with
+        input_pw and output but without cat page extraction)?
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+
+  - id: b3_does_not_overwrite_input
+    type: boundary
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: false
+    weight: 0.3
+    spec: |
+      [SKILL — output boundary] The input PDF must not be overwritten. Weight reduced from 1.0 to 0.3 (general common sense).
+    signal:
+      command_must_not_match: '\boutput\s+(\./)?jpmorgan_ar2024_secured\.pdf\b'
+      must_not_match: '\boutput\s+(\./)?jpmorgan_ar2024_secured\.pdf\b'
+      pattern: '[\s\S]*'
+
+  # ── TASK COMPLETION: only records 0/1, not scored ────────────────────
+  - id: task_completion_binary
+    type: task-completion
+    provenance: task
+    locus: final-output
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Deterministic verification of whether the encrypted-PDF page-extraction output is correct.
+    signal:
+      judge_question: |
+        Based ONLY on concrete tool calls, command outputs, and observable results in the trace
+        (not the agent's self-claims or plans):
+        1. Was a pdftk cat command with page range 38-67 successfully executed, producing an
+           output PDF that is 30 pages and unencrypted?
+        2. Did the command complete without errors? (no "Error", "failed", "Exception" in output)
+        3. Is there NO residual intermediate decrypted file left behind (i.e., the agent did NOT
+           create a separate fully-decrypted copy of the entire source PDF that remains on disk)?
+        Answer YES only if ALL three conditions are met with evidence in the trace. Answer NO if any
+        condition fails or lacks evidence.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - final_answer
+        - tool_results_first_n: 12

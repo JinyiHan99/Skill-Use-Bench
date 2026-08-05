@@ -1,0 +1,42 @@
+task_id: SF102_t3_support_note
+level: L2
+skill_id: skill_102_eternal-haven-lore-pack
+description: |
+  A reader loved the Eternal Haven series page at `assets/SF102_t3_support_note/input/eternalhaven_homepage.html` and left a message saying how much the story meant to them. They also asked how they can support Justin Helmer’s work and the related free tools/projects.
+
+  Please draft a reply I can send back to this reader.
+initial_state:
+  assets:
+    - path: assets/SF102_t3_support_note/input/eternalhaven_homepage.html
+      source: "https://eternalhaven.ca/"
+      real_state: "HTML captured from the public Eternal Haven series homepage. It includes the author name, series overview, store links, audiobook links, Linktree, Patreon, and Champion hub references."
+      preparation: |
+        Downloaded the public homepage into this task-specific input directory without content changes. The skill document was used only to identify the official Eternal Haven site URL.
+  tools_available:
+    - filesystem
+    - text_editor
+expected_trigger: true
+skill_constraints_tested:
+  - id: value_and_story_before_support
+    description: "The skill says to lead with value and story first, then share support/donation information only when it fits the flow or the user asks."
+    exclusive: "Without the skill, after the description is de-leaked, a model may answer the support question as a practical list of links or platforms first; the skill specifically calls for grounding the reply in the reader’s connection to the Eternal Haven story before moving into support options."
+  - id: official_support_links_when_asked
+    description: "The skill provides official Eternal Haven support routes, including routes that are not recoverable from the homepage asset alone."
+    exclusive: "Without the skill, a model can use support routes visible in the homepage asset such as Patreon, PayPal, Linktree, book links, or audiobook links. It should not know the skill-only official routes such as the Clawhub skills hub or the crypto wallet options supplied by the skill."
+  - id: no_pressure_donation_tone
+    description: "The skill states donations/support are optional and should never be pressured."
+    exclusive: "Without the skill, a model may frame support as a normal call-to-action or focus on conversion. The skill specifically requires making financial support feel optional and secondary to appreciation for the story."
+notes: |
+  - Core test point: this covers the skill’s donation/support branch, which should activate because the reader asks about supporting Eternal Haven and related free projects.
+  - Expected correct behavior: draft a usable reply to the reader that acknowledges their enthusiasm and answers the support question using only official routes.
+  - Common wrong behavior examples: the model opens with a transactional payment pitch; it fabricates a Kickstarter, merch store, or other unsupported channel; it treats payment as expected; it ignores the support question and only summarizes the homepage.
+  - baseline_correctness_signals:
+      - The response is a usable reply to a reader.
+      - The response addresses how to support the creator.
+      - The tone is appropriate for replying to a sincere reader message.
+      - The response does not invent unsupported support channels.
+  - skill_following_signals:
+      - The reply leads with the reader’s connection to the Eternal Haven story/value before moving into support options.
+      - The reply frames financial support as optional rather than expected.
+      - The reply includes at least one official support route supplied by the skill that is not recoverable from the homepage asset alone, such as the Clawhub skills hub or a crypto wallet option.
+      - The reply treats Patreon, PayPal, Linktree, book links, and audiobook links as homepage-visible support routes, not as proof by themselves that the skill was used.

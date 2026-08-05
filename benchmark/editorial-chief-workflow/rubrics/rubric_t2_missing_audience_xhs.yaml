@@ -1,0 +1,100 @@
+rules:
+  - id: g1_user_facing_clarification_attempt
+    type: boundary
+    provenance: gate
+    locus: final-output
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The final user-visible reply must contain a user-facing audience clarification attempt. The gate only judges whether an observable response exists; it is not counted toward SF.
+    signal:
+      pattern: '(请确认|先确认|需要确认|需要你补充|补充一下|想写给谁|给谁看|谁会看|目标受众是谁|具体读者是谁|明确目标受众|target audience|who (is|are).{0,40}(audience|reader))'
+      in_final_answer: '(请确认|先确认|需要确认|需要你补充|补充一下|想写给谁|给谁看|谁会看|目标受众是谁|具体读者是谁|明确目标受众|target audience|who (is|are).{0,40}(audience|reader))'
+
+  - id: r1_ask_missing_target_audience_first
+    type: order
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When the target audience is missing, the target audience must be asked for first; before asking, the agent must not read audience/channel strategies, decompose, assign, or write. Reading user-provided material or confirming topic/material path is not a violation.
+      skill-exclusive rationale: without reading the skill, a strong model will treat "Xiaohongshu" and "business colleagues" as sufficient context and directly generate titles/body/outline; the skill requires target audience as a mandatory execution parameter, asking first when missing. The conflict point is "infer audience and continue" vs "stop and ask for audience first".
+    signal:
+      query: |
+        Based on the final user-visible reply and actual tool-call order — not the agent's internal plan — did the model, before reading references/audiences/ or references/channels/ strategies, content decomposition, role assignment, title/cover/hook/outline/body generation, or output writing, first ask the user for the missing target audience? Answer only YES or NO.
+        Reading user-provided source material such as assets/.../input/source_notes_embeddings.md, or confirming topic/material path, is allowed before asking; these do not count as content decomposition.
+        Answer YES if it asks for the missing audience before any strategy loading/orchestration/content generation and does not include substantive XHS content in the same response.
+        Answer NO if it asks but simultaneously outputs titles, outline, hook, body, role assignments, or assumes "business colleagues" as the locked audience.
+      acceptable: "After reading source_notes_embeddings.md, only asks: who is the explicit target audience for this Xiaohongshu content? For example, business owners, customer-service team, frontline operations, etc."
+      unacceptable: "Asks for the audience while outputting 'here are three Xiaohongshu titles and a body framework', or first reads references/channels/xiaohongshu.md."
+      judge_context_window: [serialized_steps, final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_do_not_treat_business_colleagues_as_locked_audience
+    type: boundary
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Must not silently upgrade "later show to business colleagues" into a locked target-audience strategy; must acknowledge the audience parameter is still not explicit.
+      skill-exclusive rationale: without reading the skill, a strong model will usually naturally infer "business colleagues" into an audience persona; the skill explicitly forbids silently guessing execution parameters. The conflict point is "guess audience from context" vs "cannot lock when audience parameter is missing".
+    signal:
+      query: |
+        Check the complete final user-visible reply, not internal reasoning: does the model avoid presenting "business colleagues" as a locked target audience, and explicitly state that the target audience still needs user supplementation? Answer only YES or NO.
+        Answer YES if it treats business colleagues as insufficient or asks for a more precise audience.
+        Answer NO if anywhere in the reply it says the audience is locked as "business colleagues / non-technical business colleagues / business team" and proceeds or promises to draft on that basis.
+      acceptable: "You mentioned showing it to business colleagues, but that is not enough to lock the target audience; please confirm who the specific readers are."
+      unacceptable: "I will first draft a version that business team / non-technical business colleagues can understand."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_no_orchestration_strategy_load_or_draft_while_missing_audience
+    type: boundary
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When the target audience is missing, the workflow orchestration must not be entered: must not read audience/channel strategies, must not assign roles, must not output Xiaohongshu titles/cover/hook/outline/body, or write content files. Reading user-provided source material is not a violation.
+      skill-exclusive rationale: without reading the skill, a strong model, to help the user "set the direction first", will directly start Xiaohongshu topic selection, titles, cover, and body; the skill requires asking first when a parameter is missing and forbids decomposition/writing/assignment. The conflict point is "produce content value first" vs "no orchestration until parameters are complete".
+    signal:
+      query: |
+        Based on actual tool calls and the final reply — not the agent's description of its intentions — before the user supplements the target audience, did the model only do permitted material reading/clarification, and did not read references/audiences/ or references/channels/ strategy files, did not assign roles, did not generate titles/cover copy/hook/outline/body, and did not write an output content file? Answer only YES or NO.
+        Reading user source material under assets/.../input/... or meeting/notes input is allowed.
+        Answer YES if it only asks for the missing audience after any permitted source-material read and stops.
+        Answer NO if it reads strategy references, gives XHS titles/note copy/structure, assigns production roles, or writes an output file.
+      acceptable: "After Read(assets/.../input/source_notes_embeddings.md), the final reply contains only an audience clarification question, with no titles, outline, assignment, or file writes."
+      unacceptable: "Asking for the audience while attaching 'here are three Xiaohongshu titles and a body framework', or reading references/channels/xiaohongshu.md."
+      judge_context_window: [serialized_steps, final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: final-output
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] When a required audience parameter is missing, correctly completing the currently completable task: asking the user for the audience and pausing, without generating any substantive Xiaohongshu content or content files.
+    signal:
+      query: |
+        Looking only at the final user-visible reply and actual file-write tool calls: did the model ask for the target audience and pause at the clarification stage, without outputting any substantive Xiaohongshu content (titles, cover copy, hook, outline, body paragraphs) or writing content files? Answer only YES or NO.
+        Answer YES if it asks for the missing audience and pauses.
+        Answer NO if it writes/outputs any XHS content artifact or partial content, even if it also asks a question.
+      acceptable: "Please confirm who the target audience is; I will continue once I have it. No Write/Edit output file, no title/hook/outline/body."
+      unacceptable: "Gives Xiaohongshu titles or a body framework while asking whether you want to adjust the audience."
+      judge_context_window: [serialized_steps, final_answer]

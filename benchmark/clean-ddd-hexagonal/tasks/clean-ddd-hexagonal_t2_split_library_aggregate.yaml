@@ -1,0 +1,51 @@
+task_id: clean-ddd-hexagonal_t2_split_library_aggregate
+skill_id: clean-ddd-hexagonal
+description: |
+  The maintainers of the shipping sample project want to add a "demurrage dispute" capability: after cargo arrives at port, customer service can register a dispute for finance to settle later; the business hopes this capability can be integrated into the existing booking, voyage-change, and handling-registration flows, keeping the project's ubiquitous language consistent. Please design and implement the core code for this capability under `assets/clean-ddd-hexagonal_t2_split_library_aggregate/input/`, and explain your modeling choices in `output/demurrage-dispute-notes.md`.
+initial_state:
+  assets:
+    - path: assets/clean-ddd-hexagonal_t2_split_library_aggregate/input/src/
+      source: "https://github.com/citerus/dddsample-core/tree/master/src"
+      real_state: "Real DDD Sample shipping-domain project source code, containing cargo, handling, location, voyage, and other domain models plus application, infrastructure, and interface layers."
+      preparation: |
+        Shallow-cloned from the citerus/dddsample-core repository master branch, then copied the src/ directory into this task's input/; no business content was generated.
+    - path: assets/clean-ddd-hexagonal_t2_split_library_aggregate/input/pom.xml
+      source: "https://github.com/citerus/dddsample-core/blob/master/pom.xml"
+      real_state: "Real Maven project configuration file."
+      preparation: |
+        Copied pom.xml from the same repository into this task's input/.
+  tools_available:
+    - filesystem
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: id_reference_across_aggregate_boundary
+    description: "The dispute aggregate and Cargo should be associated only via IDs/value objects such as TrackingId; do not add a dispute collection inside Cargo, and do not have the dispute aggregate directly hold a Cargo entity reference."
+    exclusive: "A model that has not read the skill may follow object-graph/JPA intuition and associate DemurrageDispute as a child object or entity of Cargo; a model following the skill will keep aggregate boundaries using ID references."
+
+  - id: no_cross_aggregate_repository_writes_in_register_use_case
+    description: "The application entry that registers a dispute should only persist the dispute aggregate; do not directly save CargoRepository or HandlingEventRepository in the same use case."
+    exclusive: "A model that has not read the skill, even after extracting a dispute aggregate, may still write a transaction script that synchronously updates multiple aggregates; a model following the skill will keep one write transaction modifying only one aggregate, and use events/notifications for subsequent collaboration."
+
+  - id: port_adapter_dependency_direction
+    description: "Dispute-related persistence ports should live at the domain or application boundary, with infrastructure implementations in infrastructure; new domain/application code must not depend on infrastructure, JPA/Hibernate/Spring persistence details."
+    exclusive: "A model that has not read the skill easily leaks data-access implementation or framework annotations into the domain model; a model following Clean/Hexagonal will keep dependencies pointing inward."
+
+  - id: domain_event_fact_semantics
+    description: "If cross-flow notifications are introduced, events/application events must express business facts that have already occurred, using past-tense semantics, and must not be modeled as commands or processing directives."
+    exclusive: "A model that has not read the skill may write events as Create/Process-style commands; a model following the skill will model events as facts such as DemurrageDisputeRegistered."
+notes: |
+  - Core test point: the dispute is related to the cargo transport lifecycle but should not be added to Cargo, an existing large aggregate; it should reflect an independent aggregate, ID references, and domain-event collaboration.
+  - Expected correct behavior: add an aggregate root like `domain/model/demurrage/DemurrageDispute`, referencing `TrackingId` rather than holding a `Cargo` object; coordinate creation through an application service; if finance needs to be notified, publish a past-tense domain event.
+  - Common model mistakes: adding `List<DemurrageDispute>` near `src/main/java/se/citerus/dddsample/domain/model/cargo/Cargo.java:65` and synchronously maintaining the dispute lifecycle in `Cargo.assignToRoute()` or `deriveDeliveryProgress()`, forming a God Aggregate.
+  - Common model mistakes: adding `DemurrageDisputeLineRepository`, `DemurrageEvidenceRepository`, and other repositories built around internal entities, rather than building a single repository interface around the dispute aggregate root.
+  - Common model mistakes: creating a domain event named `CreateDemurrageDispute` or `ProcessDemurrageDispute`, and carrying mutable command parameters in the event.
+  - baseline_correctness_signals:
+      - New demurrage-dispute-related domain types, application entry, and necessary tests/notes are added in the input project.
+      - The dispute can record basic business information such as cargo identifier, reason, amount, or status.
+      - `output/demurrage-dispute-notes.md` is produced, explaining the relationship between the dispute and the cargo model.
+  - skill_following_signals:
+      - The Cargo aggregate is not expanded into a large aggregate containing a dispute collection; the dispute aggregate also does not directly hold a Cargo entity, and is associated only via IDs/value objects such as TrackingId.
+      - The application entry that registers a dispute does not directly save CargoRepository or HandlingEventRepository; the write-transaction boundary only covers the dispute aggregate.
+      - Dispute-related Repository/Port is separated from the infrastructure implementation, and new domain/application code does not depend on infrastructure or persistence-framework details.
+      - Cross-flow notifications use past-tense fact events/application events, such as DemurrageDisputeRegistered, rather than Create/Process-style commands.

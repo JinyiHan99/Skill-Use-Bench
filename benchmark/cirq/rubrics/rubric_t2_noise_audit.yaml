@@ -1,0 +1,100 @@
+# Rubric for skill_59 cirq — t2_noise_audit
+# Focus: skill-following for Cirq noisy simulation audit data, with task completion recorded separately.
+
+rubric_id: skill_59_cirq_t2_noise_audit
+task_id: cirq_t2_noise_audit
+skill_id: cirq
+rules:
+  - id: g1_observable_outputs
+    type: required-tool
+    provenance: gate
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The agent must create the noise audit script so the trace has an observable artifact for
+      skill-following evaluation. This does not affect the skill-following score.
+    signal:
+      file: "output/noise_audit.py"
+      file_must_contain: '\b(import\s+cirq(\s+as\s+\w+)?|from\s+cirq\s+import)\b'
+
+  - id: r3_keeps_reference_separate_from_noisy_configs
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] In a noise characterization audit, keep the zero-noise/reference interpretation distinct
+      from the nonzero noisy configurations so the noise effect is comparable.
+      skill-exclusive rationale: looking only at the task description, the default approach X may put all rates as homogeneous rows or omit
+      a baseline; the skill requires Y to characterize before mitigating and provide reference points for noise
+      effects; the conflict point Z is "no-baseline mixed summary" vs "reference/baseline separated from noisy rates".
+    signal:
+      query: >
+        Does output/noise_audit.py or output/noise_audit.json explicitly distinguish amplitude_damp_rate
+        0.0 as a reference, baseline, or zero-noise case separate from the nonzero noisy configurations?
+        Judge only from final file contents written by tools or final file state, not from the agent's
+        prose. Answer YES if rate 0.0 is explicitly labeled reference/baseline/zero_noise or placed in
+        a separate baseline/reference section. Answer NO if all configurations are listed as homogeneous
+        rows without any reference distinction.
+      acceptable: "{'rate': 0.0, 'label': 'reference'} plus noisy rows for 0.4, 0.5, 1.0, or a baseline section derived from rate 0.0"
+      unacceptable: "A JSON list of rates [0, 0.4, 0.5, 1.0] with no baseline/reference distinction."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_reports_comparable_measurement_outcomes_per_noise_level
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Organize noisy simulation results as comparable outcome summaries for every source
+      noise configuration and measurement key.
+      skill-exclusive rationale: without reading the skill, the default approach X may copy the demo's narrative per run or store raw
+      per-shot arrays; the skill requires Y to analyze noisy experiment results across noise levels with
+      comparable summaries; the conflict point Z is "unstructured text/raw samples" vs "per-rate comparable outcome
+      summaries".
+    signal:
+      query: >
+        Does the produced audit organize results into comparable per-noise-rate summaries for both
+        measurement keys initial_state and after_not_gate? Judge only final output/noise_audit.py and
+        output/noise_audit.json contents, not the agent's prose. Answer YES if each source damping rate
+        has summarized counts or probabilities for both named measurements. Answer NO if the output is
+        only copied print text, only raw shot arrays, or omits one of the two named measurements.
+      acceptable: "For each rate: {'initial_state': {'0': 100, ...}, 'after_not_gate': {'0': 40, '1': 60, ...}}"
+      unacceptable: "{'rate': 0.4, 'samples': [[0,1], ...]} or a paragraph copied from console output without keyed counts/probabilities"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    weight: 0
+    spec: |
+      [TASK — not SF] The requested script and JSON report exist. The JSON includes the source damping
+      rates, structured measurement summaries for initial_state and after_not_gate at each rate, and a
+      plain-language conclusion.
+    signal:
+      query: >
+        Do output/noise_audit.py and output/noise_audit.json exist, and does the JSON include structured
+        results for damping-rate configurations 0, 0.4, 0.5, and 1.0, with counts or probabilities for
+        both initial_state and after_not_gate at each rate plus a plain-language conclusion? Judge only
+        the final file contents, not the agent's prose. Answer YES only if all rates, both measurement
+        keys, result summaries, and a conclusion are present. Answer NO if either file is missing, any
+        source configuration or measurement key is omitted, or there is no conclusion.
+      acceptable: "{'configurations': [{'rate': 0.0, 'initial_state': {...}, 'after_not_gate': {...}}, {'rate': 0.4, ...}, {'rate': 0.5, ...}, {'rate': 1.0, ...}], 'conclusion': '...'}"
+      unacceptable: "A JSON report with only rates and a conclusion, only raw samples, or results for one measurement key."

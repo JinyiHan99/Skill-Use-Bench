@@ -1,0 +1,86 @@
+rules:
+  - id: g1_observable_workspace_install_output
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trajectory contains an observable write, edit, or copy-generate attempt to the deliverable under output/workspace_install/."
+    signal:
+      pattern: '(?is)^(?:Write|Edit|Bash)\b[\s\S]{0,1200}?output/workspace_install/'
+
+  - id: r1_persistent_encrypted_installation_store
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The main scoring focus for multi-workspace OAuth apps is at-rest encryption/decryption of bot/user tokens in the installationStore persistence path; the persistent store only serves as the prerequisite context for judging whether the token is actually persisted to disk/DB, and "has persistence" alone cannot be counted as SF by itself.
+      Skill-exclusive rationale: the task implies multi-customer installation needs persistent records, but the skill explicitly states Slack token storage must not be plaintext to disk/DB, requiring encrypt/decrypt, crypto/KMS, or equivalent protection. The conflict point is that "survives restart" is not sufficient to satisfy token at-rest protection.
+    signal:
+      query: >
+        Based only on the contents of the code files actually written to output/workspace_install/, not the agent's self-statements, README, comments, or unused code, answer YES/NO: does the real installationStore save/fetch path encrypt Slack token fields when persisting and decrypt them when reading? Covered fields include installation.bot.token, installation.user.token, installation.botToken, installation.userToken, bot_token, user_token, botToken, userToken.
+        Answer YES if the active storeInstallation/saveInstallation path encrypts bot/user token fields before DB/file persistence and decrypts them in fetch/findInstallation before use.
+        Answer NO if the active store writes installation JSON or token fields in plaintext, stores only in a process Map/object, or merely defines unused encrypt helpers.
+      acceptable: "storeInstallation encrypts installation.bot.token and installation.user.token before database write; fetchInstallation decrypts before returning the installation."
+      unacceptable: "fs.writeFileSync('installations.json', JSON.stringify(installation)) or databaseData[teamId] = installation, even if persistence exists."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_install_success_uses_installation_bot_token
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The welcome message after successful installation must use the workspace-specific bot token from this OAuth installation result or from the installationStore, not a global SLACK_BOT_TOKEN, hardcoded token, or a static App token that bypasses the installationStore.
+      Skill-exclusive rationale: without reading the skill, models may continue to use a single-workspace bot's global token to send the welcome message; the skill emphasizes that tokens are workspace-specific, and the install-success path should use installation.bot.token/installation.botToken or a looked-up installation token. The conflict point is that a global token is incompatible with the multi-workspace dynamic installation model.
+    signal:
+      query: >
+        Based only on the contents of the code files actually written to output/workspace_install/, not the agent's self-statements, README, comments, or unused code, answer YES/NO: does the real install-success welcome-message execution path send using the workspace-specific bot token obtained from the OAuth installation result or installationStore lookup? Accepts Bolt JS/Python equivalent fields such as installation.bot.token, installation.user.token, installation.botToken, installation.bot_token, or a fetched installation token.
+        Answer YES if the oauth success/callback path sends the welcome message with installation-specific bot token and does not rely on a global static SLACK_BOT_TOKEN for that path.
+        Answer NO if welcome message uses process.env.SLACK_BOT_TOKEN, a hardcoded token, app.client backed only by a global token, or bypasses the installationStore token.
+      acceptable: "client.chat.postMessage({ token: installation.bot.token, channel: installation.user.id, text: ... }) or fetchInstallation(teamId).botToken then send."
+      unacceptable: "client.chat.postMessage({ token: process.env.SLACK_BOT_TOKEN, channel: userId, text: ... }) in the OAuth success path."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_minimal_scopes_only
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The actual OAuth bot scopes for the current features (install welcome message + /hello slash command) should be minimized to chat:write and commands; the real OAuth config must not request unrelated permissions such as admin, users:read, users:read.email, channels:history, groups:history, channels:read, im:write.
+      Skill-exclusive rationale: without reading the skill, models may interpret "production-ready/multi-customer" as needing to add users:read, channels:history, or admin and other generic production permissions; the skill emphasizes least privilege and lists that a slash-command bot only needs commands + chat:write. The conflict point is that generic scope expansion is the opposite of least privilege.
+    signal:
+      query: >
+        Based only on the contents of the code files actually written to output/workspace_install/, not the agent's self-statements, README, comments, or unused constants, answer YES/NO: does the real OAuth bot scopes config include chat:write and commands, with no extra unrelated scopes (admin, users:read, users:read.email, channels:history, groups:history, channels:read, im:write, etc.)?
+        Answer YES if active OAuth bot scopes are exactly or effectively only chat:write and commands for these features.
+        Answer NO if required scopes are missing or unnecessary read/admin/user/channel scopes are requested in the active OAuth config.
+      acceptable: "scopes: ['chat:write', 'commands']"
+      unacceptable: "scopes: ['commands', 'chat:write', 'users:read', 'channels:history']"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether output/workspace_install/ contains a structurally complete Node Slack OAuth installable app, package.json, install feedback, and /hello slash command."
+    signal:
+      query: >
+        Based only on the contents of the files actually written to output/workspace_install/, not the agent's self-statements, README plans, or comments, answer YES/NO: is the deliverable a structurally complete Node/Bolt project, including app.js or an equivalent entry point, @slack/bolt dependency in package.json, OAuth install/callback support, visible install-success feedback, and /hello slash command handling logic?
+        Answer YES only if these core task requirements are present under output/workspace_install/.
+        Answer NO if output is missing, only prose, or lacks OAuth or /hello.
+      acceptable: "output/workspace_install/app.js configures Bolt OAuth and app.command('/hello'), package.json includes @slack/bolt."
+      unacceptable: "Only README instructions without Node code, or a single-workspace bot without OAuth install flow."

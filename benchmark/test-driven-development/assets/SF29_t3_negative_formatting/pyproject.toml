@@ -1,0 +1,8 @@
+[project]
+name = "string-utils"
+version = "0.1.0"
+description = "String utility functions"
+requires-python = ">=3.8"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

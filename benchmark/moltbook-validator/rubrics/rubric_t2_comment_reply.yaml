@@ -1,0 +1,94 @@
+# Rubric for moltbook-validator — t2_comment_reply
+# Goal: score Moltbook comment-payload skill-following only; task completion is weight 0.
+rules:
+  - id: g1_final_reply_written
+    type: required-tool
+    provenance: gate
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] A final reply JSON file must be produced so the attempt is observable.
+      This gate only checks that an output file exists with some content; correctness is checked separately.
+    signal:
+      file: "output/final_reply.json"
+      file_must_contain: '.+'
+
+  - id: r1_comment_body_uses_content_key
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Moltbook comment payloads must include a non-empty `content` field for the comment body.
+      skill-exclusive reason: the draft reply uses `text`, so without the skill a strong model may preserve the draft key or
+      treat it as ordinary JSON metadata. The skill's API reference says comment bodies require `content`. The conflict is
+      preserving the draft schema (`text`) versus using the Moltbook comment send schema (`content`).
+    signal:
+      file: "output/final_reply.json"
+      file_must_contain: '(?-i:"content")\s*:\s*"(?:[^"\\]|\\.)+"'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_comment_body_does_not_use_draft_body_keys
+    type: forbidden-arg
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The final comment body must not rely on draft-style body keys such as `text`, `body`, or `message`.
+      skill-exclusive reason: ordinary cleanup often preserves user-provided field names, but the skill warns that Moltbook
+      requires `content` and specifically that `text` is wrong. The conflict is flexible/draft JSON naming versus the fixed
+      Moltbook API body key.
+    signal:
+      file: "output/final_reply.json"
+      file_must_not_contain: '"(text|body|message)"\s*:'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_comment_payload_excludes_route_metadata
+    type: forbidden-arg
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] For `POST /api/v1/posts/{id}/comments`, draft route id fields such as `post_id`/`postId` belong to the route,
+      not the JSON body.
+      skill-exclusive reason: without the skill, a model may preserve the post id from the draft because it looks useful for
+      sending the reply. The skill's comment API reference shows the body contains only `content`. The conflict is retaining
+      routing metadata in the payload versus producing the minimal Moltbook comment body object.
+    signal:
+      file: "output/final_reply.json"
+      file_must_not_contain: '"(post_id|postId)"\s*:'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [TASK — not included in SF] `output/final_reply.json` should contain the PEP 8-derived reply text as data only.
+      This records task completion only and must not affect skill-following score.
+    signal:
+      file: "output/final_reply.json"
+      file_must_contain: '^\s*\{(?=[\s\S]*?(Guido|Style Guide|style guide evolves|PEP 8))[\s\S]*\}\s*$'

@@ -1,0 +1,123 @@
+rubric_id: rubric_SF90_t3_node_api_plan
+skill_id: structured-autonomy-plan
+task_id: SF90_t3_node_api_plan
+description: >
+  Evaluates whether the model followed the structured-autonomy-plan workflow for
+  planning an account-suspension feature in a Node/Express API without coding.
+
+rules:
+  - id: g1_observable_plan_write
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] Trace contains an observable Write/Edit attempt whose structured file_path/path argument targets a plans/<feature-name>/plan.md artifact."
+    signal:
+      pattern: "(?i)(Write|Edit)[\\s\\S]{0,240}\\\"?(file_path|path)\\\"?\\s*[:=]\\s*\\\"[^\\\"]*(?:assets/SF90_t3_node_api_plan/input/project/)?plans/[^\\\"'\\s]+/plan\\.md\\\""
+
+  - id: r1_structured_research_before_plan
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Before plan generation, the model must execute a structured research pass across key local Node/Express project context, including README/package dependency cues as the task's documentation/dependency proxy, and project model/service/controller/route/auth/validation/serialization patterns.
+      skill-exclusive reason: without reading the skill, a strong model may only read user.controller.js/user.service.js or infer Express patterns from memory; the skill requires first systematically researching README/docs, model/service/controller/routes/validation/auth/serialization patterns. The conflict is "planning directly from a few obvious files" vs "covering project structure and patterns per research_guide before planning".
+    signal:
+      query: >
+        Based only on actual content-reading evidence before the first plan.md write, did the model inspect a structured set of Node/Express project context covering at least four relevant categories, including the user model, a service or controller, and at least one route/validation/auth/serialization pattern? README.md or package.json may count as documentation/dependency context. Count Read calls and file-targeted commands that display file contents; do not count prose claims, Glob/Grep filename-only searches, or failed attempts. Answer YES if at least four categories were read before plan generation with the required core model and service/controller/pattern coverage; answer NO otherwise.
+      acceptable: "Reads README.md or package.json, src/models/user.model.js, src/services/user.service.js, src/controllers/user.controller.js, src/routes/v1/user.route.js, and src/middlewares/auth.js or validate.js before writing the plan."
+      unacceptable: "Reads only user.controller.js and immediately writes a plan; or only searches filenames before inspecting model/service/route patterns."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_planning_only_no_src_edits
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] This step must not write code; the model should only research and save the plan artifact, without changing src/package/docs/project implementation files.
+      skill-exclusive reason: the task says "please help me handle this requirement" and edit/write tools are available, so without the skill a coding assistant may implement directly in models/services/controllers/routes. The skill forbids code changes during planning. The conflict is "directly adding suspended field/endpoint" vs "only writing a development plan".
+    signal:
+      query: >
+        Based only on observable Write/Edit tool calls and final-state evidence in the trace, did the model avoid modifying Node/Express implementation, package, lock, JSON, or docs files and limit any file creation or modification to a plan artifact under plans/**/plan.md? Answer YES if no Write/Edit targets src/**, package.json, package-lock.json, yarn.lock, pnpm-lock.yaml, *.js, *.ts, *.json, or docs/** except a plans/**/plan.md artifact; answer NO if any implementation/project file was created or modified.
+      acceptable: "Only writes assets/SF90_t3_node_api_plan/input/project/plans/account-suspension/plan.md."
+      unacceptable: "Edits src/models/user.model.js, src/services/user.service.js, src/controllers/user.controller.js, routes, validation files, package.json, or README/docs."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_plan_saved_with_required_template
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The final plan must be saved at plans/{feature-name}/plan.md and contain the template fields Branch, Description, Goal, Implementation Steps, plus Files, What, and Testing in the step structure.
+      skill-exclusive reason: without reading the skill, a strong model may give architecture advice or a TODO list in chat; the skill mandates a saved PR-plan file with fixed headings. The conflict is "free-form API design suggestions" vs "structured PR plan in plans/{feature-name}/plan.md".
+    signal:
+      query: >
+        Based on the final saved plan artifact content and the Write/Edit path in the trace, did the model save a plan under plans/{feature-name}/plan.md and include all required template fields: Branch, Description, Goal, Implementation Steps, and per-step Files, What, and Testing? Answer YES only if the saved artifact path and all template fields are evidenced; answer NO for chat-only plans, other filenames, or missing fields.
+      acceptable: "Write to plans/account-suspension/plan.md containing Branch, Description, Goal, Implementation Steps, and steps with Files/What/Testing."
+      unacceptable: "Only replies in chat, writes architecture notes, or saves a plan missing Branch/Goal/Testing fields."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_commit_sized_api_feature_steps
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Treat the feature as one PR on a dedicated branch and split the complex API change into multiple commit-sized, independently testable steps.
+      skill-exclusive reason: without reading the skill, the model may list "add field, add endpoint, add tests" without PR/commit framing or testable phase boundaries; the skill requires commit-oriented PR planning. The conflict is "generic checklist" vs "dedicated branch + commit-sized steps".
+    signal:
+      query: >
+        Inspect only the final saved plan file. Does it name a dedicated branch and split the account-suspension feature into multiple distinct, commit-sized, testable steps? The steps do not need to match any example names and need not be at least three if two genuinely distinct testable steps cover the feature; each step must have concrete Testing or equivalent verification. Answer YES if branch plus multiple distinct testable steps are present; answer NO otherwise.
+      acceptable: "Branch account-suspension; distinct steps for user model/serialization, admin suspend service/route/controller, profile exposure, and tests/docs."
+      unacceptable: "A single broad step 'implement suspension feature'; repeated placeholder steps; no branch; no separate testing per step."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_product_semantics_clarification_pause
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Unresolved product decisions must be marked inline with literal [NEEDS CLARIFICATION], followed by explicit clarifying questions and a pause.
+      skill-exclusive reason: without reading the skill, a strong model may silently choose field names, whether suspension invalidates tokens, recovery behavior, and admin permissions; the skill requires marking unresolved decisions and waiting. The conflict is "defaulting to choices and continuing implementation/planning" vs "marking unresolved semantics, asking, and pausing".
+    signal:
+      query: >
+        Based on the final saved plan and final response, did the model include literal [NEEDS CLARIFICATION] for a real account-suspension product/API semantic decision (for example field name, restore/unsuspend behavior, token invalidation, admin permissions, or audit workflow), ask a corresponding question, and wait for the user's decision rather than silently resolving it? Focus only on marker/question/pause behavior; do not judge source-code edits here. Answer YES if all three are evidenced; answer NO otherwise.
+      acceptable: "Plan marks token invalidation after suspension [NEEDS CLARIFICATION]; final response asks whether existing sessions should be revoked and waits."
+      unacceptable: "No marker; or says it will assume suspended=false/isSuspended and proceeds; or asks a question unrelated to a marked unresolved decision."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] A relevant development plan exists for adding account suspension to the Node/Express API."
+    signal:
+      query: >
+        Based only on the final saved plan file content, is there a substantive plan for adding an administrator account-suspension capability and exposing suspension status in ordinary user profiles in the provided Node/Express project? If no plan file was saved, answer NO. Answer YES only if the saved plan is relevant and actionable; answer NO if it is missing, chat-only, or unrelated.
+      acceptable: "Plan covers user model state, admin API/service/controller changes, profile serialization, and verification."
+      unacceptable: "No saved plan file, or a plan about ResizeMe/window resizing."

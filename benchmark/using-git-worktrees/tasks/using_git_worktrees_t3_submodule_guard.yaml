@@ -1,0 +1,49 @@
+task_id: using_git_worktrees_t3_submodule_guard
+level: L3
+skill_id: skill_88_using-git-worktrees
+description: |
+  I have vendored a copy of a third-party library source code in `assets/using_git_worktrees_t3_submodule_guard/input/superproject/vendor/arrow/`. Next I want to try fixing a date parsing boundary issue, but I hope not to mess up my currently checked-out dependency directory. Please first prepare a safe development environment and confirm the test baseline; do not implement the fix for now.
+initial_state:
+  assets:
+    - path: assets/using_git_worktrees_t3_submodule_guard/input/superproject/
+      source: "https://github.com/arrow-py/arrow (open-source Arrow Python library snapshot reused from ./assets/SF22_t1_setup_fuzzing/repo, embedded as a Git submodule inside a small superproject)."
+      real_state: "Superproject containing vendor/arrow as an initialized Git submodule. Inside vendor/arrow, git-dir and common-dir are equal under the superproject module store, and git rev-parse --show-superproject-working-tree returns the superproject path."
+      preparation: |
+        Copied the real Arrow Python library snapshot to a temporary directory, initialized it as a Git repository with .worktrees/ ignored, then initialized a separate superproject and added the Arrow repository as vendor/arrow using a local Git submodule. Removed the temporary source after committing the superproject.
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+skill_constraints_tested:
+  - id: submodule_guard_before_worktree_conclusion
+    description: "When checking isolation, the model must explicitly verify whether the target checkout is a submodule/superproject relationship before accepting any conclusion about existing isolation."
+    exclusive: "Without the skill, a model may treat the vendored submodule checkout as sufficiently isolated or may skip the explicit superproject check. This constraint should be scored as a skill-following process signal: the model must verify the submodule/superproject relationship before accepting any isolation conclusion."
+  - id: treat_submodule_as_normal_repo_for_isolation
+    description: "If the target directory is a submodule, the skill says to treat it as a normal repo for isolation decisions rather than as already isolated."
+    exclusive: "Without the skill, a model may treat the current vendored submodule checkout itself as an acceptable isolated workspace. Score this constraint on whether the model avoids treating the existing vendor/arrow checkout as already safe for feature work."
+  - id: setup_and_baseline_after_isolation
+    description: "After the correct isolation decision, the model must auto-detect project setup and run baseline tests before feature work."
+    exclusive: "Without the skill, a model may stop after workspace setup or run checks at the superproject root. Require setup and baseline commands to run in the Arrow subproject or its isolated workspace."
+notes: |
+  Core test points:
+  - This is a positive example; the user's target directory is a Git submodule. The skill explicitly requires executing submodule/superproject guard, and must not skip this check or treat the existing vendored checkout as an already safe isolated development environment.
+  - In the asset, `vendor/arrow/.git` is a relative pointer, and `git rev-parse --show-superproject-working-tree` returns `assets/using_git_worktrees_t3_submodule_guard/input/superproject`.
+  - In the current asset, `git rev-parse --git-dir` and `git rev-parse --git-common-dir` are equal, so this task primarily evaluates process compliance and scope selection, rather than relying on the two being unequal to cause inevitable misidentification.
+
+  Expected correct behavior:
+  - Output the startup announcement required by the skill at the start.
+  - In `vendor/arrow/`, detect git-dir/common-dir/branch and execute superproject check.
+  - Identify this as a submodule, therefore treat it as a normal repo checkout: if an isolated workspace needs to be created, follow the native mechanism first; only use manual fallback when no native mechanism is available.
+  - After isolation, do setup and baseline tests for the Arrow project; if it fails, ask whether to continue.
+
+  Common model error behaviors:
+  - After seeing `vendor/arrow/.git` is a file, reporting "already in worktree" and skipping creating an isolated workspace.
+  - Directly editing the boundary issue in `assets/using_git_worktrees_t3_submodule_guard/input/superproject/vendor/arrow/arrow/parser.py`.
+  - Running tests at the superproject root instead of running baseline for the vendored Arrow project.
+  - Accepting "the current checkout is sufficiently isolated" or continuing to work in vendor/arrow in place without performing superproject/submodule hierarchy checks.
+
+  baseline_correctness_signals:
+    - Do not implement the fix for now, do not modify Arrow functional files.
+    - Report the safe development environment and test baseline status.
+  skill_following_signals:
+    - The tool trace must include superproject/submodule hierarchy checks before the conclusion of "whether already isolated"; `git rev-parse --show-superproject-working-tree` is preferred, but equivalent submodule identification checks are also acceptable.
+    - Did not misreport the submodule as an "already isolated workspace".
+    - Isolation preparation occurs in the Arrow subproject context, and continues to run setup/baseline.

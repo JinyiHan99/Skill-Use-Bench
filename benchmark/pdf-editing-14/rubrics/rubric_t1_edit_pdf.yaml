@@ -1,0 +1,149 @@
+rules:
+  # ── GATE ────────────────────────────
+  - id: g1_pdf_operation_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace should contain any observable PDF operation attempt, such as reading/writing a .pdf file, importing a PDF library, or opening or saving a PDF. This gate does not require PyMuPDF, to avoid masking wrong-library-choice samples.
+    signal:
+      pattern: '(?i)(\b[^\s''"]+\.pdf\b|import\s+(fitz|pymupdf|pypdf|PyPDF2|pikepdf|borb|pdfrw|reportlab)|from\s+(fitz|pymupdf|pypdf|PyPDF2|pikepdf|borb|pdfrw|reportlab)\b|require\(["''][^"'']*pdf[^"'']*["'']\)|fitz\.open\s*\(|pymupdf\.open\s*\(|PdfReader\s*\(|PdfWriter\s*\(|PDFDocument\.load\s*\(|\.save\s*\([^\)]*\.pdf|writeFileSync\s*\([^\)]*\.pdf)'
+
+  # ── SKILL-derived (main scoring arena) ─────────────
+  - id: r1_use_pymupdf
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL — tool choice] Must use PyMuPDF (fitz/pymupdf) as the PDF editing library. Skill-exclusive rationale: a model that does not read the skill may use general PDF libraries such as pypdf, pdf-lib, or reportlab to edit output; the skill explicitly specifies PyMuPDF because it better preserves the extractable text layer.
+    signal:
+      pattern: '(?i)(import\s+fitz\b|from\s+fitz\s+import\b|import\s+pymupdf\b(?:\s+as\s+fitz)?|from\s+pymupdf\s+import\b|fitz\.open\s*\(|pymupdf\.open\s*\()'
+      must_not_match: '(?i)(^|\n)\s*(import\s+(reportlab|pikepdf|pypdf|PyPDF2|borb|pdfrw)\b|from\s+(reportlab|pikepdf|pypdf|PyPDF2|borb|pdfrw)\b\s+import\b|(?:const|let|var)\s+.*=\s*require\(["'']pdf-lib["'']\)|import\s+.*\s+from\s+["'']pdf-lib["''])'
+
+  - id: r2_no_rasterize
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — forbidden operation] Never convert the PDF to images then edit; the text layer must be preserved. Skill-exclusive rationale: a model that does not read the skill may take the common visual-editing route of PDF to image to draw to PDF; the skill explicitly forbids the rasterize/flatten/image workflow.
+    signal:
+      must_not_match: '(?i)(\.get_pixmap\s*\(|\.to_image\s*\(|convert_from_path\s*\(|(^|\n)\s*(from\s+pdf2image\s+import\b|import\s+pdf2image\b|from\s+PIL\s+import\b|import\s+PIL\b)|Image\.open\s*\([^\)]*\.pdf|\bpdftoppm\b|\bmutool\s+draw\b|wand\.image)'
+
+  - id: r3_cover_then_replace
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL — step order] When replacing existing text, you must use Cover then Replace: first cover with a white rectangle or use true redaction to remove the old value, then write the new value at the same or near-same position using insert_text() or insert_textbox(). Blank fields may be filled by direct insertion without requiring a prior cover.
+    signal:
+      judge_question: |
+        Based only on actual executed code/tool calls and command outputs, not on final-answer claims or explanatory prose, did the agent use the required cover-then-replace pattern for every existing PDF text value it replaced?
+
+        Answer YES if existing text replacements first cover/remove the old value with a white draw_rect() or add_redact_annot()+apply_redactions(), then insert the replacement at the same or near-same position using insert_text() or insert_textbox(). Direct insertion is acceptable only for genuinely blank/empty fields with no old value to replace.
+
+        Answer NO if any existing old value is left visible/extractable because the agent only writes the new value next to it, overlays new text without prior cover/removal, uses a significantly offset position, or applies cover-then-replace to only some replaced fields.
+      acceptable: |
+        rect = page.search_for(old_value)[0]
+        page.draw_rect(rect, color=(1,1,1), fill=(1,1,1), width=0)
+        page.insert_text((rect.x0, rect.y1), new_value, fontsize=11)
+
+        For a blank signature/date field, direct insert_text() next to the label is acceptable because there is no old value to replace.
+      unacceptable: |
+        page.insert_text((old_rect.x1 + 10, old_rect.y1), new_value)
+        # or inserting new text at old_rect without first draw_rect/redaction for an existing old value.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - {"tool_results_first_n": 20}
+
+  - id: r4_no_strikethrough
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — forbidden operation] Do not use strikethrough to mark replaced text. Skill-exclusive rationale: a model that does not read the skill may use strikethrough to express revisions; the skill explicitly requires cover/replace rather than striking through.
+    signal:
+      must_not_match: '(?i)\.add_strikeout_annot\s*\('
+
+  - id: r5_true_redaction
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL — tool choice] For sensitive information (such as student ID/PID), you must use TRUE redaction: call add_redact_annot() on the sensitive old value and apply_redactions(), then write the masked value; you must not only use draw_rect for visual cover.
+    signal:
+      judge_question: |
+        Based only on actual executed code/tool calls and command outputs, not on final-answer claims or explanatory prose, did the agent use true redaction specifically for sensitive identifiers such as student ID/PID?
+
+        Answer YES if the code locates the sensitive original value, applies add_redact_annot() to that value/region, calls apply_redactions(), and then inserts the masked value (for example ****5678). The redaction APIs must be used for the sensitive field, not merely appear elsewhere.
+
+        Answer NO if the sensitive identifier is only hidden with draw_rect/white overlay, if add_redact_annot() and apply_redactions() are absent, if they are not applied to the sensitive field, or if the original sensitive value would remain extractable in the PDF structure.
+      acceptable: |
+        rect = page.search_for(original_pid)[0]
+        page.add_redact_annot(rect, fill=(1,1,1))
+        page.apply_redactions()
+        page.insert_text((rect.x0, rect.y1), masked_pid, fontsize=11)
+      unacceptable: |
+        page.draw_rect(pid_rect, fill=(1,1,1))
+        page.insert_text((pid_rect.x0, pid_rect.y1), masked_pid)
+        # This only visually covers the PID and does not remove it from the PDF structure.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - {"tool_results_first_n": 20}
+
+  - id: r6_white_fill_redaction
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 0.75
+    depends_on: r5_true_redaction
+    spec: |
+      [SKILL — parameter choice] When using add_redact_annot(), you must use a white fill; do not use black/dark fill, and do not omit fill, which results in a default black effect. This is a refined parameter constraint of r5.
+    signal:
+      judge_question: |
+        Based only on actual executed code/tool calls and command outputs, not on final-answer claims or explanatory prose, did every add_redact_annot() call use a white fill?
+
+        Answer YES if add_redact_annot() uses a semantically white fill such as fill=(1,1,1), fill=[1,1,1], fill=(1.0,1.0,1.0), or a variable/constant clearly assigned to white.
+
+        Answer NO if any redaction uses black/dark fill such as (0,0,0), omits fill, or uses a variable whose value is not clearly white.
+      acceptable: |
+        WHITE = (1, 1, 1)
+        page.add_redact_annot(rect, fill=WHITE)
+        page.add_redact_annot(rect, fill=[1, 1, 1])
+      unacceptable: |
+        page.add_redact_annot(rect, fill=(0, 0, 0))
+        page.add_redact_annot(rect)
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - {"tool_results_first_n": 20}
+
+  # ── TASK COMPLETION (bypass) ────────────
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Whether the task is complete: output/output.pdf exists, and should be verified by eval_task_completion.py / a dedicated PDF parser to confirm the text layer is readable and passes the original benchmark's 9 content checks (name, PID masking, email, DOB, phone, appeal reason, signature, date, tag retention). Tag/line/frame layout retention is recorded only in the task-completion bypass and is not counted toward the skill-following main score; do not use file_must_contain to scan the PDF binary directly.
+    signal:
+      file: output/output.pdf

@@ -1,0 +1,144 @@
+# Rubric for skill_22_fuzzing — SF22_t1_setup_fuzzing
+# Revised per Aggregator review: top-level dict, product-focused checks, SF vs task-completion separated.
+
+rules:
+  - id: r1_no_source_modification
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Must not modify the original source code; only creating/modifying repo/APIs.txt and fuzz harness files under repo/fuzz/ is allowed.
+      Skill-exclusive rationale: the task requires implementing a fuzzing pipeline; a model that has not read the skill may directly modify source, tests, or config to make the harness pass; the skill explicitly requires prioritizing analysis reports and not modifying source code unless explicitly requested by the user.
+    signal:
+      judge_question: |
+        Based only on actual file-modifying evidence in tool calls and state changes, did the agent avoid modifying files under assets/SF22_t1_setup_fuzzing/repo/ except these allowed outputs: assets/SF22_t1_setup_fuzzing/repo/APIs.txt and files under assets/SF22_t1_setup_fuzzing/repo/fuzz/?
+        Answer YES if every observed modification is limited to APIs.txt and/or repo/fuzz/**.
+        Answer NO if any source file, test file, package/config file, fixture, or other repository file outside those allowed paths is created, edited, overwritten, or deleted.
+        Ignore the agent's self-claims; judge only actual Write/Edit/tool-command effects.
+      acceptable: "Writes assets/SF22_t1_setup_fuzzing/repo/APIs.txt and assets/SF22_t1_setup_fuzzing/repo/fuzz/fuzz_parse.py only."
+      unacceptable: "Edits assets/SF22_t1_setup_fuzzing/repo/package/module.py, tests/test_*.py, pyproject.toml, setup.py, or deletes any existing repo file."
+      judge_expected: "YES"
+
+  - id: r2_structured_apis_content
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL] repo/APIs.txt must contain the structured analysis artifacts required by the skill: important file/function localization, test summary, per-FUT structured notes, and a final JSON block.
+      Skill-exclusive rationale: a normal fuzzing setup may write a harness directly; this skill requires first producing a reusable target-localization report and giving a machine-parseable JSON summary at the end.
+    signal:
+      judge_question: |
+        Inspect the final actual content written to assets/SF22_t1_setup_fuzzing/repo/APIs.txt. Does it contain ALL four required structured outputs from the skill?
+        1. important file localization with file paths and rationales;
+        2. important function/FUT localization with function names, file/location information, and rationales;
+        3. a populated existing-test summary describing test files/coverage/oracles/gaps;
+        4. per-FUT Fuzzing Target Notes plus a final machine-parseable JSON object containing keys for important_files, important_functions, test_summary, selected_futs, and notes_to_self.
+        Answer YES only if all four are present in the actual APIs.txt content. Answer NO for keyword-only, partial, empty, self-described, or non-file evidence.
+      acceptable: "APIs.txt includes sections for important_files, important_functions, test_summary, selected_futs/notes_to_self, and ends with a JSON object containing those keys."
+      unacceptable: "APIs.txt only says targets were selected, or only contains selected_futs without test_summary or final JSON."
+      judge_expected: "YES"
+
+  - id: r3_inspect_existing_tests
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL] Must actually inspect and incorporate existing tests, using test coverage, assertions/oracles, and coverage gaps to assist FUT selection and harness design.
+      Skill-exclusive rationale: a normal model may select fuzz targets only from source code; this skill explicitly requires explicitly considering existing tests and reusable oracle/seed information.
+    signal:
+      judge_question: |
+        Did the agent BOTH actually read or inspect existing test files in the repository (for example tests/**, test_*.py, *_test.py, conftest.py, or configured test paths) AND reflect that evidence in the final APIs.txt with specific references to test file names plus asserted behaviors, inferred oracles, seed ideas, or coverage gaps?
+        Answer YES only when actual test-file reads/tool output exist and APIs.txt contains concrete test references tied to FUT selection or harness planning.
+        Answer NO if the agent merely states that tests exist, gives a generic test summary, or APIs.txt lacks concrete test files/assertions/oracles/gaps.
+        Ignore self-claims not backed by tool-call evidence and final APIs.txt content.
+      acceptable: "The trace reads tests/test_parser.py and APIs.txt cites tests/test_parser.py::test_invalid_input as an oracle/gap for parse_payload."
+      unacceptable: "APIs.txt says 'reviewed tests' but no test files were actually read, or no specific test assertions/gaps are cited."
+      judge_expected: "YES"
+
+  - id: r4_small_shortlist
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The final FUT shortlist must stay concise (1–5), and the number of Atheris harnesses created should match the number of final selected_futs.
+      Skill-exclusive rationale: a normal task completion may build harnesses for many candidates or auxiliary modules; the skill explicitly requires the final FUT shortlist to be small for subsequent executability.
+    signal:
+      judge_question: |
+        Count only the final selected FUTs in assets/SF22_t1_setup_fuzzing/repo/APIs.txt (selected_futs section or final JSON), not candidate lists or important_functions. Count only Atheris harness .py files under assets/SF22_t1_setup_fuzzing/repo/fuzz/ that correspond to selected FUTs; ignore helper modules and __init__.py.
+        Answer YES only if selected_futs count is between 1 and 5 inclusive, corresponding harness count is between 1 and 5 inclusive, and the two counts are equal.
+        Answer NO if counts are outside 1–5, unequal, inferred from candidates rather than final selected_futs, or helper files are counted as harnesses.
+      acceptable: "selected_futs has 3 entries and repo/fuzz/ contains 3 corresponding fuzz_*.py harness files plus no extra counted harness."
+      unacceptable: "selected_futs has 2 entries but 4 harness files, or 8 selected_futs, or only important_functions are listed."
+      judge_expected: "YES"
+
+  - id: r5_structured_note_to_self
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL] Each final selected FUT must have a complete Fuzzing Target Note in APIs.txt, covering callable contract, input model, oracles, harness plan, risk flags, next actions, and other fields.
+      Skill-exclusive rationale: a normal model may only list target names or simple reasons; the skill requires per-target structured notes to guide subsequent harness, seed, and oracle design.
+    signal:
+      judge_question: |
+        For every final selected FUT in assets/SF22_t1_setup_fuzzing/repo/APIs.txt, is there a corresponding structured Fuzzing Target Note that includes all of these field groups: Callable contract, Input model, Oracles, Harness plan, Risk flags, and Next actions?
+        Answer YES only if each selected FUT has a complete note with those field groups populated with target-specific content.
+        Answer NO if any selected FUT lacks a note, if notes only contain generic placeholders, or if any required field group is missing.
+        Judge only the actual final APIs.txt content, not agent explanations.
+      acceptable: "Each selected FUT has a Fuzzing Target Note with target/location, callable contract, input model, oracles, harness plan, risk flags, and numbered next actions."
+      unacceptable: "Only one global note exists for multiple FUTs, or a selected FUT has no oracles/harness plan/risk flags."
+      judge_expected: "YES"
+
+  - id: r6_analysis_before_harness
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Must first complete the structured APIs.txt analysis before writing the harness under repo/fuzz/.
+      Skill-exclusive rationale: the task may induce the model to directly implement the harness; the skill's guardrail requires preferring analysis and reporting over code changes, and using APIs.txt as the guide for subsequent harnesses.
+    signal:
+      judge_question: |
+        In the actual event/tool-call sequence, before the first creation or modification of any file under assets/SF22_t1_setup_fuzzing/repo/fuzz/, had the agent already written assets/SF22_t1_setup_fuzzing/repo/APIs.txt with substantive structured analysis including selected_futs and per-FUT guidance?
+        Answer YES if a substantive APIs.txt analysis write precedes the first fuzz/ harness write.
+        Answer NO if any fuzz/ file is written before APIs.txt exists, before APIs.txt contains selected_futs/per-FUT guidance, or if the order cannot be established.
+        Ignore plans or self-claims; use only actual file write order and content.
+      acceptable: "Write APIs.txt with important_functions, test_summary, selected_futs, notes_to_self; later Write repo/fuzz/fuzz_target.py."
+      unacceptable: "Write repo/fuzz/fuzz_target.py first, then create APIs.txt afterward."
+      judge_expected: "YES"
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Whether the task is complete: APIs.txt exists with structured content, Atheris-based harness files exist, and at least one harness syntax check or fuzzing run did not fail due to harness errors.
+      This rule only records the task completion rate, weight=0; environment issues such as missing dependencies may cause task-completion to be NO, but should not affect the skill-following main score.
+    signal:
+      judge_question: |
+        Based on actual final files and command output, are ALL task-completion conditions met?
+        1. assets/SF22_t1_setup_fuzzing/repo/APIs.txt exists and contains structured target/test/FUT guidance plus final JSON;
+        2. one or more Python harness files exist under assets/SF22_t1_setup_fuzzing/repo/fuzz/ and are Atheris-based (import/use atheris, not an equivalent non-Atheris framework);
+        3. the trace shows an actual syntax-check, import-check, or fuzzing run for at least one harness that does not fail due to harness errors such as SyntaxError, ImportError from bad local imports, TypeError in the harness, or unhandled harness exceptions.
+        If a fuzzing run reports a target bug/crash after the harness starts correctly, do not count that as a harness failure. If the only failure is ModuleNotFoundError: atheris because the environment lacks the dependency, answer NO for task completion but do not infer any skill-following failure.
+        Ignore self-claims and phrases like "or equivalent"; require Atheris-based files and concrete command output.
+      acceptable: "APIs.txt is structured, repo/fuzz/fuzz_parse.py imports atheris, and python -m py_compile repo/fuzz/fuzz_parse.py succeeds or an Atheris run starts."
+      unacceptable: "Harness uses hypothesis instead of atheris, no run/check was attempted, or the harness has SyntaxError/ImportError/TypeError before fuzzing starts."
+      judge_expected: "YES"

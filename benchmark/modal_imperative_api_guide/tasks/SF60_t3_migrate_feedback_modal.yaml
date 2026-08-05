@@ -1,0 +1,48 @@
+task_id: SF60_t3_migrate_feedback_modal
+level: L3
+skill_id: skill_60_modal_imperative_api_guide
+description: |
+  The feedback modal still uses the old pattern, which makes later maintenance awkward. Please migrate it following the project's current unified modal conventions, keeping the existing experience unchanged: title, width, no footer buttons, and closing the modal after submission.
+
+  The relevant file is `assets/SF60_t3_migrate_feedback_modal/input/src/features/FeedbackModal/index.tsx`.
+  Place the modified file under `output/src/` at the corresponding path.
+initial_state:
+  assets:
+    - path: assets/SF60_t3_migrate_feedback_modal/input/src/features/FeedbackModal/index.tsx
+      source: "Constructed from the documented Lobe UI modal API at https://github.com/lobehub/lobe-ui/blob/master/src/base-ui/Modal/index.md and real LobeChat modal examples at https://raw.githubusercontent.com/lobehub/lobe-chat/main/src/features/LibraryModal/CreateNew/index.tsx and https://raw.githubusercontent.com/lobehub/lobe-chat/main/src/features/SkillStore/index.tsx."
+      real_state: "A realistic pre-migration feature file using a local open flag, an inline dialog component, i18n hooks, width styling, no footer, and body padding customization."
+      preparation: |
+        Combined the real LobeChat import/i18n style with documented modal API shape to create a migration fixture that exercises the same constraints as real project code.
+    - path: assets/SF60_t3_migrate_feedback_modal/input/README_SOURCE.md
+      source: "Local provenance note for the asset preparation."
+      real_state: "Documents source URLs and preprocessing for this task asset set."
+      preparation: |
+        Written alongside the assets to make provenance and preprocessing reproducible.
+  tools_available: [read, edit, write, grep]
+expected_trigger: true
+skill_constraints_tested:
+  - id: migrate_to_imperative_pattern
+    description: "New or migrated modal code should expose an imperative opener and avoid local open-state rendering in the entry component."
+    exclusive: "Without the skill, a model may only tidy the existing stateful dialog or keep the same declarative pattern."
+  - id: content_can_close_via_modal_context
+    description: "Modal body content that needs to dismiss itself should obtain the close action from the modal context instead of receiving a state setter from the page component."
+    exclusive: "A default refactor often passes onClose through props from local state, preserving the coupling the task is meant to remove."
+  - id: semantic_content_styling
+    description: "Body-region styling should use the semantic content region for the newer stack, not the older body-key convention."
+    exclusive: "A model copying older examples may keep body-specific styling that does not match the recommended modal stack."
+notes: |
+  - Positive case with migration pressure.
+  - This task evaluates feature-level modal migration only; assume any required global ModalHost wiring already exists and do not require root-level host changes.
+  - Observable success signals in the output file:
+    - entry code no longer renders a local <Modal open=...> flow or keeps local open state for this modal
+    - modal opening is delegated to the project-recommended imperative modal API from the base-ui stack
+    - form content obtains close behavior from modal context rather than receiving onClose/setOpen props from the entry component
+    - body padding customization is expressed on the semantic content slot, not the legacy body slot
+    - title, width, and footer-null behavior are preserved
+  - Common failures:
+    - keeping useState or local open rendering
+    - wrapping the same declarative modal in a helper without moving to imperative opening
+    - passing onClose or setOpen through props for the form to close the modal
+    - keeping styles.body
+    - switching to the legacy root package instead of the recommended base-ui stack
+    - attempting to modify unrelated root/host files for this single-file migration task

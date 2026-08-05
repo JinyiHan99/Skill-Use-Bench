@@ -1,0 +1,66 @@
+# Rubric for skill_06_docx — SF06_t3_extract_content
+# Scoring boundary: skill scores the main points; task only records completion rate with weight=0; gate only judges evaluability.
+
+rubric:
+  # ── GATE: evaluability ────────────────────────────
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable attempt to extract content from .docx.
+      Avoid matching bare docx/extract on paths, self-descriptions, or task text.
+    signal:
+      pattern: "(\\bpandoc\\b[^\\n]*\\.docx\\b|\\bpython(?:3)?\\b[^\\n]*(?:\\.docx|extract)\\b|from\\s+docx\\s+import|\\bimport\\s+docx\\b)"
+
+  # ── Must do: skill-derived behavior ─────────────────────
+  - id: r1_use_pandoc
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline skill-exclusive] Must use pandoc for .docx content extraction.
+      skill-exclusive rationale: a model that does not read the skill may use python-docx to iterate paragraphs; the skill specifies pandoc to preserve complex formatting.
+    signal:
+      pattern: "\\bpandoc\\b[^\\n]*\\.docx\\b"
+
+  - id: r2_markdown_format
+    type: required-arg
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — skill-exclusive] When structurally extracting to Markdown, must explicitly use the markdown writer/to parameter.
+      skill-exclusive rationale: a model that does not read the skill may use -t plain or python-docx to manually build, losing structure.
+    signal:
+      pattern: "\\b(?:-t|--to|-w|--write)(?:\\s+|=)markdown\\b"
+
+  # ── Must not do: skill boundary violations ─────────────────────
+  - id: b1_no_python_docx_extract
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — boundary] Using python-docx to manually iterate paragraphs for content extraction is forbidden.
+      Removed bare python-docx / pip install text matching to avoid false positives on explanatory text.
+    signal:
+      pattern: "(\\bfrom\\s+docx(?:\\.[A-Za-z_]\\w*)*\\s+import\\b|\\bimport\\s+docx(?:\\.[A-Za-z_]\\w*)*\\b|\\.paragraphs\\b)"
+
+  # ── Task completion: records 0/1 only, not scored ─────────────────
+  - id: task_completion_binary
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Setting aside whether the skill was followed, record whether the task is completed as a binary value.
+      meeting_notes.md should exist, and the content should look like the result of meeting-notes extraction, not an empty file.
+    signal:
+      file: "meeting_notes.md"
+      file_must_contain: "(?s)(#|\\bAction Items?\\b|\\bSummary\\b|\\|.+\\|)"

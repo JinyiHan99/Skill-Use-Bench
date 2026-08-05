@@ -1,0 +1,40 @@
+task_id: SF60_t2_add_delete_confirmation
+level: L2
+skill_id: skill_60_modal_imperative_api_guide
+description: |
+  The delete button on the knowledge-base detail page currently deletes immediately. Please change it so the user first sees a confirmation prompt and deletion runs only after confirmation; canceling should not delete. Preserve the existing button label and the post-delete callback behavior.
+
+  The relevant input file is `assets/SF60_t2_add_delete_confirmation/input/src/features/LibraryModal/DeleteKnowledgeBase/index.tsx`. Keep it consistent with the existing interaction style of the current knowledge-base detail area.
+  Place the modified file under `output/src/` at the corresponding path.
+initial_state:
+  assets:
+    - path: assets/SF60_t2_add_delete_confirmation/input/src/features/LibraryModal/DeleteKnowledgeBase/index.tsx
+      source: "Prepared from LobeChat knowledge-base modal conventions and component style, with API reference from https://github.com/lobehub/lobe-ui/blob/master/src/base-ui/Modal/index.md."
+      real_state: "Delete action component in LobeChat style; it currently performs the async delete immediately from the button click."
+      preparation: |
+        Created a small sibling component using the same imports, i18n namespace, prop shape, and callback style as the real LobeChat knowledge-base modal area.
+    - path: assets/SF60_t2_add_delete_confirmation/input/src/features/LibraryModal/CreateNew/index.tsx
+      source: "https://raw.githubusercontent.com/lobehub/lobe-chat/main/src/features/LibraryModal/CreateNew/index.tsx"
+      real_state: "Public LobeChat knowledge-base create/edit modal hook using an imperative modal pattern and modal content context."
+      preparation: |
+        Fetched the real source file and kept its modal pattern unchanged as local context for the task.
+    - path: assets/SF60_t2_add_delete_confirmation/input/README_SOURCE.md
+      source: "Local provenance note for the asset preparation."
+      real_state: "Documents source URLs and preprocessing for this task asset set."
+      preparation: |
+        Written alongside the assets to make provenance and preprocessing reproducible.
+  tools_available: [read, edit, write, grep]
+expected_trigger: true
+skill_constraints_tested:
+  - id: use_confirm_flow_for_destructive_action
+    description: "A destructive one-step action should use the stack's dedicated imperative confirm flow, specifically `confirmModal` from `@lobehub/ui/base-ui`, while preserving async behavior on confirmation."
+    exclusive: "Without the skill, a model may satisfy the behavior with `window.confirm`, a local-state declarative modal, or a custom confirmation built with `createModal`; the skill points to the dedicated base-ui `confirmModal` API for confirm flows."
+  - id: deletion_deferred_to_confirm_callback
+    description: "The delete button click should only open the imperative confirmation flow; `removeKnowledgeBase(id)` and `onDeleted?.()` must run only inside the positive confirm action callback."
+    exclusive: "Without the skill, models may keep deletion in the button handler, add only a superficial prompt, or implement a generic stateful modal that does not follow the stack's imperative confirm convention."
+notes: |
+  - Positive case.
+  - Correct behavior: clicking delete opens a confirmation prompt; only the positive confirmation awaits removeKnowledgeBase(id) and then calls onDeleted; canceling does not call either.
+  - Skill evidence: output imports and calls `confirmModal` from `@lobehub/ui/base-ui`; the delete button's onClick only opens the confirmation flow; `removeKnowledgeBase(id)` appears only inside the confirm action callback.
+  - Non-skill-but-task-correct examples: browser-native confirm, local-state declarative modal, or a custom confirmation built with createModal.
+  - Common failures: immediate deletion, browser-native confirmation, declarative stateful modal, importing confirmModal from `@lobehub/ui`, using `createModal` for the confirmation, or losing the existing translation/button behavior.

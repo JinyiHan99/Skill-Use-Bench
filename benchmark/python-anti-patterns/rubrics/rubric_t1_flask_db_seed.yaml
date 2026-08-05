@@ -1,0 +1,138 @@
+# ── GATE ──
+rules:
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: "(?s)<tool_use[^>]*(?:Write|Edit)[\\s\\S]*?file_path[\"']?\\s*[:=]\\s*[\"'][^\"']*(?:db_seed|test_db_seed)\\.py[\"']|\\b(?:Write|Edit)\\([^\\n]*file_path\\s*=\\s*[\"'][^\"']*(?:db_seed|test_db_seed)\\.py[\"']"
+    spec: "[GATE] The trajectory contains a real Write/Edit tool call, and file_path points to db_seed.py or test_db_seed.py."
+
+  # ── Skill-Following rules ──
+  - id: r1_retrofit_all_public_typing
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Top-level public functions in db_seed.py, and public helper functions in test_db_seed.py that are not test_-prefixed and not @pytest.fixture, must have complete parameter and return type annotations, and list/dict/set/tuple annotations must carry element types.
+      Skill-exclusive rationale: without reading the skill, strong models usually keep the Flask-tutorial original un-annotated style for get_db, close_db, init_db, init_db_command, init_app, only adding minimal types to the new seed helper; skill AP-3/AP-4 requires retrofitting types even on inherited/copied public production functions and test helpers, and the conflict point is "keep as-is" vs. "retyping the public API of touched production/test code".
+    signal:
+      query: >
+        Based on the finally written db_seed.py and test_db_seed.py file contents, not the agent's self-statements, are these satisfied: all top-level functions in db_seed.py not starting with an underscore have complete parameter and return type annotations; all public helper functions in test_db_seed.py not starting with test_ and not decorated with @pytest.fixture have complete parameter and return type annotations; all list/dict/set/tuple annotations are not bare collection types? Answer only YES or NO.
+      acceptable: "def get_db() -> sqlite3.Connection: ...; def close_db(e: BaseException | None = None) -> None: ...; def load_seed_rows(path: Path) -> list[SeedRow]: ...; pytest test function def test_seed(tmp_path): may pass without annotations."
+      unacceptable: "db_seed.py with def get_db(): ..., def close_db(e=None): ...; test_db_seed.py non-fixture helper def make_csv(rows): ...; def helper(rows: list) -> dict: ... — even if the new seed functions have types, it does not pass."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_specific_contextual_chained_seed_errors
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When seed reading, parsing, validation, or DB-write fails, specific exception types must be caught, the error message must include context such as the seed file path or line number/field, and when re-raising a new exception in except, raise ... from e must be used.
+      Skill-exclusive rationale: without reading the skill, default implementations commonly wrap CSV/SQLite flows in except Exception, return a generic "failed to seed database", or directly raise ValueError losing the original exception; skill AP-1/AP-9/AP-10 requires specific exceptions, context, and exception chaining, and the conflict point is "quick uniform failure handling" vs. "diagnosable, cause-preserving precise error handling".
+    signal:
+      query: >
+        Based on the actual code content of the final db_seed.py, not the agent's self-statements, judge by the following checklist — all four must be satisfied to answer YES, otherwise NO: 1) no bare except, except Exception, or except BaseException exists; 2) seed file read, CSV/row validation, and SQLite write failures each catch specific exception types; 3) raised or logged errors include locatable context such as seed path, line number, field name, or DB operation; 4) when re-raising a new exception in an except block, raise ... from the original exception is used.
+      acceptable: "except FileNotFoundError as e: raise SeedDataError(f'Seed file not found: path={seed_path}') from e; except sqlite3.DatabaseError as e: raise SeedDataError(f'Failed to insert seed row {row_number} from {seed_path}') from e"
+      unacceptable: "except Exception: pass; except Exception as e: raise ValueError('bad seed'); except csv.Error: raise SeedDataError('invalid csv') (no path/line and no chaining); satisfying only two or three items also does not pass."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_validate_external_csv_rows_before_insert
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] sample_posts.csv is an external file input; each row must be validated before DB insert for the presence of required columns username/title/body and non-empty, non-whitespace string values, and bad-row errors should identify the source row.
+      Skill-exclusive rationale: without reading the skill, strong models tend to directly DictReader then row['username']/row['title']/row['body'] insert into the DB, relying on KeyError or DB NOT NULL failures; skill AP-8 requires explicit boundary validation of external input, and the conflict point is "trust the given CSV structure" vs. "validate before use".
+    signal:
+      query: >
+        Based on the actual code content of the final db_seed.py, not the agent's self-statements, does the CSV seed data explicitly validate the username, title, and body fields for presence and non-empty, non-whitespace strings before DB insert, and on failure produce an error with a line number or field name? Answer only YES or NO.
+      acceptable: "After reading each DictReader row, check required_fields, and on missing or empty-after-strip raise SeedDataError(f'Malformed seed row {line_number}: missing title'), then insert only after validation passes."
+      unacceptable: "Directly cursor.execute(... row['username'] ... row['title'] ...); only rely on sqlite NOT NULL/KeyError; only check key presence but allow empty strings; errors do not identify line number or field."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_context_managed_resources_and_seed_transaction
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Seed files and DB resources must be safely managed; seed inserts must have a rollback-safe explicit transaction boundary, and on failure no partial seed data is committed.
+      Skill-exclusive rationale: without reading the skill, the model may use open()/close() or per-row commit, or may open a standalone sqlite3.connect for seed and close it manually; skill AP-6 requires resource context management and transaction safety, and the conflict point is "ad-hoc script-style seeding" vs. "rollback-safe transaction".
+    signal:
+      query: >
+        Based on the actual code content of the final db_seed.py, not the agent's self-statements, does the seed file read use with/context manager or equivalent resource management that ensures closing, and is the seed insert done within an explicit rollback-safe transaction boundary (e.g. try/commit/rollback, with db:, savepoint, or equivalent), ensuring no partial seed data is committed on failure? Answer only YES or NO. Do not treat whether the Flask app lifecycle is preserved as the core scoring point of this rule.
+      acceptable: "with seed_path.open(newline='', encoding='utf-8') as f: ...; try: ... db.commit(); except sqlite3.DatabaseError as e: db.rollback(); raise ... from e; or with db: / savepoint or other equivalent transaction writing."
+      unacceptable: "f = open(path) then manual close; commit after each row insert; no rollback on exception; seed directly sqlite3.connect(...) with unclear resource closing/transaction boundary."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: low
+
+  - id: r5_no_hardcoded_input_or_database_configuration
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The production module db_seed.py must not hardcode absolute asset paths, DB connection strings, or passwords/API keys; the seed source and DB location should come from Flask config, function parameters, or caller-supplied paths. Temporary paths in test fixtures/tmp_path do not violate this rule.
+      Skill-exclusive rationale: without reading the skill, to quickly satisfy this task the model may write assets/SF51_t1.../sample_posts.csv or /data/workspace/... directly into the module; skill AP-2 requires configuration externalization, and the conflict point is "hardcode against eval paths" vs. "production code is configurable".
+    signal:
+      query: >
+        Based on the actual content of the final db_seed.py, not the agent's self-statements, does the production module not hardcode /data/workspace absolute paths, assets/SF51_t1_flask_db_seed/input/sample_posts.csv, DB URLs/passwords/API keys and other configuration, and obtain schema/seed/database paths via parameters or Flask config? Temporary tmp_path/fixture paths in test files test_db_seed.py do not count as violations. Answer only YES or NO.
+      acceptable: "def init_db(seed_path: Path | str | None = None) -> None resolves seed_path via current_app.config or a parameter; tests may use the tmp_path fixture."
+      unacceptable: "SEED_FILE = '/data/workspace/.../sample_posts.csv'; DATABASE_URL = 'sqlite:///demo.db'; production code directly opens assets/SF51_t1_flask_db_seed/input/sample_posts.csv."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_error_paths_are_tested
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Any seed path that can throw an exception or return an error state must have error tests; this task should at least test a missing seed file and a malformed CSV row, and use pytest.raises or equivalent assertions to verify the error behavior and context.
+      Skill-exclusive rationale: without reading the skill, default tests often only cover successful initialization and inserting three rows; skill AP-11 requires error-path testing, and the conflict point is "only prove the happy path works" vs. "explicitly verify exception semantics".
+    signal:
+      query: >
+        Based on the actual code content of the final test_db_seed.py, not the agent's self-statements, are there failure-path tests for a missing seed file and a malformed CSV row, using pytest.raises or an equivalent mechanism to assert that the error type/message includes path, line number, or field context? Answer only YES or NO.
+      acceptable: "with pytest.raises(SeedDataError, match='missing.csv'): init_db(seed_path=missing_path); with pytest.raises(SeedDataError, match='row 2|title'): init_db(seed_path=bad_csv)"
+      unacceptable: "Only tests successful seed; only checks the function returns False; pytest.raises does not match any context; no malformed-row test."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  # ── Task-completion record (not counted toward SF) ──
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the task is complete: generate db_seed.py and test_db_seed.py, initialize the schema, then seed users/posts from sample_posts.csv while preserving the Flask helper lifecycle."
+    signal:
+      query: >
+        Based on the final filesystem and actually written content, not the agent's self-statements, are these implementation logics satisfied: 1) db_seed.py and test_db_seed.py exist; 2) db_seed.py implements the logic of reading username/title/body data from the CSV and writing user/post (and seed_audit if implemented) after schema initialization; 3) test_db_seed.py covers initialization/seed behavior; 4) the Flask request-scoped lifecycle logic of get_db/close_db/init_app still exists. Answer only YES or NO.
+      acceptable: "db_seed.py defines init_db/seed helper, reads username,title,body CSV, creates alice/bob users and three posts; test_db_seed.py covers initialization/seed; preserves get_db using g.db cache and close_db teardown registration."
+      unacceptable: "Files missing; only copied original db.py without seeding; only wrote pseudocode; broke get_db using g.db cache or close_db teardown."

@@ -1,0 +1,122 @@
+task_id: SF102_t2_champion_systems
+skill_id: skill_102_eternal-haven-lore-pack
+rules:
+  - id: g1_observable_final_answer
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [GATE] The final answer must contain an evaluable team-note attempt; this is only a trigger gate and does not judge quality.
+    signal:
+      pattern: "(?s)\\S[\\s\\S]{40,}"
+
+  - id: r1_champion_as_meta_archetype_not_character
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    severity: hard
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] The task description already directly requires a Champion lens rather than an in-universe character; here we only record whether the final text maintains that boundary.
+    signal:
+      query: |
+        Inspect only the final answer. Does the text consistently frame ÆTHERIS as a Champion lens, interpretive filter, register, archetypal voice, coordination archetype, or persona mode rather than as a literal Eternal Haven character?
+        Answer YES if the whole answer maintains the lens/persona boundary and does not make ÆTHERIS a book character.
+        Answer NO if any part says or implies ÆTHERIS is an in-universe hero/character, a peer in the saga, or only says "I am ÆTHERIS" without any lens/persona/register boundary.
+      acceptable: "In an ÆTHERIS Champion lens, not as a saga character..."
+      unacceptable: "I, ÆTHERIS, stood beside the heroes of Eternal Haven..."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r2_anchor_first_from_page_before_soaring
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    severity: hard
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] The task description already requires opening from concrete page details before expanding; here we only record whether the first substantive content paragraph of the final note anchors page facts first.
+    signal:
+      query: |
+        Inspect only the final answer. After ignoring a brief format header such as "Team note:" or a title, does the first substantive paragraph begin from concrete Eternal Haven homepage facts before moving into metaphor or practical systems guidance?
+        Answer YES if the first substantive content mentions concrete page facts such as the four-book saga, Justin Helmer, book titles, audiobooks, Δ9 LYGO Haven, Champion Hub, or Eternal Haven page context before abstraction. The name "Eternal Haven" alone is not enough.
+        Answer NO if it opens with generic philosophy, generic software advice, or mythic imagery without concrete page-specific grounding.
+      acceptable: "Team note: The page presents Justin Helmer's complete four-book saga and a Δ9 LYGO Haven / Champion Hub... From there, distributed cognition..."
+      unacceptable: '"Distributed cognition is a constellation of minds..." with no concrete page anchor at the start.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r3_mythic_language_tied_to_system_structure
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] Mythic Eternal Haven/Champion language must keep one foot in math/systems: lore terms should be explicitly mapped to practical collaborative-software structures such as shared state, protocols, ledgers, feedback loops, invariants, seal chains, accords, or Δ9-style order.
+      skill-exclusive rationale: looking only at the task description, a strong model can satisfy distributed cognition with generic nodes/teams/coordination advice; the skill specifically rejects free-floating mysticism and requires mythos connected to real structures such as seal chains, accords, ledgers, and Δ9 Mandala.
+    signal:
+      query: |
+        Inspect only the final answer. Is there at least one explicit mapping, analogy, or definition that connects a lore/mythic term to a concrete distributed-systems or collaboration concept?
+        Answer YES if it explains a relation such as "an accord is a protocol," "a seal chain is an invariant/checkpoint chain," or "the ledger image maps to shared state/feedback loops."
+        Answer NO if mythic terms and systems terms merely co-occur without an explanatory mapping, or if the text is mostly mystical prose/generic software advice.
+      acceptable: "An accord is a protocol: shared state, agreed invariants, and feedback loops that reveal drift."
+      unacceptable: '"Let the stars remember each mind in the circle; use shared state and protocols" with no explanation connecting the imagery to the system concepts.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_no_literal_character_memory_claim
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.5
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] A Champion may speak as if it resonates with Eternal Haven events, but must not claim literal first-person participation, identity with, or memories as an in-universe book character unless the user consents.
+      skill-exclusive rationale: default persona writing often uses immersive first-person roleplay; the skill permits resonance but forbids collapsing Champion and book-character identity, so literal memory/identity claims are a skill-specific boundary violation. Because r1 is task-completion weight 0, this remains the scored skill persona-boundary signal.
+    signal:
+      query: |
+        Inspect only the final answer. Is the text free of literal first-person memory, participation, or identity claims by ÆTHERIS as an Eternal Haven book character/event participant?
+        Answer YES if it uses lens, resonance, metaphor, or archetype language only.
+        Answer NO if it claims literal participation or memory, such as "I remember when I fought in the Ascension War," "I stood beside the heroes," or "I am one of the heroes."
+      acceptable: "ÆTHERIS resonates with the pattern of accord-making."
+      unacceptable: "I remember standing in the Ascension War beside the heroes."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] Whether the final answer is a short note for an engineering team that discusses distributed cognition, uses the supplied Eternal Haven homepage context, and gives practical guidance for collaborative software systems.
+    signal:
+      query: |
+        Inspect only the final answer. Does it satisfy all checklist items: (1) short team-note format, (2) discusses distributed cognition, (3) uses supplied Eternal Haven homepage context, and (4) gives practical guidance for designing collaborative software systems?
+        Answer YES only if all four task-completion elements are present. Answer NO if any element is missing.
+      acceptable: "A concise team note that opens from the Eternal Haven page, explains distributed cognition for shared work, and gives concrete design guidance such as shared state, feedback loops, handoff protocols, or review checkpoints."
+      unacceptable: "A poetic Eternal Haven reflection with no practical collaborative-software guidance, or generic software advice with no homepage context."

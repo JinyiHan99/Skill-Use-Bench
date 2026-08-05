@@ -1,0 +1,42 @@
+task_id: architecture_patterns_t1_flask_registration
+level: L2
+skill_id: skill_61_architecture_patterns
+description: |
+  We have a piece of registration/login code extracted from the official tutorial project. The relevant files are `assets/architecture_patterns_t1_flask_registration/input/flaskr/auth.py`, `assets/architecture_patterns_t1_flask_registration/input/flaskr/db.py`, and `assets/architecture_patterns_t1_flask_registration/input/flaskr/schema.sql`.
+
+  We plan to continue extending authentication-related capabilities, but the current registration logic is not conducive to future evolution. While preserving existing behavior, extract the "register user" capability from the current implementation, and add unit tests covering "successful registration" and "duplicate username". Username and password cannot be empty, usernames cannot be duplicated, passwords must still be stored securely, and on success the outer layer should still redirect to the login page.
+initial_state:
+  assets:
+    - path: assets/architecture_patterns_t1_flask_registration/input/flaskr/auth.py
+      source: "https://github.com/pallets/flask/blob/main/examples/tutorial/flaskr/auth.py"
+      real_state: "The authentication view file from the official Flask tutorial; the registration logic is coupled with form reading, SQL execution, and page response in the same view function."
+      preparation: |
+        Downloaded directly from the Pallets Flask GitHub repository main branch, content unmodified.
+    - path: assets/architecture_patterns_t1_flask_registration/input/flaskr/db.py
+      source: "https://github.com/pallets/flask/blob/main/examples/tutorial/flaskr/db.py"
+      real_state: "The SQLite connection and initialization helper file from the official Flask tutorial."
+      preparation: |
+        Downloaded directly from the Pallets Flask GitHub repository main branch, content unmodified.
+    - path: assets/architecture_patterns_t1_flask_registration/input/flaskr/schema.sql
+      source: "https://github.com/pallets/flask/blob/main/examples/tutorial/flaskr/schema.sql"
+      real_state: "The user and blog table schema SQL from the official Flask tutorial."
+      preparation: |
+        Downloaded directly from the Pallets Flask GitHub repository main branch, content unmodified.
+  tools_available: ["read", "write", "edit", "bash"]
+expected_trigger: true
+skill_constraints_tested:
+  - id: inward_dependencies
+    description: "Business rules should go into an inner module that does not depend on the web framework, database connections, or template responses; the outer layer is only responsible for input/output conversion."
+    exclusive: "Without following the skill, a model often moves registration logic from the Flask view to a service/helper, but the business code still imports Flask, calls get_db, accepts a concrete database connection, or returns redirect/render; following the skill, the registration use case does not depend on Flask, sqlite, get_db, or page response objects."
+
+  - id: repository_port_for_user_lookup
+    description: "When the registration flow crosses a persistence boundary, it should depend on an abstract repository port, with the concrete implementation provided by the outer layer."
+    exclusive: "Without following the skill, a model typically lets the registration service execute SQL directly, accepts a sqlite3.Connection/db connection, or implicitly calls Flask get_db; following the skill, the registration use case depends only on an abstract user repository port via dependency inversion, implemented by a SQLite adapter in the outer layer."
+
+  - id: in_memory_use_case_tests
+    description: "Use-case tests should use in-memory doubles to verify business branches, without starting a database, application context, or network service."
+    exclusive: "Without following the skill, a model often writes Flask test client tests, patches database calls, or uses SQLite :memory: to complete tests; following the skill, core registration use-case tests verify successful registration and duplicate-username branches through pure Python in-memory repository doubles, without depending on a Flask app/request context or a real database."
+notes: |
+  - Core test point: whether the controller, business rules, and persistence boundary can be separated, with dependencies pointing inward.
+  - Expected correct behavior: pure business use case/entity or value object, user repository interface, Flask/SQLite adapter, and in-memory repository unit tests appear.
+  - Common mistakes: only moving files without changing dependency direction; domain/use case still imports Flask, sqlite, get_db; tests depend on application context or a real database.

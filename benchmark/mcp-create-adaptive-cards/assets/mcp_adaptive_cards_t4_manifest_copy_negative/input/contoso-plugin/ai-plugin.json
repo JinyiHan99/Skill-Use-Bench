@@ -1,0 +1,32 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/copilot/plugin/v2.2/schema.json",
+  "schema_version": "v2.2",
+  "name_for_human": "Contoso Partner Directory",
+  "namespace": "contosoPartnerDirectory",
+  "description_for_human": "Look up partner directory records for account teams.",
+  "description_for_model": "Use this plugin to look up partner company records and contacts for account planning.",
+  "functions": [
+    {
+      "name": "SearchPartners",
+      "description": "Returns partner company records that match an account-team search query.",
+      "capabilities": {
+        "response_semantics": {
+          "data_path": "$.results",
+          "properties": {
+            "title": "$.companyName",
+            "subtitle": "$.partnerTier",
+            "url": "$.profileUrl"
+          }
+        }
+      }
+    }
+  ],
+  "runtimes": [
+    {
+      "type": "OpenApi",
+      "auth": { "type": "None" },
+      "spec": { "url": "./openapi.yaml" },
+      "run_for_functions": ["SearchPartners"]
+    }
+  ]
+}

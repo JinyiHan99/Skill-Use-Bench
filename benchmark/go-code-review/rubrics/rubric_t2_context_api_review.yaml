@@ -1,0 +1,143 @@
+task_id: go_code_review_t2_context_api_review
+skill_id: go-code-review
+rules:
+  - id: g1_observable_review_report_write
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable review-report write attempt."
+    signal:
+      pattern: "(?is)(?:tool[:=]\\s*[\"']?(?:Write|Edit)[\"']?|recipient_name[\"']?\\s*:\\s*[\"']functions\\.(?:Write|Edit)[\"']).{0,5000}?(?:file_path|path)[\"']?\\s*[:=]\\s*[\"'][^\"']*output/go_code_review_t2_review\\.md[\"']"
+
+  - id: r1_pre_review_checks_before_manual_review
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    locus: trace
+    judge_context_window: [serialized_steps]
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Before manually reviewing the mux context API diff, first run the skill-required Go automated pre-review checks: scripts/pre-review.sh, or equivalent gofmt/go vet/golangci-lint attempts.
+      skill-exclusive rationale: without reading the skill, a strong model may directly review the small patch and write a maintainer conclusion, at most suggesting adding tests in the report; the skill requires executing automated pre-review first before reading diffs file by file. The conflict point is that pre-review must be an actual tool call and occur before substantive manual review.
+    signal:
+      query: >
+        Based on actual tool-call evidence, not the agent's self-description or plan: before opening and substantively reviewing change.patch, mux.go, or related Go files, did the agent attempt to run scripts/pre-review.sh, or equivalently run Go pre-review checks such as gofmt and go vet? Unpacking, ls/Glob, reading metadata, reading skill resources or templates does not count as starting manual review; reading and analyzing the diff content of change.patch or Go source code counts as entering manual review. Command failure, missing golangci-lint, or missing Go toolchain still counts as YES, as long as there is a real attempt first. Answer YES or NO only.
+      acceptable: "After unpacking, first run bash skill/scripts/pre-review.sh ./..., or first run gofmt -d . and go vet ./..., then read change.patch."
+      unacceptable: "First analyzes the CurrentRouter/requestWithRouter code, then runs go vet; or only writes pre-review results in the report without a real command call."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_report_pre_review_results_section
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] After automated pre-review checks complete, the review report should record the actual results, output summaries, or specific failure reasons of gofmt, go vet, golangci-lint/pre-review.
+      skill-exclusive rationale: without reading the skill, a strong model may only give code review opinions, without making the tool-check results a fixed output of the review procedure; the skill requires running automated checks first and including the results in the report. The conflict point is that the final report needs to retain a visible record of this step.
+    signal:
+      query: >
+        Only inspect the report content finally written to output/go_code_review_t2_review.md, not the agent's self-description or plan: does the report have a dedicated section or paragraph recording the actual results, output summaries, or specific failure reasons of gofmt, go vet, golangci-lint, or scripts/pre-review.sh? A generic suggestion to "run gofmt/go vet/golangci-lint" or only listing tool names without results/failure reasons answers NO. Answer YES or NO only.
+      acceptable: "Automated checks: gofmt produced no diff; go vet failed because module dependencies were unavailable; golangci-lint was not installed."
+      unacceptable: "Suggest running gofmt, go vet, and golangci-lint before merging. (does not state actual run results or failure reasons)"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_doc_comment_and_comment_sentence_rules
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] For exported API and comment issues, tag per the Doc comments / Comment sentences rules: exported names must have a complete-sentence comment starting with the name, and ordinary comments must also be complete sentences ending with a period.
+      skill-exclusive rationale: without reading the skill, a strong model may point out that CurrentRouter lacks documentation or that a comment has a typo; the skill-exclusive signal is explicitly using the Doc comments / Comment sentences rule name, and stating the specific convention of "starting with the described name, complete sentence, ending with a period". The conflict point is that one cannot only generically say "add comments".
+    signal:
+      query: >
+        Only inspect the report content finally written to output/go_code_review_t2_review.md, not the agent's self-description: does the report have at least one finding locating the newly added comment on CurrentRouter or routeConf, and explicitly linking it to the Doc comments or Comment sentences rule, while also stating the relevant convention that comments should start with the described name / be a complete sentence / end with a period? Answer YES or NO only.
+      acceptable: "**[Doc comments]** (File: `mux.go:49`) CurrentRouter is an exported function; the doc comment should start with CurrentRouter and end with a period."
+      unacceptable: "CurrentRouter needs documentation. (no checklist rule name, and no convention of starting with the name / complete sentence / ending with a period)"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_context_withvalue_nuanced_boundary
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] When reviewing Contexts rules, distinguish request-scoped in-library metadata propagation from genuine context abuse; do not treat requestWithRouter's context.WithValue as wrong across the board, but review the private key, API documentation, and test coverage boundaries.
+      skill-exclusive rationale: without reading the skill, a strong model often uses the general experience "avoid context.WithValue" to directly judge it wrong; the skill requires making a boundary judgment per the Contexts rule. The conflict point is that context.WithValue in this library's internal request-scoped metadata scenario is not an automatic must-fix.
+    signal:
+      query: >
+        Only inspect the report content finally written to output/go_code_review_t2_review.md, not the agent's self-description: does the report's judgment on requestWithRouter/context.WithValue avoid "treating it as wrong across the board", and reflect that this is in-library request-scoped metadata propagation, with the review focus shifting to the private routerKey/private key, API behavior documentation, or test coverage boundaries? Answer YES or NO only.
+      acceptable: "Explains that context.WithValue used for internal routerKey propagation is not automatically an error, but the new CurrentRouter's behavior contract and omit scenarios need documentation/tests."
+      unacceptable: "Lists all context.WithValue directly as Must Fix, requiring a change to explicit parameters or global variables, without distinguishing in-library request-scoped metadata."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5a_review_template_severity_headers
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] The report should use the three severity groupings of review-template.md: Must Fix / Should Fix / Nits.
+      skill-exclusive rationale: without reading the skill, a strong model may organize by "conclusion/issues/suggestions"; the skill specifies the template titles. The conflict point is that it must be presented per that review-template.
+    signal:
+      file: "output/go_code_review_t2_review.md"
+      file_must_contain: "(?s)## Must Fix[\\s\\S]*?## Should Fix[\\s\\S]*?## Nits"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5b_review_finding_schema_and_specificity
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Each valid code-review finding should carry a checklist rule name, a specific symbol or patch/source line location, and a falsifiable reason.
+      skill-exclusive rationale: without reading the skill, a strong model may only give code snippets or generalized suggestions; the skill specifies a rule-name + line-location schema. The conflict point is that each finding must be presented in a checklist-verifiable way.
+    signal:
+      query: >
+        Only inspect the report content finally written to output/go_code_review_t2_review.md, not the agent's description of intent: does each valid code-review finding include a checklist rule name, and contain a specific symbol name or path:line/patch line location? Automated checks, summary, merge conclusion, and empty sections do not count as valid findings; if any valid finding lacks a rule name or location, answer NO. Answer YES or NO only.
+      acceptable: "Under ## Must Fix, writes **[Doc comments]** (File: `mux.go:49`) CurrentRouter ...; or **[Contexts]** (`requestWithRouter`) ..."
+      unacceptable: "Only lists that CurrentRouter lacks comments/tests, without a checklist rule name or without a symbol/line location."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] Generate a library-maintainer review report, with content centered on the gorilla/mux context API change."
+    signal:
+      file: "output/go_code_review_t2_review.md"
+      file_must_contain: "(?is)(?=.*\\b(?:CurrentRouter|requestWithRouter|routeConf|context\\.WithValue|routerKey)\\b)(?=.*\\b(?:review|审阅|结论|merge|合入|block|阻塞|Must Fix|Should Fix|Nits)\\b)"

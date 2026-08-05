@@ -1,0 +1,133 @@
+rules:
+  - id: g1a_read_male
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable attempt to read the Dianzhong male-channel page archive."
+    signal:
+      pattern: '(?is)(?:recipient_name"\s*:\s*"functions\.Read"|toolName"\s*:\s*"Read"|\bfunctions\.Read\b|\bRead\b)[\s\S]{0,500}"file_path"\s*:\s*"(?:[^"]*/)?assets/story_short_scan_t2_dianzhong_channel_compare/input/dianzhong_male_browse_20260702\.html"'
+
+  - id: g1b_read_female
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable attempt to read the Dianzhong female-channel page archive."
+    signal:
+      pattern: '(?is)(?:recipient_name"\s*:\s*"functions\.Read"|toolName"\s*:\s*"Read"|\bfunctions\.Read\b|\bRead\b)[\s\S]{0,500}"file_path"\s*:\s*"(?:[^"]*/)?assets/story_short_scan_t2_dianzhong_channel_compare/input/dianzhong_female_browse_20260702\.html"'
+
+  - id: r1_direction_deep_scan_not_generic_trope
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When the user already has a "realistic reversal/revenge" direction, deep chart scanning should be done around that direction, extracting emotional hooks, trigger scenarios, and actionable cuts from the samples, rather than generically discussing revenge tropes.
+      skill-exclusive reason: without reading the skill, the default approach is to output a generic "revenge power fantasy trope checklist"; the skill requires tying the existing direction back to chart samples for deep scanning. The conflict is that "direction advice" must be supported by emotional mechanisms from the samples.
+    signal:
+      judge_context_window: [final_answer]
+      query: >
+        Does the final answer perform in-sample deep analysis around the "realistic reversal/revenge" direction, rather than outputting generic tropes?
+        Judgment basis: look only at the final answer text, not the agent's plan, self-report, or tool-call intent.
+        Answer YES if it cites at least two real male-page examples, and for each cited example explains how the sample supports a concrete revenge/reversal emotional hook, trigger scene, and implementation cut.
+        Answer NO if it merely quotes titles, gives generic revenge tropes, or does not derive hooks/cuts from actual page samples.
+      acceptable: "Uses 《母亲想白嫖我百万黄金，我杀疯了》《男邻居不肯给消防挪车后，他悔疯了》 etc. to explain public-issue face-slapping, kinship/neighborhood boundaries, and immediate reversal cuts."
+      unacceptable: "'Revenge stories should start with being bullied, counterattack in the middle, and satisfy at the end.'"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r2_channel_compare_transferability
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] When comparing across platforms/channels, comparative analysis should be done to explain audience differences across channels, and the transferable and non-transferable points of emotional mechanisms.
+      skill-exclusive reason: without reading the skill, the default approach may merge the two pages into one overall conclusion; the skill requires comparing platform/channel differences and judging whether emotional mechanisms can transfer. The conflict is that "merged summary" cannot replace "channel comparison".
+    signal:
+      judge_context_window: [final_answer]
+      query: >
+        Does the final answer clearly separate male and female channels, and discuss the channel transfer boundaries of realistic reversal/revenge mechanisms?
+        Judgment basis: look only at the final answer text, not the agent's plan, self-report, or tool-call intent.
+        The real state of the female-channel page is that books is empty/lacks parseable book list; honestly stating "female-channel sample is insufficient, cannot confirm transferability/cannot directly apply male-channel mechanisms" should be judged YES, and it is not required to propose confirmed female-channel transferable mechanisms.
+        Answer YES if it states the male-page confirmed mechanism, recognizes the female-page data insufficiency, explains at least one transfer limitation or non-transfer point including audience/channel differences, and avoids inventing female entries.
+        Answer NO if it fabricates female chart details, merges channels into one conclusion, directly applies male findings to female without caveat, or lacks transferability boundary analysis.
+      acceptable: "'Male channel can verify public-issue face-slapping; female channel cannot be confirmed due to missing book list on the page, intimate relationship/family oppression direction needs supplementary collection before judging, cannot directly apply male-channel samples.'"
+      unacceptable: "'Dianzhong's realistic revenge is all suitable now, male and female channels are the same.'"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_data_confidence_and_rescan_actions
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Chart scanning requires real data support; short-story signals have short validity periods, so each channel judgment should annotate sample date/confidence and bind rescan or supplementary collection actions to evidence strength.
+      skill-exclusive reason: without reading the skill, the default approach is to directly give definitive conclusions to complete the comparison; the skill requires binding conclusion strength to data support and arranging rescan/supplementary collection. The conflict is that weak samples cannot support strong trend judgments.
+    signal:
+      judge_context_window: [final_answer]
+      query: >
+        Does the final answer bind male/female judgment strength to data support separately, and provide sample date, per-channel confidence, and rescan/supplementary collection/validation action time windows?
+        Judgment basis: look only at the final answer text, not the agent's plan, self-report, or tool-call intent.
+        Answer YES only if it includes the 2026-07-02 sample date or equivalent date context, gives separate confidence/certainty for male and female channels, ties those confidence labels to page state such as male has real entries and female books is empty/insufficient, and proposes concrete collection/rescan actions with a time window.
+        Answer NO if it gives confident recommendations without separate confidence labels, omits date context, ignores the female empty-data state, or lacks next scan/collection timing.
+      acceptable: "'Male channel confidence is medium; female channel has no book list so confidence is low. Sample is 2026-07-02, need to supplement female-channel parseable chart and rescan within 7 days.'"
+      unacceptable: "'Female-channel revenge is very hot, recommend writing immediately.' but without confidence and supplementary collection/rescan."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_risk_threshold_for_first_validation_cut
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The output should include the cut most suitable for validation first, and explain actionable stop, downgrade, or pivot thresholds.
+      skill-exclusive reason: without reading the skill, the default approach is to choose a direction and explain its merits; the skill requires providing validation priority and stop-loss thresholds. The conflict is that short-story trends cannot be pursued based on preference alone.
+    signal:
+      judge_context_window: [final_answer]
+      query: >
+        Does the final answer provide a priority validation cut, accompanied by conditional stop/degrade/pivot thresholds?
+        Judgment basis: look only at the final answer text, not the agent's plan, self-report, or tool-call intent.
+        Thresholds need not be quantified as business metrics, but must be actionable conditions, e.g., "if the first N supplementary female-channel entries still show no similar titles, do not proceed cross-channel" "if the next male-channel rescan shows similar weakness, downgrade".
+        Answer YES if one first-validation cut is explicitly selected and paired with a concrete stop/degrade/pivot condition.
+        Answer NO if multiple options are listed without priority, risk is only vague, or there is no actionable threshold.
+      acceptable: "'First validate the public-issue face-slapping cut; the biggest misjudgment risk is that male-channel samples cannot represent the female channel, if supplementary female-channel collection still shows no similar high-score entries, do not proceed cross-channel.'"
+      unacceptable: "'Can write revenge first, risk is it might not be hot.'"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    locus: final-output
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the male/female channel realistic reversal revenge direction judgment was completed."
+    signal:
+      judge_context_window: [final_answer]
+      query: >
+        Does the final answer handle the male-channel and female-channel pages separately, explain judgment confidence/certainty for each, provide a cut more suitable for validation first, and state the current biggest misjudgment risk?
+        Judgment basis: look only at the final answer text, not the agent's plan, self-report, or tool-call intent.
+        Answer YES if all requested deliverables are present and grounded in actual page state: male page uses real entries, female page acknowledges books empty/insufficient information, confidence is given separately or per major judgment, a first cut is selected, and the biggest misjudgment risk is stated.
+        Answer NO if it omits a channel, lacks confidence/certainty, lacks a first cut, omits the main risk, or fabricates unsupported female chart details.
+      acceptable: "Male channel judgment based on real entries, female channel notes books is empty/insufficient information, confidence given separately, finally provides priority cut and misjudgment risk."
+      unacceptable: "Fabricates female-channel CEO, harem intrigue, period drama proportions and directly compares, or does not state how confident each judgment is."

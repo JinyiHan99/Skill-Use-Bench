@@ -1,0 +1,132 @@
+rules:
+  - id: g1_observable_pr_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: '(?s)(functions\.Bash|Bash).*"command"\s*:\s*"[^"]*((gh\s+auth\s+status)|(gh\s+pr\s+create)|(git\s+branch\s+--show-current)|(git\s+status)|(git\s+commit)|(git\s+push)|(npm|pnpm)\s+run\s+(lint|typecheck|test))'
+    spec: "[GATE] The trajectory contains a real Bash tool call that started an explicit step in the PR-creation workflow such as authentication, branch check, commit, push, PR creation, or fallback checks."
+
+  - id: r1_create_fix_prefixed_branch
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] If a new branch is actually created or switched to, the branch name must follow type/short-description; a bug fix should use the fix/ prefix, hyphenated words, and a total length of less than 50 characters; must not publish from main/master.
+      Skill-exclusive rationale: looking only at the task, strong models may create router-regression, bugfix-router-regression, or router_regression_fix; the skill requires a fixed type/short-description enumerated format, and the conflict point is that branch naming is not arbitrary "reflects a bug fix".
+    signal:
+      query: >
+        Based on actual git checkout/switch/branch tool calls and command outputs, not the agent's self-statements: if the model actually creates or switches a branch, does it use a non-default branch matching `fix/<hyphenated-description>` and not publish from main/master; if the model reasonably stops before the branch stage due to a non-git-repo or similar environment blocker, does it not violate this rule? Answer only YES or NO.
+      acceptable: "`git checkout -b fix/router-regression` or `git switch -c fix/router-regression`; or stops and reports the blocker after confirming it is not a git repo, without continuing to publish."
+      unacceptable: "`git checkout -b router_regression_fix`, `bugfix/router_regression`; or directly publishing from main/master; or falsely claiming a branch was created and continuing after a non-git blocker."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r2_fallback_checks_when_preflight_missing
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When package.json has no preflight script, you must read scripts and attempt lint, typecheck, and test fallbacks per the repository's declared scripts before creating a PR; on check failure you must stop, must not continue the PR, and must not treat the nonexistent preflight as an available command.
+      Skill-exclusive rationale: without reading the skill, strong models may skip pre-publish checks, only run npm test, or fabricate npm run preflight; the skill gives an explicit fallback for when preflight is missing, and the conflict point is that it must be driven by package.json and cover three categories of checks.
+    signal:
+      query: >
+        Based on actual Read/Bash tool calls and command outputs, not the agent's self-statements: did the model read package.json, confirm there is no preflight script, and attempt lint, typecheck, and test fallbacks per declared scripts before git push or gh pr create; if any check failed or the environment could not run them, did it stop and not continue push/PR; and did it not treat the nonexistent `npm run preflight` as a successful check? Answer only YES or NO.
+      acceptable: "Read package.json, find no preflight in scripts; then attempt to run lint, typecheck, test (e.g. pnpm run lint && pnpm run typecheck && pnpm run test); only continue after all pass, or stop after a failure/environment blocker."
+      unacceptable: "Run the nonexistent npm run preflight and continue; only run npm test; skip all checks without inspecting package.json; or push or gh pr create after fallback checks fail."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_preserve_angular_review_form
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Must locate and read .github/PULL_REQUEST_TEMPLATE.md, and preserve the Angular template's PR Checklist, PR Type, current behavior, new behavior, breaking change, Other information sections in their original order in the PR body; must not replace them with a self-invented format.
+      Skill-exclusive rationale: the task requires using the normal review form; this rule only evaluates the skill's additional emphasis on strictly preserving the repository template structure, not adding/removing/reordering sections, rather than generically using any review form.
+    signal:
+      query: >
+        Based on actual tool calls that read the template and write the PR body, not the agent's self-statements: did the model actually read .github/PULL_REQUEST_TEMPLATE.md, and have the body used for gh pr create preserve the Angular template's main sections in their original order (PR Checklist, PR Type, What is the current behavior?, What is the new behavior?, Does this PR introduce a breaking change?, Other information), without deleting, reordering, or replacing them with a self-invented Summary/Testing template? Answer only YES or NO.
+      acceptable: "Read .github/PULL_REQUEST_TEMPLATE.md; the body file preserves the above headings in their original order and fills in the router regression information in the corresponding positions."
+      unacceptable: "Did not read the template; the body only has Summary/Testing; or deleted, reordered PR Type/breaking change or other original template sections."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_honest_checkboxes_only_when_supported
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Checkboxes may only be checked when the corresponding work or verification is actually complete; you must not select all of them just to make the PR look complete.
+      Skill-exclusive rationale: looking only at the task, strong models may check all relevant checklists in the review form; the skill explicitly requires honest checking, and the conflict point is that template filling must be constrained by actual tool-call evidence.
+    signal:
+      query: >
+        Based on actual tool calls, command outputs, and the content written to the PR body, not the agent's self-statements: are there no `[x]` checks in the PR template that lack tool-evidence support (e.g. tests/docs/breaking-change items that were not completed being checked)? Leaving completed items unchecked does not count as a failure of this rule. Answer only YES or NO.
+      acceptable: "Only items supported by actual evidence are marked [x]; when there is no evidence of adding docs/tests or completing the breaking-change process, the corresponding items remain [ ]."
+      unacceptable: "Checking Tests added and Docs updated without evidence of adding docs/tests; or changing all checklists to [x]."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_conventional_commit_and_pr_title
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] If a commit is actually made or a PR is created, both the commit message and PR title must follow Conventional Commits: a valid lowercase type, an optional lowercase scope, a colon-space followed by a lowercase imperative verb, <=50 characters, and not ending with a period; a bug fix should use the fix type.
+      Skill-exclusive rationale: looking only at the task, strong models may write "Fix router regression" or "Bugfix: Fixed the router regression."; the skill requires stricter Conventional Commits details, and the conflict point is that the title/commit format must be machine-verifiable.
+    signal:
+      query: >
+        Based on actual git commit and gh pr create --title tool calls, not the agent's self-statements: if the commit message and PR title behavior occurs, do both use the Conventional Commits format with the fix type, and satisfy lowercase description, imperative mood, no period, and brevity; if it reasonably stops before the commit/PR-title stage due to a non-git-repo or authentication blocker, does it not violate this rule? Answer only YES or NO.
+      acceptable: "`git commit -m \"fix(router): handle regression\"` and `gh pr create --title \"fix(router): handle regression\" ...`; or stop at an environment blocker that prevents entering the commit/PR stage."
+      unacceptable: "`Fix router regression`, `fix: Handle regression.`, a compliant commit but a non-compliant PR title, or falsely claiming a commit/PR was created but the format is not observable."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r6_use_body_file_for_pr_creation
+    type: required-arg
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    signal:
+      pattern: '(?s)(functions\.Bash|Bash).*"command"\s*:\s*"(?:(?!--body(\s|=)).)*gh\s+pr\s+create(?:(?!--body(\s|=)).)*--body-file(=|\s)[^"\\]*(?:(?!--body(\s|=)).)*"'
+    spec: |
+      [SKILL] After entering the PR-creation stage, the complete review form must be passed in via a temporary body file and `gh pr create --body-file`, and inline `--body` must not be used.
+      Skill-exclusive rationale: without reading the skill, strong models may directly inline --body or only output a draft for the user to copy; the skill requires a fixed gh CLI argument, and the conflict point is the PR body delivery method. If it reasonably stops before PR creation due to an authentication, non-git-repo, or similar blocker, this rule should not be used as a task-completion deduction basis.
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether a reviewable PR was successfully created for the router regression bug fix, or whether complete PR artifacts were delivered and the unreachable reason was clearly reported under an environment blocker."
+    signal:
+      query: >
+        Based on actual tool calls and the final result, not the agent's self-statements: was a PR successfully created for the router regression bug fix in assets/pr_creator_t2_missing_preflight/input/repo_snapshot; or under an environment blocker such as non-git-repo, authentication, or remote, were compliant PR title/body artifacts delivered, executable pre-check attempts completed, and the reason for being unable to create a real PR clearly reported? Answer only YES or NO.
+      acceptable: "gh pr create successfully outputs a PR URL/success signal; or when unable to create due to an environment blocker, provides reviewable PR title/body artifacts, explains the attempted/completed runnable checks, and reports the blocker."
+      unacceptable: "A simply-failed gh pr create call; only drafting a review form without explaining the blocker; PR content is not about the router regression; or not using the repository review form."

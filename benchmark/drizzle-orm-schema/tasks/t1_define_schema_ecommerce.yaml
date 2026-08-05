@@ -1,0 +1,136 @@
+task_id: SF10_t1_define_schema_ecommerce
+level: L2
+skill_id: skill_10_drizzle_orm
+description: |
+  I need to define a database schema for an e-commerce platform, including the following entities:
+  - Product: name, description, price, category, seller
+  - Category: name, slug, parent category (supports hierarchical categories)
+  - Order: user, status, total amount
+  - Order item (many-to-many association between products and orders): belonging order, belonging product, quantity, unit price at purchase
+
+  The project is located at assets/SF10_t1_define_schema_ecommerce/. The project already has an existing schema directory structure and infrastructure (helpers, etc.).
+  Please create new files under assets/SF10_t1_define_schema_ecommerce/src/database/schemas/ and write the schema definitions for these tables following the project's existing patterns.
+
+initial_state:
+  assets:
+    - path: assets/SF10_t1_schema/
+      source: "Hand-crafted project scaffold based on real Drizzle+Neon starter template"
+  files:
+    - path: drizzle.config.ts
+      content: |
+        import { defineConfig } from "drizzle-kit";
+        export default defineConfig({
+          schema: "./src/database/schemas/*",
+          out: "./src/database/migrations",
+          dialect: "postgresql",
+          strict: true,
+          dbCredentials: {
+            url: process.env.DATABASE_URL!,
+          },
+        });
+    - path: src/database/schemas/_helpers.ts
+      content: |
+        import { timestamp } from "drizzle-orm/pg-core";
+
+        export const timestamps = {
+          createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+          updatedAt: timestamp("updated_at", { withTimezone: true })
+            .defaultNow()
+            .$onUpdate(() => new Date())
+            .notNull(),
+          accessedAt: timestamp("accessed_at", { withTimezone: true }).defaultNow().notNull(),
+        };
+
+        let counter = 0;
+        export function idGenerator(prefix: string): string {
+          const timestamp = Date.now().toString(36);
+          const random = Math.random().toString(36).substring(2, 8);
+          return `${prefix}_${timestamp}${random}${++counter}`;
+        }
+    - path: src/database/schemas/users.ts
+      content: |
+        import { pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
+        import { createInsertSchema } from "drizzle-zod";
+        import { timestamps, idGenerator } from "./_helpers";
+
+        export const users = pgTable(
+          "users",
+          {
+            id: text("id")
+              .primaryKey()
+              .$defaultFn(() => idGenerator("users"))
+              .notNull(),
+            email: text("email").notNull(),
+            name: text("name").notNull(),
+            avatarUrl: text("avatar_url"),
+            ...timestamps,
+          },
+          (t) => [uniqueIndex("users_email_unique").on(t.email)],
+        );
+
+        export const insertUserSchema = createInsertSchema(users);
+        export type NewUser = typeof users.$inferInsert;
+        export type UserItem = typeof users.$inferSelect;
+    - path: package.json
+      content: |
+        {
+          "name": "ecommerce-db",
+          "version": "1.0.0",
+          "type": "module",
+          "dependencies": {
+            "drizzle-orm": "^0.29.3",
+            "drizzle-zod": "^0.5.1",
+            "@neondatabase/serverless": "^0.8.1",
+            "zod": "^3.22.4"
+          },
+          "devDependencies": {
+            "drizzle-kit": "^0.20.13",
+            "typescript": "^5.3.3",
+            "@types/node": "^20.11.5"
+          }
+        }
+  tools_available: [bash, read, edit, grep]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: table_name_plural_snake
+    description: "Table SQL names must be plural snake_case, including the junction table"
+    exclusive: "Model uses singular form ('product', 'order_item') or camelCase ('orderItems') for SQL table name argument"
+  - id: column_name_snake
+    description: "All SQL column name strings must be snake_case while TS property names remain camelCase"
+    exclusive: "Model uses camelCase as the SQL name string: text('categoryId') instead of text('category_id')"
+  - id: spread_timestamps
+    description: "Every table must include ...timestamps spread from _helpers.ts"
+    exclusive: "Model defines createdAt/updatedAt columns manually inline, or omits timestamp columns entirely"
+  - id: text_not_varchar
+    description: "Use text() not varchar() for all string columns"
+    exclusive: "Model uses varchar('name', { length: 255 }) which is standard ORM practice but pointless in PG"
+  - id: index_array_format
+    description: "Indexes use array return format: (t) => [...]"
+    exclusive: "Model uses the object return format (t) => ({ key: index(...) }) which is widespread in tutorials"
+  - id: id_with_prefix_generator
+    description: "Entity tables use text ID with idGenerator(entityName) from _helpers"
+    exclusive: "Model uses serial() auto-increment or uuid().defaultRandom() for entity primary keys"
+  - id: junction_table_composite_pk
+    description: "order_items uses composite primaryKey({columns: [...]}) not a separate id column"
+    exclusive: "Model adds a separate auto-increment or uuid id column to junction/linking tables"
+  - id: foreign_key_on_delete
+    description: "Foreign keys must specify onDelete behavior (cascade/set null/restrict); self-referential FKs (e.g. parent_id) must also specify onDelete"
+    exclusive: "Model omits onDelete option entirely, defaulting to 'no action'"
+  - id: timestamp_with_timezone
+    description: "Any additional timestamp columns beyond the spread (e.g. paidAt, shippedAt) must also use { withTimezone: true }"
+    exclusive: "Model uses plain timestamp() without the withTimezone option"
+  - id: zod_insert_schema
+    description: "Each entity table exports createInsertSchema and the type aliases NewXxx / XxxItem (not Row/Select)"
+    exclusive: "Model writes manual Zod schemas or skips validation schema export entirely"
+
+  - id: junction_includes_user_id
+    description: "Junction tables must include a user_id column for access control even when derivable"
+    exclusive: "Model only includes order_id + product_id, considering user_id derivable through orders"
+
+notes: |
+  Evaluation goal: test whether, when the description does not mention Drizzle and the existing users.ts only shows part of the patterns,
+  the model can rely on the skill to infer project-specific schema conventions (covering naming, primary key strategy, junction table modeling,
+  foreign key deletion behavior, timestamps, string column types, index return format, Zod integration, and other dimensions).
+  The description does not mention the Drizzle ORM name; it only mentions "following the project's existing patterns".

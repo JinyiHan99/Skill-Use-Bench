@@ -1,0 +1,85 @@
+task_id: SF03_t1_merge_unordered
+level: L2
+skill_id: skill_03_pdf
+description: |
+  I'm working on a cybersecurity compliance review and have downloaded several standards PDFs from NIST and IETF, all placed in the docs/ directory:
+
+    - rfc9114_http3.pdf           (HTTP/3)
+    - rfc9110_http_semantics.pdf  (HTTP Semantics)
+    - rfc9000_quic.pdf            (QUIC Transport)
+    - nist_sp800_53.pdf           (Security Controls)
+    - nist_cybersecurity_framework.pdf  (CSF 2.0)
+
+  Please merge these into a single PDF in the current directory. Some of these files are quite large (several hundred pages), so be careful not to lose any content during the merge.
+
+initial_state:
+  files:
+    - path: docs/README.txt
+      content: |
+        Downloaded standards documents for cybersecurity compliance review.
+        All files are real PDF documents from official sources (NIST, IETF).
+  tools_available: [bash, read, edit, grep]
+  binary_assets:
+    - path: docs/rfc9110_http_semantics.pdf
+      source_url: "https://www.rfc-editor.org/rfc/rfc9110.pdf"
+      pages: 194
+      size_mb: 2.7
+      description: "RFC 9110 - HTTP Semantics (IETF standard)"
+    - path: docs/nist_sp800_53.pdf
+      source_url: "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-53r5.pdf"
+      pages: 492
+      size_mb: 5.8
+      description: "NIST SP 800-53 Rev.5 - Security and Privacy Controls"
+    - path: docs/rfc9000_quic.pdf
+      source_url: "https://www.rfc-editor.org/rfc/rfc9000.pdf"
+      pages: 151
+      size_mb: 1.5
+      description: "RFC 9000 - QUIC Transport Protocol"
+    - path: docs/nist_cybersecurity_framework.pdf
+      source_url: "https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf"
+      pages: 32
+      size_mb: 1.4
+      description: "NIST Cybersecurity Framework (CSF) 2.0"
+    - path: docs/rfc9114_http3.pdf
+      source_url: "https://www.rfc-editor.org/rfc/rfc9114.pdf"
+      pages: 57
+      size_mb: 1.1
+      description: "RFC 9114 - HTTP/3"
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: tool_restriction
+    description: "Must use pdftk, not Python PDF libraries or other CLI tools"
+    exclusive: "Model's default is pypdf/PyPDF2; in bash-only contexts model often picks pdfunite, qpdf --pages, or ghostscript instead of pdftk"
+  - id: alphabetical_sort
+    description: "User did not specify order → must sort alphabetically by filename"
+    exclusive: "Model tends to merge in the order listed in the user's message"
+  - id: batch_merge
+    description: "File count exceeds skill's per-batch limit → must batch according to skill rules instead of passing all files in one command"
+    exclusive: "Model would normally pass all files in one command"
+  - id: output_naming
+    description: "Output filename must follow skill's naming rule (merged_<first_alpha_stem>.pdf), derived from the alphabetically-first input stem — not from the order listed in the user's message"
+    exclusive: "Model names it merged.pdf or combined.pdf"
+  - id: input_validation
+    description: "Must run dump_data on inputs before merging to get page counts"
+    exclusive: "Model skips validation, or uses pdfinfo / Python len(reader.pages) instead of pdftk's own dump_data; page counts must come from pdftk dump_data only"
+  - id: output_verification
+    description: "Must verify output page count equals the sum obtained from running dump_data on every input; the total figure must be computed from those probes, never hardcoded or taken from prior knowledge / metadata"
+    exclusive: "Model skips verification — critical for large files where data loss is possible"
+  - id: workspace_location
+    description: "Intermediate batch files must go to the skill-specified fixed workspace path, cleaned up after merge"
+    exclusive: "Model would create batch files in cwd, or use mktemp -d / $TMPDIR / a random /tmp subdir instead of the skill-specified fixed workspace path"
+  - id: no_glob_expansion
+    description: "Must explicitly list the input filenames in the required order; using shell globs like docs/*.pdf is not acceptable"
+    exclusive: "Model defaults to docs/*.pdf for convenience, which bypasses explicit ordering and batching"
+  - id: workspace_cleanup
+    description: "Intermediate workspace must be removed after the final output is verified"
+    exclusive: "Model leaves intermediate batch files behind"
+
+notes: |
+  Core test points:
+  1. Five real standards documents; the user gives no page counts and no order; the model must obtain each file's page count and the sorting rule via the skill-specified method.
+  2. File count exceeds the skill's per-batch limit → must batch per the skill spec and place intermediates in the skill-specified workspace rather than cwd / mktemp.
+  3. The user says "quite large, don't lose content" → implies bidirectional input/output page-count verification; the total must be computed by summing actual probes, hardcoding is forbidden.
+  4. Anti-patterns: directly `pdftk *.pdf cat output merged.pdf`, using pypdf/pdfunite/qpdf, naming the output merged.pdf/combined.pdf.

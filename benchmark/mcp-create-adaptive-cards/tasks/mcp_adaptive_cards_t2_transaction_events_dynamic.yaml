@@ -1,0 +1,49 @@
+task_id: mcp_adaptive_cards_t2_transaction_events_dynamic
+skill_id: mcp-create-adaptive-cards
+description: |
+  Finance reviewers use `assets/mcp_adaptive_cards_t2_transaction_events_dynamic/input/payments-events-plugin/` during close review. The recent balance activity includes credits, payouts, and refunds, but Copilot currently presents every item in the same flat way, so reviewers miss the difference between money coming in and money leaving. Please update the plugin package so those different activity types are easier to distinguish visually while keeping the existing operation and data source intact.
+initial_state:
+  assets:
+    - path: assets/mcp_adaptive_cards_t2_transaction_events_dynamic/input/payments-events-plugin/ai-plugin.json
+      source: "Schema and manifest structure adapted from Microsoft 365 Copilot plugin manifest documentation: https://github.com/MicrosoftDocs/m365copilot-docs/blob/main/docs/plugin-manifest-2.4.md"
+      real_state: "Plugin manifest for a Stripe balance activity function with citation mappings but no item-specific visual presentation."
+      preparation: |
+        Started from the public Microsoft 365 Copilot plugin manifest schema examples and filled the function metadata around Stripe's public balance transaction API documentation.
+    - path: assets/mcp_adaptive_cards_t2_transaction_events_dynamic/input/payments-events-plugin/openapi.yaml
+      source: "Real API field structure from Stripe Balance Transaction documentation: https://docs.stripe.com/api/balance_transactions/object"
+      real_state: "OpenAPI description of Stripe balance transaction list fields, including mixed transaction types, signed amounts, nullable descriptions, fees, and net values."
+      preparation: |
+        Reduced Stripe's documented balance transaction object to the fields needed for a review plugin fixture while preserving real field names and value semantics.
+    - path: assets/mcp_adaptive_cards_t2_transaction_events_dynamic/input/payments-events-plugin/sample-response.json
+      source: "Example field values adapted from Stripe API documentation examples: https://docs.stripe.com/api/balance_transactions/list"
+      real_state: "Representative response containing charge, payout, and refund items with different signs and one null description."
+      preparation: |
+        Copied the documented Stripe response shape and kept a small representative subset of records to show the mixed item states used by the task.
+  tools_available: [Read, Write, Edit, Glob, Grep, Bash, WebFetch]
+expected_trigger: true
+skill_constraints_tested:
+  - id: dynamic_template_selector_for_mixed_items
+    description: "The skill says APIs returning multiple item types should use a per-item template selector in response_semantics.properties and embed the corresponding templates in the API response data."
+    exclusive: "Without the skill, a model is likely to create one static card with conditional text or colors, because generic card knowledge does not imply configuring a manifest selector that points at response-embedded templates."
+  - id: response_embedded_type_templates
+    description: "The skill's dynamic pattern requires the returned items to carry a selector value that resolves to templates included in the response, such as separate debit and credit card definitions."
+    exclusive: "Without the skill, a model may only change the manifest and never adapt the response shape or sample contract to include selector paths and template objects, making dynamic selection impossible."
+notes: |
+  - Positive trigger: this plugin returns a list whose items represent materially different financial states, matching the skill's dynamic response-template branch.
+  - Expected correct behavior: the manifest maps a selector property under `response_semantics.properties`, and the response/sample contract is updated so each transaction item can resolve to an appropriate embedded card template for incoming versus outgoing/refund-like activity.
+  - Common failure modes: adding only `static_template` under `response_semantics`; placing `template_selector` at the top level of the function instead of under `response_semantics.properties`; adding `displayTemplate` to sample items but no `templates` object; using one card with `color: ${type}` instead of concrete card variants; rendering `${amount}` or `${net}` without `formatNumber(...)`; using an array-level selector path such as `$.data[*].displayTemplate` instead of an item-relative selector path such as `$.displayTemplate` under the existing `data_path`.
+  - baseline_correctness_signals:
+      - The manifest remains valid JSON and still points `ListBalanceTransactions` to the existing OpenAPI runtime.
+      - The OpenAPI/sample response remains a list of balance transaction records with the original Stripe field names preserved.
+      - The resulting presentation distinguishes charges from payouts/refunds in visible wording or color.
+      - Monetary values are rendered in a reviewer-friendly format rather than as raw unformatted integers.
+  - skill_following_signals:
+      - `response_semantics.properties.template_selector` exists and points to a per-item selector field.
+      - Transaction items in the sample or documented response contract include selector values resolving to response-embedded card templates.
+      - Separate Adaptive Card template objects exist for at least incoming and outgoing/refund-like transaction categories.
+      - Monetary fields are displayed through template formatting expressions and nullable text uses conditional fallbacks.
+      - Numeric formatting alone does not count as skill-following evidence unless the dynamic template selector and response-embedded template pattern is also implemented.
+      - Nullable transaction text, including null descriptions, is handled with a fallback in the embedded card templates.
+  - Partial skill-following signal: the manifest adds `response_semantics.properties.template_selector` under the correct function, even if the sample response is not fully updated.
+  - Incomplete dynamic implementation: sample items include selector values or response-embedded templates exist, but the manifest does not wire `template_selector` correctly.
+  - Negative skill-following signal: the solution only adds a single `static_template` with conditional text, color, `$when`, or `${if(...)}` logic and does not implement the dynamic selector pattern.

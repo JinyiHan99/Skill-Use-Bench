@@ -1,0 +1,33 @@
+task_id: SF06_t3_extract_content
+level: L1
+skill_id: skill_06_docx
+description: |
+  I have a meeting minutes document assets/SF06_t3_extract/meeting_notes.docx; help me extract the content and organize it into a plain-text file
+  meeting_notes.md for easier subsequent reading and searching.
+
+initial_state:
+  files:
+    - path: README.txt
+      content: |
+        Meeting notes document from Q4 product planning session.
+        Contains headings, bullet lists, action items, and a summary table.
+  tools_available: [bash, read, edit, grep, python]
+  binary_assets:
+    - path: assets/SF06_t3_extract/meeting_notes.docx
+      description: "Real Word document with meeting notes - headings, bullet lists, action items table"
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: use_pandoc_extraction
+    description: "Must use a structured document converter that preserves headings, lists, and tables when extracting from .docx"
+    exclusive: "Model uses naive paragraph-only iteration (e.g., reading paragraphs one by one) and loses heading levels, list nesting, and table structure"
+  - id: markdown_output_format
+    description: "Output must be structured Markdown that preserves heading hierarchy, list structure, and tables (verified by checking the resulting .md file contains markdown syntax such as #/##, -, and table pipes)"
+    exclusive: "Model produces plain-text output (no markdown syntax markers) that strips heading levels and list/table formatting"
+
+notes: |
+  Core test points:
+  1. Choose a structured conversion tool that preserves document structure (heading hierarchy, lists, tables), rather than manually rebuilding text paragraph by paragraph
+  2. The output must be structured Markdown (containing #/## heading markers, list syntax, table syntax), not flattened plain text
+  3. The L1 simple task tests basic tool selection ability

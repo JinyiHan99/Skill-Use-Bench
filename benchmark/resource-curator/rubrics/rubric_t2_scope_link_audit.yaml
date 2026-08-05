@@ -1,0 +1,189 @@
+rules:
+  - id: g1_observable_scope_maintenance_attempt
+    type: required-tool
+    provenance: gate
+    locus: trace
+    verifier: regex
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The trace must show an observable attempt to write or edit one of the requested Scope output files. This only gates evaluability and does not affect skill-following score.
+    signal:
+      pattern: '(("tool_name"\s*:\s*"(Write|Edit)"|tool:?\s*(Write|Edit))[^}]{0,1200}file_path"?\s*:\s*"[^"]*output/scope(-and-closures|_resource_maintenance)\.(mdx|md)"|file_path"?\s*:\s*"[^"]*output/scope(-and-closures|_resource_maintenance)\.(mdx|md)"[^}]{0,1200}("tool_name"\s*:\s*"(Write|Edit)"|tool:?\s*(Write|Edit)))'
+
+  - id: r1_release_note_distinguishes_audit_status_categories
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    severity: hard
+    weight: 1.0
+    spec: |
+      [SKILL] Link maintenance should distinguish audit statuses and actions: redirect links should be updated to final URLs, 403/blocked links should receive manual/contextual review, and broken/404 links if present should be removed or replaced.
+      Skill-exclusive rationale: without reading the skill, strong models will do ordinary link cleanup, treating all non-200/redirect links in the snapshot as generic "bad links"; the skill requires handling 200/301-302/404/403 separately. Default behavior X = uniformly update or delete problem links, skill requires Y = different actions by status category, conflict point Z = whether to distinguish blocked 403, redirect, and broken.
+    signal:
+      query: >
+        In output/scope_resource_maintenance.md, does the actual release note describe status-to-action mapping rather than a generic link-fix summary: redirects were updated to final URLs; 403/blocked links were manually/contextually reviewed; and broken/404 links, if any existed, were removed or replaced? Judge only the final file contents actually written. Answer YES if these status categories and actions are distinguished; answer NO if it merely says links were fixed, broken links were updated, or all inaccessible links were handled the same way. Do not require an explicit category for kept 200 links.
+      acceptable: "Updated dev.to redirect to its final URL; treated the two Medium 403 responses as blocked/inaccessible and reviewed them for learner access before replacing/removing; no 404s were present."
+      unacceptable: "Fixed broken links and updated some URLs."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_redirect_resource_hrefs_updated_to_final_urls
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: state-diff
+    exclusive: false
+    severity: soft
+    weight: 0
+    spec: |
+      [TASK/DIAGNOSTIC — not counted toward SF] The known redirecting dev.to href should be updated to its final URL. This is useful task-correctness evidence, but it is weakly skill-exclusive because task clues and general link-audit common sense can imply the same action.
+    signal:
+      file: "output/scope-and-closures.mdx"
+      file_must_contain: 'https?://dev\.to/bbarbour/closures-using-memoization-3597/?'
+      file_must_not_contain: 'https?://dev\.to/steelvoltage/closures-using-memoization-3597/?'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: low
+
+  - id: r3_blocked_links_are_not_blindly_deleted_or_ignored
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    severity: hard
+    weight: 0.75
+    spec: |
+      [SKILL] For 403/blocked resources, the audit process says to check manually/contextually; they should be kept, replaced, or removed based on learning value and accessibility rationale, not treated exactly like 404s or ignored.
+      Skill-exclusive rationale: without reading the skill, strong models may delete both Medium cards solely because automation saw 403, or leave them untouched because the task only says "awkward or blocked paths"; the skill requires 403 to be a separate manual-review category. Default behavior X = 403=broken or no-op, skill requires Y = manual/contextual decision with rationale, conflict point Z = blocked links receive category-specific reasoning.
+    signal:
+      query: >
+        In the final output files, are both known Medium 403 resources handled individually with an explicit keep/replace/remove disposition and a rationale tied to accessibility and learning value: "I never understood JavaScript closures" at https://medium.com/dailyjs/i-never-understood-javascript-closures-9663703368e8, and "The Difference Between Function and Block Scope" at https://medium.com/@josephcardillo/the-difference-between-function-and-block-scope-in-javascript-4296b2322abe? Judge only actual written output/scope-and-closures.mdx and output/scope_resource_maintenance.md contents, not self-description. Answer YES if each of the two resources has a category-specific disposition and rationale; answer NO if either is blindly deleted solely as broken, left untouched with no 403 rationale, or omitted from the maintenance note.
+      acceptable: "The note says the DailyJS Medium article was replaced because 403 blocks readers while preserving beginner closure coverage, and the Joseph Cardillo Medium article was removed or replaced because an accessible source covers function vs block scope better."
+      unacceptable: "Both Medium links vanish with the only reason '403 broken', or both remain with no note about the 403 snapshot."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_resource_counts_preserve_skill_target_mix
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    exclusive: true
+    severity: hard
+    weight: 0.75
+    spec: |
+      [SKILL] After auditing links, the maintained page should still meet the skill's core resource mix targets: 2-4 Reference/official cards, 4-6 Articles, and 3-4 Videos.
+      Skill-exclusive rationale: a generic link fixer that has not read the skill will stop after URL edits/removals; the skill requires recounting sections and gaps after removals/replacements. Default behavior X = only fix links, skill requires Y = check resource balance after link maintenance, conflict point Z = whether to turn cleanup into a maintained learning shelf.
+    signal:
+      file: "output/scope-and-closures.mdx"
+      file_must_contain:
+        - '(?is)## Reference\b(?=(?:(?:(?!## (?:Books|Articles)\b).)*?<Card\b){2})(?!(?:(?:(?!## (?:Books|Articles)\b).)*?<Card\b){5})'
+        - '(?is)## Articles\b(?=(?:(?:(?!## (?:Tools|Courses|Videos)\b).)*?<Card\b){4})(?!(?:(?:(?!## (?:Tools|Courses|Videos)\b).)*?<Card\b){7})'
+        - '(?is)## Videos\b(?=(?:(?:(?!## (?:Courses|Books|Related|Next|$)).)*?<Card\b){3})(?!(?:(?:(?!## (?:Courses|Books|Related|Next|$)).)*?<Card\b){5})'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_post_audit_gap_analysis_mentions_balance
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    severity: hard
+    weight: 0.5
+    spec: |
+      [SKILL] After auditing links, the release note should mention post-audit gap awareness, such as section balance, replacement coverage, or preserving beginner/advanced and visual/text diversity.
+      Skill-exclusive rationale: a generic link fixer that has not read the skill usually only lists URL edits/removals; the skill requires doing gap analysis and noting recommendations after cleanup. Default behavior X = link-fix log, skill requires Y = explain coverage/balance/gaps, conflict point Z = whether the release note reflects post-audit resource curation.
+    signal:
+      query: >
+        In output/scope_resource_maintenance.md, does the final release note mention post-audit resource balance, gaps, replacement coverage, or preserving beginner/advanced or visual/text coverage after link fixes? Judge only the final file contents actually written. Answer YES if the note explicitly connects the maintenance decisions to resource mix or coverage; answer NO if it only lists URL updates/deletions without any gap or balance awareness.
+      acceptable: "Replaced blocked Medium articles so the Articles section still has beginner and practical closure coverage, while Videos remain at target count for visual learners."
+      unacceptable: "Updated redirect URL; removed blocked Medium links."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_weak_blurbs_rewritten_as_specific_value_descriptions
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    severity: soft
+    weight: 0.75
+    spec: |
+      [SKILL] Resource descriptions should be reviewed and improved from generic one-line blurbs into specific, valuable two-sentence descriptions.
+      Skill-exclusive rationale: without reading the skill, strong models may update URLs only and keep blurbs like "Official MDN documentation on closures and lexical scoping"; the skill requires description review as part of the audit. Default behavior X = link-only maintenance, skill requires Y = description specificity/value update, conflict point Z = blurbs are curated, not merely preserved.
+    signal:
+      query: >
+        In output/scope-and-closures.mdx, were at least three known weak/generic one-line resource blurbs materially rewritten into specific value-focused descriptions, generally two sentences that state what the resource covers and why a reader should click? Anchor the check to weak initial blurbs such as "Clear FreeCodeCamp guide comparing the three variable declaration keywords with practical examples", "Zell Liew's comprehensive CSS-Tricks article covering both scope and closures in one excellent resource", "Dan Abramov's clear, concise explanation of closures. Perfect for the 'aha moment'", "Olivier De Meulder's article that has helped countless developers finally understand closures", or "Brian Barbour's practical guide showing how closures enable powerful caching patterns." Judge only the final file contents actually written. Answer YES only if at least three such descriptions are no longer generic one-liners and now include both coverage and reader value; answer NO for superficial wording changes or fewer than three improvements.
+      acceptable: "MDN Closures card explains it covers lexical environments and closure creation, then says to use it for exact terminology and browser-neutral examples; CSS-Tricks and FreeCodeCamp cards also have coverage + learner value."
+      unacceptable: "Official MDN documentation on closures and lexical scoping"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_known_generic_blurbs_not_preserved_verbatim
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    exclusive: true
+    severity: soft
+    weight: 0.25
+    spec: |
+      [SKILL] As deterministic support for description review, known generic one-line blurbs should not be preserved verbatim.
+      Skill-exclusive rationale: link-only maintenance would often leave these exact blurbs untouched; the skill requires reviewing descriptions and improving generic phrasing.
+    signal:
+      file: "output/scope-and-closures.mdx"
+      file_must_not_contain:
+        - 'Clear FreeCodeCamp guide comparing the three variable declaration keywords with practical examples\.'
+        - 'Zell Liew''s comprehensive CSS-Tricks article covering both scope and closures in one excellent resource\.'
+        - 'Olivier De Meulder''s article that has helped countless developers finally understand closures\.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done_page_structure
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The cleaned Scope page exists, preserves Scope/Closures content, and still has resource Card sections.
+    signal:
+      file: "output/scope-and-closures.mdx"
+      file_must_contain:
+        - '(?is)\b(Scope|Closures)\b'
+        - '(?is)## Reference\b.{0,5000}<Card\b'
+        - '(?is)## Articles\b.{0,8000}<Card\b'
+        - '(?is)## Videos\b.{0,8000}<Card\b'
+
+  - id: tc2_task_done_release_note
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The release note exists and summarizes the maintenance result.
+    signal:
+      file: "output/scope_resource_maintenance.md"
+      file_must_contain: '(?is)\b(changed|updated|replaced|removed|kept|redirect|blocked|403|maintenance|summary)\b'

@@ -1,0 +1,128 @@
+rubric_id: skill_81_software_architecture_t1_checkout_ui
+objective: Evaluate whether the model follows the software-architecture skill to do the checkout shipping-area maintainability refactor; task completion is only recorded at weight=0.
+rules:
+  - id: g1_observable_checkout_source_edit
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trajectory must contain an observable write/edit attempt to the checkout input project's src tree.
+      The gate only judges whether there is an evaluable code change, not the refactor quality.
+    signal:
+      pattern: >-
+        \b(?:Write|Edit)\b[\s\S]{0,2000}(?:assets/software_architecture_t1_checkout_ui/input/src/|software_architecture_t1_checkout_ui/input/src/|./assets/software_architecture_t1_checkout_ui/input/src/|src/hooks/useShippingAddress\.js)
+
+  - id: r1_decompose_shipping_orchestration
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Complex functions/components over 80 lines should be split into smaller focused functions; files over 200 lines that are no longer focused should be split.
+      Skill-exclusive rationale: looking only at the task, strong models may only do minor local cleanup in useShippingAddress.js to "keep behavior unchanged"; the skill explicitly requires splitting long functions/files by thresholds, and the conflict point is "local cleanup but still one long callback bears multiple responsibilities" vs. "splitting shipping validation, shipping-line selection, billing sync, tax update and other responsibilities into small focused units/modules".
+    signal:
+      query: |
+        Based on the code actually written/edited in the final file state, not the agent's self-statements or plans:
+        Has the shipping address submission flow been split from the original long inline callback into a short orchestration, delegating multiple responsibilities such as validation, updating the shipping address, default shipping-line selection, billing-same-as-shipping sync, and tax/update decisions to focused functions or a shipping-address domain module?
+        Answer YES if the main submit callback is clearly no longer an over-80-line-scale multi-responsibility block, delegates several responsibilities to focused extraction units, and any extracted units are not just another large multi-purpose function; if `useShippingAddress.js` still remains over roughly 200 lines, YES requires meaningful split-out into focused shipping-address modules rather than keeping the hook as a dumping ground.
+        Answer NO if most responsibilities remain directly inline in one long callback, if the code only moves the same large block into a single catch-all helper, or if an over-200-line hook still acts as the non-focused home for the shipping workflow.
+      acceptable: |
+        submitShippingAddress delegates validation, shipping-line setup, billing sync, and tax/update steps to separately named focused functions or domain modules, leaving a concise orchestration flow.
+      unacceptable: |
+        useShippingAddress.js still contains one long submitShippingAddress callback with inline validation branches, API calls, shipping-line nested logic, billing sync, and tax generation, or it calls one broad helper that contains the same multi-responsibility procedure.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_use_domain_specific_extraction_names
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Avoid generic names like `utils`/`helpers`/`common`/`shared`; modules should use bounded-context/domain-specific names with a single responsibility.
+      Skill-exclusive rationale: the project already had `src/hooks/shared/` and `src/utils/`, and a model that has not read the skill can easily reuse these default locations to add or extend `shippingHelpers.js` / shared index; the skill requires using names that express the checkout/shipping-address domain responsibility, and the conflict point is "reuse generic dumping ground" vs. "domain-named focused module".
+    signal:
+      query: |
+        Based on the extraction code actually newly added or substantively expanded in the final file state, not the agent's self-statements:
+        If the model added or expanded shipping-address extraction units, do the filenames, function names, and landing locations of these units all use domain-specific checkout/shipping-address names, rather than placing new responsibilities in or expanding `src/utils`, `src/hooks/shared`, `helpers`, `common`, `shared` and other generic dumping grounds?
+        Answer YES if the extracted units that exist clearly identify responsibilities such as shipping-address validation, default shipping-line selection, billing sync, or checkout tax update, and their path is not a generic dumping ground.
+        Answer NO if newly added/expanded shipping responsibilities live in generic locations such as `src/utils`, `src/hooks/shared`, `helpers`, `common`, or `shared`, or use catch-all names such as `handleShipping`, `shippingHelpers`, `helpers`, or `utils` even when the filename is otherwise near the domain.
+        Do not answer NO merely because there was little or no extraction; lack of decomposition is evaluated by r1. This rule evaluates naming and placement of extraction units that were actually added or expanded.
+      acceptable: |
+        New files/functions such as `shippingAddressValidation.js`, `defaultShippingLineSelection.js`, or `billingAddressSync.js` hold the extracted responsibilities outside generic dumping-ground directories.
+      unacceptable: |
+        The refactor creates `src/hooks/shared/shippingHelpers.js`, edits `src/utils/index.js` to hold shipping logic, or adds a generic `handleShipping` helper containing unrelated responsibilities.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_flatten_shipping_line_flow_diagnostic
+    type: boundary
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: false
+    weight: 0
+    spec: |
+      [DIAGNOSTIC — not counted toward SF] The shipping-line flow should not just preserve the deep nesting as-is in the main callback.
+      This signal had insufficient masking-test discriminative power and was downgraded from the main score; it is only an auxiliary observation for r1/r4.
+    signal:
+      file: assets/software_architecture_t1_checkout_ui/input/src/hooks/useShippingAddress.js
+      file_must_not_contain: >-
+        if\s*\(\s*shippingAddressData\.country_code\s*\)\s*\{[\s\S]{0,1600}getShippingLinesResponse\.success[\s\S]{0,1600}selected_shipping
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_keep_business_logic_out_of_ui_hook_body
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Do not mix business logic in UI components/hooks; business rules should keep a clear boundary from the framework/UI adaptation layer.
+      Skill-exclusive rationale: the task only says to make the shipping-address area easier to maintain, and strong models may continue to keep required-field/country/province/postal-code, billing-same-as-shipping, tax-generation and other checkout rules in the React hook; the skill requires distinguishing UI hook adaptation from domain rules, and the conflict point is "hook still bears business rules" vs. "hook mainly orchestrates state, rules are in focused domain functions".
+    signal:
+      query: |
+        Based on the final actual code content, not the agent's self-statements:
+        Are at least two of the checkout shipping business-rule clusters moved out of the React hook body into framework-agnostic or less-React-dependent focused functions/modules? Key rule clusters include: address required/country/province/postal-code validation, default shipping-line selection, billing-same-as-shipping sync, tax update/generation decision.
+        Answer YES if at least two of those business-rule clusters live outside the hook callback/body in focused functions/modules, and the extracted functions receive data/dependencies as parameters rather than directly calling React hooks or implicitly reading React state through closure.
+        Answer NO if only one small rule was extracted, if most checkout decisions remain inline in `useCallback`, or if extracted functions still directly depend on React hooks/state closure instead of explicit inputs.
+      acceptable: |
+        Address validation and default shipping-line selection are extracted to functions that receive data and dependencies as arguments rather than using React state directly.
+      unacceptable: |
+        All validation decisions, billing sync decisions, shipping-line selection, and tax decisions remain inline in `useCallback`, or only a trivial validation helper was extracted while the hook still owns the business flow.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The checkout shipping-address behavior should be preserved.
+    signal:
+      query: |
+        Based on the final actual file content, not the agent's self-statements:
+        Does the shipping-address flow still preserve core behaviors such as required fields, country/province/postal-code checks, shipping-line selection, billing-same-as-shipping update, and tax generation?
+        Answer YES only if these core behaviors are still represented in code. Answer NO if major behavior was removed.
+      acceptable: |
+        The modified code still validates address fields, updates shipping address, may set a default shipping line, syncs billing when selected, and generates taxes.
+      unacceptable: |
+        The code removes province/postal validation, never updates billing when billingSameAsShipping is true, or eliminates tax generation.

@@ -1,0 +1,135 @@
+rubric_id: skill_75_power_platform_mcp_connector_suite_t2_runtime_troubleshooting
+objective: Evaluate whether the model follows the Power Platform MCP Connector Suite skill to simultaneously repair Copilot Studio endpoint discovery, the JSON-RPC runtime envelope, and the resource/context exposure boundary.
+rules:
+  - id: r1_definition_restores_agentic_protocol_marker
+    type: required-arg
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Runtime troubleshooting is not just about fixing the C# script; the Swagger POST operation of the /mcp endpoint must also carry x-ms-agentic-protocol: mcp-streamable-1.0, to ensure Copilot Studio agent discovery.
+      Skill-exclusive rationale: without reading the skill, strong models facing "test chat generic connector error" will prioritize debugging script.csx or HTTP error handling; the skill requires the definition-level discovery marker to align with the runtime script. Default behavior X = only fix runtime code, skill requires Y = the Swagger endpoint also adds the agentic protocol marker, conflict point Z = the script appears fixed but Copilot Studio still cannot correctly discover the agent endpoint.
+    signal:
+      file: output/salesforce_runtime_fix/apiDefinition.swagger.json
+      file_must_contain: >-
+        "\/?mcp"\s*:\s*\{[\s\S]{0,3000}"post"\s*:\s*\{[\s\S]{0,3000}"x-ms-agentic-protocol"\s*:\s*"mcp-streamable-1\.0"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_unknown_agent_methods_return_json_rpc_error_envelope
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The MCP handler in script.csx must return a JSON-RPC 2.0 error envelope for unknown/unsupported agent methods, rather than a plain HTTP BadRequest/plain connector error.
+      Skill-exclusive rationale: without reading the skill, ordinary Web API debugging naturally returns 400 BadRequest or plain-text errors; the skill requires MCP JSON-RPC 2.0 message handling so that Copilot Studio can understand the error. Default behavior X = HTTP 400 generic error, skill requires Y = {jsonrpc,id,error{code,message}} envelope, conflict point Z = generic HTTP errors manifest as generalized connector failures in the Copilot Studio test chat.
+    signal:
+      query: |
+        Based on the actual content of the finally written output/salesforce_runtime_fix/script.csx, not the agent's self-statements: does the unsupported/unknown method handling path of the MCP method dispatcher return a JSON-RPC 2.0-shaped error envelope, rather than HttpStatusCode.BadRequest/plain string generic connector error?
+        Answer YES if unsupported or unknown methods call a helper or construct a response containing jsonrpc "2.0", the original id, and an error object with code/message.
+        Answer NO if unsupported/unknown handling still returns new HttpResponseMessage(HttpStatusCode.BadRequest) with only text/string JSON content, or throws a generic exception without JSON-RPC envelope.
+      acceptable: |
+        default: return CreateJsonRpcErrorResponse(requestId, -32601, $"Method not found: {method}"); where the helper writes {"jsonrpc":"2.0","id":...,"error":{"code":...,"message":...}}.
+      unacceptable: |
+        default: return new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = CreateJsonContent($"Unsupported method: {method}") };
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_successful_agent_calls_use_json_rpc_success_envelope
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: false
+    weight: 0.5
+    spec: |
+      [SKILL/regression protection] Successful responses of implemented agent calls such as initialize, tools/list, tools/call, and ping must preserve the JSON-RPC 2.0 success envelope (jsonrpc/id/result), rather than directly returning bare arrays, bare objects, or ordinary REST responses.
+      The skill-exclusive rationale is weaker: the input baseline may already have partial success envelopes; this rule mainly prevents breaking the MCP JSON-RPC response shape during runtime troubleshooting via ordinary REST thinking.
+    signal:
+      query: |
+        Based on the actual content of the finally written output/salesforce_runtime_fix/script.csx, not the agent's self-statements: does every implemented main MCP success path return results through a JSON-RPC 2.0 success envelope?
+        Answer YES if implemented initialize/tools/list/tools/call/ping or equivalent agent methods return through CreateJsonRpcSuccessResponse or otherwise include jsonrpc "2.0", id, and result.
+        Answer NO if any implemented success path returns bare tools arrays, plain resource objects, or ordinary REST responses without jsonrpc/id/result envelope.
+      acceptable: |
+        case "tools/list": return HandleToolsList(requestId); and HandleToolsList returns CreateJsonRpcSuccessResponse(requestId, new JObject { ["tools"] = tools });
+      unacceptable: |
+        case "tools/list": return new HttpResponseMessage(HttpStatusCode.OK) { Content = CreateJsonContent(tools.ToString()) };
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: low
+
+  - id: r4_salesforce_context_exposed_with_supported_resource_boundary
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Salesforce context/resources must remain available to Copilot Studio through supported runtime behavior: preferably resources as tool outputs, or a clearly Copilot-compatible JSON-RPC runtime route such as resources/list and resources/read. It must not be deleted, ignored, or treated as unsupported prompt-only/resource-only content.
+      Skill-exclusive rationale: without reading the skill, the model may ignore context requests, delete resources handling, or mechanically add generic MCP resources without considering that Copilot Studio only supports tools and resources as tool outputs. The skill requires preserving resource visibility and respecting the Copilot Studio boundary. Default behavior X = delete/ignore context or bare resource implementation, skill requires Y = expose Salesforce context through supported tool-result/runtime output, conflict point Z = business context appears to exist but is not available to the agent runtime.
+    signal:
+      query: |
+        Based only on the actual content of the finally written output/salesforce_runtime_fix/script.csx, not the troubleshooting note or the agent's self-statements: is Salesforce context/resource behavior preserved and exposed through a Copilot Studio-supported runtime path (providing context in tools/call/tool output, or a clearly compatible resources/list+resources/read JSON-RPC routing)?
+        Answer YES if script.csx handles context/resource requests compatibly through JSON-RPC envelopes or exposes Salesforce context via tool outputs.
+        Answer NO if context/resource handling is removed, ignored, only documented as unsupported, or implemented solely as prompt/resource metadata with no Copilot-compatible runtime path.
+      acceptable: |
+        script.csx includes cases for "resources/list" and "resources/read" returning JSON-RPC envelopes with Salesforce context, or tools/call has a getSalesforceContext-style tool returning context as tool output.
+      unacceptable: |
+        The fix only changes unknown methods and deletes all resource/context paths; or only says "resources are not supported" without providing tool-output-compatible context in script.csx.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_note_explains_definition_script_alignment
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] troubleshooting note should explain the two-layer MCP failure mode: definition-level discovery marker and script-level JSON-RPC/resource handling must align for the same /mcp endpoint.
+      Skill-exclusive rationale: without reading the skill, the model will write an ordinary "fixed bug" handoff or C# troubleshooting note; the skill requires the Integration Troubleshooting pattern to diagnose the consistency of the connector definition + script transformation workflow. Default behavior X = only describe code bugs, skill requires Y = explain the relationship between the discovery marker and the JSON-RPC script handler, conflict point Z = the team does not know both layers must be verified during re-import.
+    signal:
+      query: |
+        Based on the actual content of the markdown troubleshooting/handoff/readme document finally written under output/salesforce_runtime_fix/, not the agent's self-statements: does the note explain that the Swagger x-ms-agentic-protocol marker and the JSON-RPC/resource handling in script.csx of the same /mcp endpoint must align, and that both are part of the Copilot Studio runtime fix?
+        Answer YES if the note explicitly connects definition discovery marker and script runtime envelope/resource handling for the same /mcp endpoint.
+        Answer NO if the note only says files were copied, only mentions C# code, or only mentions generic validation without the marker/script alignment.
+      acceptable: |
+        "Re-import after verifying the /mcp operation has x-ms-agentic-protocol: mcp-streamable-1.0 and that script.csx returns JSON-RPC success/error envelopes for initialize/tools/resources calls."
+      unacceptable: |
+        "Fixed the connector error and updated script.csx. Re-import the package."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/salesforce_runtime_fix/ should contain the completely repaired Salesforce connector package and troubleshooting note, preserving the original business coverage.
+    signal:
+      query: |
+        Based on the final filesystem artifacts and actually written content, not the agent's self-statements: does output/salesforce_runtime_fix/ contain apiDefinition.swagger.json, apiProperties.json, script.csx, readme.md or equivalent documentation, and must contain troubleshooting/handoff note content; the core JSON should be non-empty and parseable, preserving Salesforce coverage, and not be an as-is copy of the input or a minimal demo?
+        Answer YES if key package files and a troubleshooting/handoff note are present, substantive, parseable where JSON is expected, and preserve Salesforce operations with real fixes.
+        Answer NO if key files are missing, empty, unparseable, the note is absent, files are merely copied unchanged from input, or the package was replaced by a minimal demo.
+      acceptable: |
+        Complete package plus troubleshooting_note.md exists; apiDefinition.swagger.json and apiProperties.json parse as JSON; apiDefinition.swagger.json still contains Salesforce operationIds/paths and includes substantive fixes.
+      unacceptable: |
+        Only script.csx is produced, output contains only prose without connector files, no troubleshooting note exists, or files are raw input copies with no runtime/definition repair.

@@ -1,0 +1,57 @@
+task_id: resource_curator_t1_promise_resources
+level: L2
+skill_id: skill_84_resource_curator_for_concept_pages
+description: |
+  Our Promises concept page has picked up newer language features, and the learning links at the bottom now feel uneven: some cards read like placeholders, and the resource shelf feels more like an archive than a guided path.
+
+  Please review the current learning shelf in `./assets/resource_curator_t1_promise_resources/input/promises.mdx`, keep only links that still earn a spot, refresh or replace weak or stale entries, and save the revised page as `output/promises.mdx`.
+
+  Also include a short editor note at `output/promises_resource_notes.md` summarizing which existing resources you kept, removed, updated, or replaced, and why.
+initial_state:
+  assets:
+    - path: ./assets/resource_curator_t1_promise_resources/input/promises.mdx
+      source: "https://github.com/leonardomso/33-js-concepts/blob/master/docs/concepts/promises.mdx"
+      real_state: "Real JavaScript concept page for Promises from the 33-js-concepts repository; includes extensive tutorial content plus existing Reference, Articles, Videos, and Related Concepts card sections. The page includes modern Promise.try and Promise.withResolvers sections, and the resource area has more official reference cards than the skill target range."
+      preparation: |
+        Downloaded the raw MDX file from GitHub without content changes:
+        https://raw.githubusercontent.com/leonardomso/33-js-concepts/master/docs/concepts/promises.mdx
+  tools_available:
+    - read
+    - edit
+    - write
+    - web_search
+    - web_fetch
+    - bash
+expected_trigger: true
+expected_outputs:
+  - output/promises.mdx
+  - output/promises_resource_notes.md
+skill_constraints_tested:
+  - id: audit_before_refresh
+    description: "The skill requires auditing existing resources before adding or changing links, including accessibility, accuracy, dates, outdated patterns, and description quality."
+    exclusive: "A model without the skill may review existing cards superficially, but is less likely to conduct a structured resource audit that weighs link health, freshness, outdated patterns, description quality, and section-level gaps, or to document keep/remove/update/replace decisions in the editor note."
+  - id: target_resource_mix
+    description: "The skill defines target resource ranges: 2-4 MDN/reference links, 4-6 articles, 3-4 videos, and optional courses/books, with foundational and official resources ordered first."
+    exclusive: "A generic editor may keep every existing official link, add even more references for the new Promise APIs, or optimize only for quantity rather than the skill's section-level mix."
+  - id: specific_two_sentence_descriptions
+    description: "The skill requires each resource description to be specific and valuable, normally two sentences: what is unique or covered, then why the reader should click."
+    exclusive: "Without the skill, the model may leave one-line descriptions such as 'Complete reference for the Promise object' or use generic phrases like 'great tutorial' and 'comprehensive guide'."
+notes: |
+  Positive task for refreshing resources on an existing JavaScript concept page.
+
+  Baseline correctness signals:
+    - `output/promises.mdx` exists and preserves the original concept article structure outside the resources area.
+    - The output still contains usable external resource cards for Promises, including reference, article, and video resources.
+    - `output/promises_resource_notes.md` exists and briefly records keep/remove/update/replace decisions about the existing resource shelf.
+
+  Skill-following signals:
+    - The final revision reflects review of the current resource shelf by pruning overlaps, updating weak descriptions, and documenting keep/remove/update/replace decisions in the editor notes.
+    - The final resource mix is close to the skill targets: no more than 4 official/reference cards, 4-6 article cards, and 3-4 video cards.
+    - Coverage of the newer `Promise.withResolvers()` / `Promise.try()` material is handled deliberately, without keeping every method-level MDN card in an overlong Reference section.
+    - Resource descriptions are specific two-sentence value propositions; weak existing lines like `Complete reference for the Promise object and all its methods` are rewritten or replaced.
+    - Resources are ordered so official/foundational material precedes advanced or niche material.
+
+  Common failure examples:
+    - The model leaves the six-card Reference section around `promises.mdx` lines 1706-1727 untouched, missing the skill's 2-4 reference target.
+    - The model appends a new `Promise.withResolvers()` card while preserving all current cards, making the shelf more archive-like.
+    - The model keeps one-line descriptions such as the Reference cards near `promises.mdx` lines 1709-1726, failing the skill's description formula.

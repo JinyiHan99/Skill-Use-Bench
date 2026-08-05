@@ -1,0 +1,138 @@
+# ── GATE ──
+rules:
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: "(?s)<tool_use[^>]*(?:Write|Edit)[\\s\\S]*?file_path[\"']?\\s*[:=]\\s*[\"'][^\"']*(?:healthcheck|test_healthcheck)\\.py[\"']|\\b(?:Write|Edit)\\([^\\n]*file_path\\s*=\\s*[\"'][^\"']*(?:healthcheck|test_healthcheck)\\.py[\"']"
+    spec: "[GATE] The trajectory contains a real Write/Edit tool call, and file_path points to healthcheck.py or test_healthcheck.py."
+
+  # ── Skill-Following rules ──
+  - id: r1_async_probe_uses_nonblocking_io
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] async def probing/reporting code must not use synchronous blocking HTTP, sleep, or file I/O such as requests, urllib.request, time.sleep, Path.read_text/open().read; use an async-native HTTP client/awaitable sleep, and place sync boundaries outside async or asyncify them.
+      Skill-exclusive rationale: without reading the skill, strong models often wrap requests.get/open().read_text in async def, which looks like it satisfies "asynchronous health-check" but actually blocks the event loop; skill AP-5 explicitly forbids blocking calls inside async functions, and the conflict point is "surface async wrapper" vs. "truly non-blocking async implementation".
+    signal:
+      query: >
+        Based on the actual code content of the final healthcheck.py, not the agent's self-statements; ignore comments, docstrings, and string examples. Do all async def functions internally avoid blocking calls such as requests.*, urllib.request.*, http.client sync calls, time.sleep, pathlib.Path.read_text/read_bytes, built-in open or sync file-object read/write, and use async-native HTTP client/awaitable operations for endpoint probing? Wrapping sync requests via asyncio.to_thread(requests.get, ...) does not count as compliant. Answer only YES or NO.
+      acceptable: "async with httpx.AsyncClient(timeout=timeout) as client: response = await client.get(endpoint.url); async file writes or write the report in a sync public wrapper."
+      unacceptable: "async def probe(...): response = requests.get(url); async def probe(...): await asyncio.to_thread(requests.get, url); async def main(): data = Path(config).read_text(); time.sleep(1); async def write_report(): open(output, 'w').write(...)."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_validate_endpoint_json_boundary
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] endpoints.json is an external input; all consumed fields must be validated before use; at least validate timeout_seconds, the endpoints list, and each endpoint's name/url type and URL shape (environment should also be validated if used), and error messages must point to the config path or endpoint identifier.
+      Skill-exclusive rationale: without reading the skill, default implementations json.load then directly access data['endpoints'], entry['url'] and fire requests; skill AP-8 requires boundary validation via Pydantic/dataclass validator or an explicit validation function, and the conflict point is "trust local JSON asset" vs. "validate before probing".
+    signal:
+      query: >
+        Based on the actual content of the final healthcheck.py, not the agent's self-statements, is the endpoint JSON explicitly validated before probing, including all consumed fields, and at least including timeout_seconds type/range, endpoints being a list, each entry's name and url present and of valid type, url being a non-empty string with http/https scheme; if the environment field is used, also validate it; validation-failure errors include the config path or endpoint name/index. Answer NO if only key presence is checked or only partial validation is done. Answer only YES or NO.
+      acceptable: "EndpointConfig/Endpoint dataclass or Pydantic model; validate_config(data, source) checks name/url/timeout and raises ConfigError(f'Invalid endpoint at index {i} in {source}: url=...')."
+      unacceptable: "for item in json.load(f)['endpoints']: await probe(item['url']); only catching KeyError or only using dict.get() to check key presence without type/range/URL scheme validation; using environment without validating it."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_externalized_source_output_timeout
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] endpoint source, output report path, and timeout must not be hardcoded as non-overridable hidden production constants; the public entry point should read these configs from function parameters, CLI args, or validated input. Overridable function default parameters or argparse/CLI defaults are compliant.
+      Skill-exclusive rationale: without reading the skill, to quickly finish the eval the model often writes ENDPOINTS = 'assets/.../endpoints.json', OUTPUT = 'status_report.json', TIMEOUT = 5; skill AP-2 requires configuration externalization, and the conflict point is "hardcode against the current asset" vs. "reusable monitoring-worker config".
+    signal:
+      query: >
+        Based on the actual content of the final healthcheck.py, not the agent's self-statements, does the production code avoid hardcoding /data/workspace absolute paths, assets/SF51_t2_http_client_async/input/endpoints.json, hidden non-overridable fixed report filenames, or hidden timeout constants; and receive endpoint source, output destination, and timeout via public function/CLI parameters or JSON config? Overridable function default parameters or argparse/CLI defaults (e.g. timeout=5.0 or output_path='report.json') are allowed. Answer only YES or NO.
+      acceptable: "async def run_healthcheck(config_path: Path, output_path: Path = Path('status_report.json')) -> StatusReport; timeout_seconds comes from validated JSON or an overridable default parameter."
+      unacceptable: "CONFIG_PATH = '/data/workspace/.../endpoints.json'; REPORT_PATH = 'health_report.json' and the caller cannot override it at all; probe_endpoint uses a hidden fixed timeout=5 internally and does not accept any parameter/config input at all."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_public_typing_and_parameterized_collections
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] All public functions in healthcheck.py and test_healthcheck.py (names not starting with an underscore, including test functions and pytest fixtures) must have complete parameter and return type annotations, and all collection-type annotations (e.g. list/dict) must be parameterized.
+      Skill-exclusive rationale: without reading the skill, strong models focus on async behavior and JSON output, often omitting types on test functions, fixtures, helpers, or main, or writing -> dict/list; skill AP-3/AP-4 requires all public Python functions and collection types to be fully annotated, and the conflict point is "script-style tooling with few types" vs. "production/test code public API fully typed".
+    signal:
+      query: >
+        Based on the actual content of the final healthcheck.py and test_healthcheck.py, not the agent's self-statements, do all public functions whose names do not start with an underscore (including test functions starting with test_ in test_healthcheck.py and functions decorated with @pytest.fixture) have complete parameter and return type annotations, and are all list/dict/set/tuple annotations parameterized with element types? Answer only YES or NO.
+      acceptable: "async def probe_endpoint(client: httpx.AsyncClient, endpoint: Endpoint, timeout: float) -> EndpointStatus; def load_config(path: Path) -> HealthcheckConfig; def test_success(tmp_path: Path) -> None: ...; @pytest.fixture def config_path(tmp_path: Path) -> Path: ...."
+      unacceptable: "async def probe(endpoint): ...; def write_report(report: dict) -> None; def test_success(tmp_path): ...; @pytest.fixture def config_path(tmp_path): ...."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_specific_endpoint_errors_with_context_and_chaining
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Config read/parse and endpoint-probe failures must use specific exception handling; failure states or thrown errors must include endpoint name/url or config path; when re-raising a new exception in except, raise ... from e must be used.
+      Skill-exclusive rationale: without reading the skill, default implementations often write success=false, error='failed' in an outer except Exception around asyncio.gather, or raise ValueError without preserving the JSON/HTTP cause; skill AP-1/AP-9/AP-10 requires specific exceptions, context, and chaining, and the conflict point is "uniformly swallow/generalize failures" vs. "operator-facing diagnosable failures".
+    signal:
+      query: >
+        Based on the actual code content of the final healthcheck.py, not the agent's self-statements, judge by the following checklist — all must be satisfied to answer YES, otherwise NO: 1) no bare except, except Exception, or except BaseException exists; 2) config read/parse and network failures catch specific exception types; 3) thrown errors or failure reports include endpoint name/url or config path; 4) only when re-raising a new exception in an except block is raise ... from the original exception required; if directly converted to a failure-report entry, chaining is not required.
+      acceptable: "except json.JSONDecodeError as e: raise ConfigError(f'Invalid JSON in {config_path}') from e; except httpx.TimeoutException as e: return EndpointStatus(name=endpoint.name, url=endpoint.url, ok=False, error=f'timeout: {e}') (not re-raising an exception, so no from needed)."
+      unacceptable: "except Exception: return {'ok': False, 'error': 'failed'}; except ValueError: raise ConfigError('bad config') (no use of from e); failure report only has ok: False without any endpoint name/url context."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_error_paths_are_tested
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Error paths must be tested; this task should at least test invalid configuration and a simulated endpoint failure, and verify that the error type/report contains debuggable context.
+      Skill-exclusive rationale: without reading the skill, default tests often only mock successful responses and check the JSON report; skill AP-11 requires pytest.raises/equivalent error assertions for any throwable or error state, and the conflict point is "happy path report testing" vs. "failure-semantics testing".
+    signal:
+      query: >
+        Based on the actual content of the final test_healthcheck.py, not the agent's self-statements, does it include a pytest.raises/equivalent assertion for invalid endpoint configuration, and a test for a simulated endpoint failure/timeout, checking that the error message or report failure entry contains endpoint name/url or config path? Answer only YES or NO.
+      acceptable: "with pytest.raises(ConfigError, match='endpoint.*url|endpoints.json'): load_config(bad_path); mock AsyncClient.get to raise httpx.TimeoutException then assert report['endpoints'][0]['name']=='status' and error contains URL/timeout."
+      unacceptable: "Only tests all three endpoints succeeding; failure tests only assert ok is False without checking context; no invalid-config test."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  # ── Task-completion record (not counted toward SF) ──
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the task is complete: generate an async health-check implementation and tests, read endpoints.json, probe each endpoint, and write a compact JSON status report."
+    signal:
+      query: >
+        Based on the final filesystem and actually written content, not the agent's self-statements, are these implementation logics satisfied: 1) healthcheck.py and test_healthcheck.py exist; 2) healthcheck.py implements reading timeout_seconds and endpoints from endpoints.json; 3) performs a health probe for each endpoint and records success/failure with error debug context; 4) writes the results to a compact JSON status report; 5) tests cover the read and write process. Answer only YES or NO.
+      acceptable: "healthcheck.py provides run_healthcheck(config_path, output_path) logic, and tests cover reading, probing, and writing the report."
+      unacceptable: "Core files missing; only wrote plain text/pseudocode, or did not actually implement the logic structure of reading, health-probing, and saving the report in code."

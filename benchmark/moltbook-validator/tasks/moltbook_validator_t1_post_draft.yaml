@@ -1,0 +1,40 @@
+task_id: moltbook_validator_t1_post_draft
+skill_id: moltbook-validator
+description: |
+  I have a draft based on a public Python README that I want to publish as a Moltbook post. Please turn `assets/moltbook_validator_t1_post_draft/input/draft_post.json` into the final JSON body I can send, and save it to `output/final_post.json`. The note is about software development.
+
+initial_state:
+  assets:
+    - path: assets/moltbook_validator_t1_post_draft/input/source_README.rst
+      source: "https://raw.githubusercontent.com/python/cpython/main/README.rst"
+      real_state: "Raw CPython README source downloaded from the public GitHub repository."
+      preparation: |
+        Downloaded unchanged as source material for the draft.
+    - path: assets/moltbook_validator_t1_post_draft/input/draft_post.json
+      source: "https://raw.githubusercontent.com/python/cpython/main/README.rst"
+      real_state: "Draft Moltbook post JSON containing a title, a catch-all subarea, and a body copied from the README under the draft author's body key."
+      preparation: |
+        Extracted the first non-empty README lines into a draft post JSON. The body text comes from the real source; the JSON wrapper models a user's pre-publication draft.
+  tools_available:
+    - filesystem
+expected_trigger: true
+skill_constraints_tested:
+  - id: pre_post_payload_validation
+    description: "Before a Moltbook post is sent, the payload must be checked so the required body field exists and is non-empty."
+    exclusive: "Without the skill, a model may pass through the draft's existing body key and produce a payload that Moltbook stores with an empty body."
+  - id: avoid_catch_all_for_dev_post
+    description: "For coding/dev posts, the skill recommends a more specific submolt instead of the high-spam catch-all area."
+    exclusive: "Without the skill, a model is likely to preserve the provided catch-all destination or choose it as a safe default."
+notes: |
+  - Core test: the task looks like ordinary JSON cleanup, but success requires using Moltbook-specific pre-send rules and submolt guidance.
+  - Expected behavior: `output/final_post.json` exists, keeps the real README-derived title/body meaning, uses the required Moltbook body key, has a non-empty body, and routes the software-development post to a specific dev/coding submolt.
+  - Common wrong behavior: model copies `assets/moltbook_validator_t1_post_draft/input/draft_post.json` line containing `"text": ...` into the final post instead of converting it to the required body key, causing Moltbook to save a null body.
+  - Common wrong behavior: model leaves `"submolt": "general"` in `output/final_post.json` even though the post topic is coding/dev and the skill warns that the catch-all area has high spam exposure.
+  - baseline_correctness_signals:
+      - `output/final_post.json` is valid JSON.
+      - The output preserves the README-derived title/body substance rather than inventing unrelated content.
+      - The output is suitable as a single post body object.
+  - skill_following_signals:
+      - The output uses `content` with a non-empty value and does not rely on `text` as the body field.
+      - The output includes a post title and a submolt.
+      - The submolt is `m/coding` or `m/dev`, not `general`.

@@ -1,0 +1,48 @@
+task_id: gongwen_format_t1_training_notice
+skill_id: gongwen_format
+description: |
+  The R&D efficiency group is preparing to organize an internal learning activity for the engineering team. Please read `assets/gongwen_format_t1_training_notice/input/pycon_china_2024_event_digest.md`, and on behalf of the R&D Management Department, draft an official notice directing each R&D team to arrange key engineers to attend the learning activity and submit a review summary.
+
+  Use the following issue title: "关于组织研发团队参加 PyCon China 2024 内部学习活动并提交复盘纪要的通知" (Notice on organizing R&D teams to participate in the PyCon China 2024 internal learning activity and submit review summaries). Because this title is long, please use a multi-line title layout when typesetting to ensure aesthetic formatting.
+
+  Save the final draft as `output/training_notice.docx`, and also save the runnable script you used to generate the document as `output/create_notice_document.js`.
+initial_state:
+  assets:
+    - path: assets/gongwen_format_t1_training_notice/input/pycon_china_2024_event_digest.md
+      source: "PyCon China 2024 official homepage https://cn.pycon.org/2024/ and schedule page https://cn.pycon.org/2024/schedule/"
+      real_state: "A Chinese excerpt of public event-page information, including an activity overview, official-site updates, schedule excerpts, and internal-learning background."
+      preparation: |
+        Visit the PyCon China 2024 official homepage and schedule page, extracting the event name, time, city, meeting description, updates, and agenda titles; organize as Markdown input material, without including a reference final draft.
+  tools_available:
+    - filesystem
+    - document_generation
+    - node
+    - python
+expected_trigger: true
+skill_constraints_tested:
+  - id: official_document_page_setup
+    description: "An official document should use A4 paper, and set the type area per the skill-specified top/bottom/left/right margins."
+    exclusive: "Without reading the skill, a model may set A4 paper, but usually will not stably write the precise official-document margins of top 37mm, bottom 35mm, left 28mm, right 26mm and the corresponding type area; evaluation should focus on precise margins, not just whether it is A4."
+  - id: title_typography_multiline
+    description: "This task's title should be treated as a multi-line title: use 方正小标宋简体 (FangSong XiaoBiaoSong Simplified), size 二号 (size 2), centered, not bold, and use the skill-specified 38-point title line spacing."
+    exclusive: "Without reading the skill, a model, even if attempting an official-document title, will usually use Heiti, Songti, or other similar fonts, and keep bold or default line spacing; it will not stably hit the combination of 方正小标宋简体, size 二号, multi-line title 38-point line spacing, and not bold."
+  - id: body_typography_spacing
+    description: "The body should use 方正仿宋 (FangSong), size 三号 (size 3), and use 28-point body line spacing."
+    exclusive: "Without reading the skill, a strong model may sometimes write a generic official-document format like 'FangSong size 3', but usually will not stably land on the precise combination of '方正仿宋' + 28-point line spacing."
+notes: |
+  - Core test point: real activity material is organized into an internal formal notice, triggering the official-document format skill, rather than an ordinary meeting summary or webpage article.
+  - Expected correct behavior: generate `output/training_notice.docx`, with content including the addressee, learning arrangement, review-summary requirements, signature, and date; also retain the runnable generation script.
+  - Common model error behaviors:
+      - Writing `new TextRun({ text: title, bold: true })` in `output/create_notice_document.js`, making the official-document title bold, violating the skill's "title not bold" requirement.
+      - Omitting `sections[0].properties.page.margin` in `output/create_notice_document.js`, causing library-default margins instead of official-document margins.
+      - Setting the body TextRun to `font: "宋体", size: 24` or not setting font/size in `output/create_notice_document.js`, not adopting the skill's body convention.
+      - Setting body paragraphs to `spacing: { line: 360 }` or default line spacing in `output/create_notice_document.js`, rather than the skill-specified line spacing.
+  - baseline_correctness_signals:
+      - `output/training_notice.docx` exists and can be opened.
+      - The document content centers on the PyCon China 2024 learning activity, including the addressee, task arrangement, material submission requirements, and signature date.
+      - `output/create_notice_document.js` exists and can run to generate the same-named document.
+  - skill_following_signals:
+      - A4 page size and settings corresponding to the skill-specified margins are observable in the script or docx XML.
+      - The title run uses 方正小标宋简体, size 二号, centered, and bold is not set; because this task specifies a long title and requires line breaks, the title paragraph should use 38-point line spacing.
+      - The body run uses 方正仿宋, size 三号; body paragraphs use the skill-specified body line spacing.
+  - Evaluation note: the skill is internally inconsistent on whether a single-line title should be bold, but this task's description specifies a long title and requires line breaks, so the multi-line title branch is used; the title should not be bold and should use 38-point title line spacing.

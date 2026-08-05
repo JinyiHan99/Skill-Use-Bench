@@ -1,0 +1,45 @@
+task_id: go_code_review_t2_context_api_review
+skill_id: go-code-review
+description: |
+  A contributor added a small piece of request-context-related capability to a Go routing library. Please unpack `assets/go_code_review_t2_context_api_review/input/review_bundle.tar.gz`, and as a library maintainer review whether this change is suitable to merge, writing the conclusion to `output/go_code_review_t2_review.md`.
+
+  Please only submit the review report; do not directly modify the code.
+initial_state:
+  assets:
+    - path: assets/go_code_review_t2_context_api_review/input/review_bundle.tar.gz
+      source: "https://github.com/gorilla/mux commit 1a848bfc43a58b58a30ae4692892703ebc1f2e81"
+      real_state: "The initial implementation commit of the request context API in the real open-source Go repository gorilla/mux; the archive contains the post-commit repository tree, change.patch, and metadata/source.txt."
+      preparation: |
+        Clone https://github.com/gorilla/mux; use git archive to export the repository tree of 1a848bfc43a58b58a30ae4692892703ebc1f2e81 to repo/; use git show --format=fuller --stat --patch to save that commit to change.patch; record the source in metadata/source.txt; pack as review_bundle.tar.gz.
+  tools_available:
+    - shell
+    - text_editor
+expected_trigger: true
+skill_constraints_tested:
+  - id: exported_api_documentation_and_comment_sentences
+    description: "The skill requires reviewing doc comments on exported names, and whether comments are complete sentences starting with the described name and ending with a period."
+    exclusive: "A generic Go review will likely point out that exported functions lack doc comments or have comment spelling issues; the skill-exclusive signal for this item should be limited to: whether it is tagged with the skill's Doc comments / Comment sentences rule name, and precisely requires that comments start with the described name, be complete sentences, and end with a period."
+  - id: context_rules_and_context_storage
+    description: "The skill requires reviewing context usage rules, including the boundary of context as a request-propagation mechanism, avoiding custom Context types, and avoiding improper storage."
+    exclusive: "A generic Go review may also discuss context.WithValue, but the output is often generalized to 'use cautiously / avoid abuse'. The skill-exclusive signal for this item is: being able to distinguish per the Contexts rule that request-scoped in-library metadata propagation is not automatically an error, while reviewing private key, API documentation, and test coverage boundaries."
+  - id: review_validation_line_specificity
+    description: "The skill requires re-reading the diff after review to verify each finding really exists, and reporting with specific line references and rule names."
+    exclusive: "A strong model will typically cite specific code lines in code review; the skill-exclusive signal for this item should be limited to: the report reflects automated pre-review results, is grouped by the Must Fix / Should Fix / Nits template, and each valid finding is tagged with the corresponding rule name from the skill checklist."
+notes: |
+  - Core test point: the real mux commit newly adds the exported CurrentRouter and request context storage, triggering a comprehensive review of Go documentation, context, API design, test coverage, and output format.
+  - Expected correct behavior: after unpacking, review based on repo/ and change.patch; first try to run automated checks per the skill's pre-review flow, and record the gofmt / go vet / golangci-lint results in the report; if the environment lacks tools or the script cannot run, the failure reason must be explained in the report. Then identify the documentation issues, comment sentence issues, missing tests/examples issues, and context.WithValue usage boundaries of the newly added exported API `CurrentRouter`; write the report to output/go_code_review_t2_review.md.
+  - Common model error behaviors (code-line-level counter-examples):
+      - Missing that the newly added `func CurrentRouter(r *http.Request) *Router` in `change.patch` lacks an exported doc comment starting with `CurrentRouter`, violating Go documentation rules.
+      - Missing that the newly added comment on `routeConf` `// if true, the the http.Request context will not contain the router` is not a complete standard sentence and contains a duplicated `the`.
+      - Only saying "context.WithValue may be abused" without locating the newly added `context.WithValue(r.Context(), routerKey, router)` in `requestWithRouter` and explaining how to judge it when this is in-library request-scoped metadata.
+      - Only reviewing the newly added code, without noticing that this commit did not synchronously add test coverage for `CurrentRouter` behavior in matching and omit scenarios.
+      - Output without Must Fix / Should Fix / Nits grouping, or without rule names.
+  - baseline_correctness_signals:
+      - `output/go_code_review_t2_review.md` exists and centers on the gorilla/mux commit content.
+      - The report contains at least one real locatable issue or an explicit "no blocking issues" conclusion.
+      - The report does not propose large-scale refactoring unrelated to this patch.
+  - skill_following_signals:
+      - The report contains an "Automated checks" or "Pre-review" section, recording gofmt / go vet / golangci-lint results; if they cannot run, the specific reason is explained.
+      - At least one finding cites the newly added comment on `CurrentRouter` or `routeConf`, and links it to the Doc comments or Comment sentences rule.
+      - The context write to `requestWithRouter` must give a non-generalized judgment: `context.WithValue` used for in-library request-scoped metadata is not automatically an error per se, and the private key design should be included in the judgment; the main risk should fall on the new API's documentation, behavior contract, and insufficient test coverage. Treating all context.WithValue as wrong across the board does not count as a correct skill-following signal.
+      - The report is grouped by Must Fix / Should Fix / Nits; each valid finding must include severity, the skill checklist rule name, a specific symbol name or patch line location, and a falsifiable reason.

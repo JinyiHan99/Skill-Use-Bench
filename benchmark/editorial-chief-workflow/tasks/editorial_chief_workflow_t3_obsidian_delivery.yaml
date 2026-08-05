@@ -1,0 +1,45 @@
+task_id: editorial_chief_workflow_t3_obsidian_delivery
+skill_id: editorial-chief-workflow
+description: |
+  I want to turn `assets/editorial_chief_workflow_t3_obsidian_delivery/input/source_notes_combined.md` into a long WeChat public-account article for founders and operations leads, on the topic of "when to use tool calling and when to use semantic search". Please, as editor-in-chief, push it to a review-ready state, and place it into this Obsidian vault: `assets/editorial_chief_workflow_t3_obsidian_delivery/input/obsidian_vault`. I am only reviewing first; I have not yet decided to publish.
+initial_state:
+  assets:
+    - path: assets/editorial_chief_workflow_t3_obsidian_delivery/input/source_notes_combined.md
+      source: "https://raw.githubusercontent.com/openai/openai-cookbook/main/examples/How_to_call_functions_with_chat_models.ipynb and https://raw.githubusercontent.com/openai/openai-cookbook/main/examples/Semantic_text_search_using_embeddings.ipynb"
+      real_state: "Consists of factual excerpts from two real OpenAI Cookbook notebooks, on the topics of function/tool calling and semantic text search using embeddings."
+      preparation: |
+        On 2026-07-02 used WebFetch to obtain the two public GitHub raw notebooks' content, extracting facts and merging them into editor-usable material; no final draft or reference implementation was added.
+    - path: assets/editorial_chief_workflow_t3_obsidian_delivery/input/obsidian_vault/.obsidian/app.json
+      source: "local Obsidian-compatible vault fixture created for benchmark runtime path validation"
+      real_state: "An empty Obsidian vault skeleton with a .obsidian config directory; app.json sets the default new-file folder to `待发布` (Pending Publish) for placing review-ready files."
+      preparation: |
+        Created an Obsidian vault skeleton and app.json in the task asset directory, so the model can place the review-ready file into a real accessible vault path at runtime.
+  tools_available:
+    - filesystem
+    - multi_agent_orchestration
+    - file_editing
+expected_trigger: true
+skill_constraints_tested:
+  - id: obsidian_review_ready_before_publish
+    description: "The skill requires that when Obsidian is mentioned, the real vault config is parsed first; the review-ready file is placed in the `待发布/` (Pending Publish) subfolder based on `.obsidian/app.json`'s default new-file folder; and publishing is only allowed after explicit approval."
+    exclusive: "A model without the skill, even if it follows the user path, will usually write directly to the vault root or a generic output location, and will not proactively read `.obsidian/app.json` and place files under `待发布/`; it is also more likely to conflate review delivery with the publish boundary."
+  - id: proof_layout_after_visual_final
+    description: "The skill requires the final order to be: finalize, create/embed actual visual assets, perform proof/layout QA on the visual-final version, then deliver the Obsidian review file."
+    exclusive: "A generic model often ends after writing body text, or only gives image suggestions/prompts, and does not include actual visual embedding in the final QA order."
+  - id: preserve_fixed_business_goal_audience_channel
+    description: "The skill requires continuously locking business goal, audience, channel, and success criteria during assignment, rewriting, and acceptance; if an intermediate artifact deviates from the business-judgment topic of tool calling vs semantic search, the editor-in-chief must reject and request redo."
+    exclusive: "A model without the skill may directly accept rewritten results, only doing ordinary content polish; it will not explicitly check against fixed business goal, audience, channel, and success criteria in each round of assignment/acceptance, nor will it reject and reassign when content drifts into generic AI popularization or growth articles."
+notes: |
+  - Core test point: this is a positive Obsidian-delivery and publish-order example, requiring editor-in-chief coordination, real vault-path delivery, and review-without-publish.
+  - Expected correct behavior: parse and use `assets/editorial_chief_workflow_t3_obsidian_delivery/input/obsidian_vault` as the Obsidian vault; read `.obsidian/app.json` and place the review-ready markdown into `待发布/` per the default new-file folder; if visual assets are generated/created, embed them via relative links; finally state that it awaits user review and must not claim publishing is complete.
+  - Common model error behaviors: writing the file as `output/final.md` instead of `assets/editorial_chief_workflow_t3_obsidian_delivery/input/obsidian_vault/待发布/...`; or conflating "tool calling" and "semantic search" as "letting the AI look things up" in the body text; or writing "published to the public account" at the end.
+  - baseline_correctness_signals:
+      - A reviewable markdown file exists in the Obsidian vault, and its content is non-empty.
+      - The article targets founders/operations leads and centers on the business judgment of when to use tool calling vs semantic search.
+      - Preserves the fact boundaries from the input material: the API does not itself execute external functions; semantic search is based on embedding similarity.
+  - skill_following_signals:
+      - There is behavior reading or parsing `obsidian_vault/.obsidian/app.json`, and based on it the review markdown is placed in the vault's `待发布/` subfolder, rather than the vault root or a generic output directory.
+      - The final proof/layout QA target should be the Obsidian review version after visual-asset embedding is complete; if real visual assets cannot be generated or embedded, the model should explicitly state this block and must not claim complete review delivery is done.
+      - Before formal assignment, rewriting, or acceptance, there is explicit behavior locking business goal, audience, channel, and completion criteria; fixed English labels are not required, but the four meanings should be recognizable.
+      - Does not publish without explicit user approval.
+  - This task does not require dependence on an external image-generation API; if the model cannot create real embeddable visual assets within the available tools, it should explicitly state the visual-asset block and must not claim that visual-final QA is complete.

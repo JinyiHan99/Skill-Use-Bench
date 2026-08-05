@@ -1,0 +1,139 @@
+task_id: SF04_t2_fix_docstring_format
+level: L2
+skill_id: skill_04_pytorch_docstring
+description: |
+  An intern on our team added docstrings to several activation functions, but the documentation preview shows quite a few formatting issues.
+  Please help me fix these docstrings in src/nn/functional/activation.py so that they conform to the project's existing
+  API documentation style.
+
+initial_state:
+  files:
+    - path: src/nn/functional/activation.py
+      content: |
+        import torch
+        from torch import Tensor
+        from typing import Optional
+
+
+        def gelu(input: Tensor, approximate: str = "none") -> Tensor:
+            """Applies the Gaussian Error Linear Unit function.
+
+            The GELU activation is defined as:
+
+            GELU(x) = x * Φ(x)
+
+            where Φ(x) is the cumulative distribution function of the standard
+            normal distribution.
+
+            When approximate='tanh':
+                GELU(x) ≈ 0.5 * x * (1 + tanh(√(2/π) * (x + 0.044715 * x³)))
+
+            See torch.nn.GELU for more details.
+
+            Arguments:
+                input: the input tensor
+                approximate: the approximation method. Can be 'none' or 'tanh'.
+                    Default: 'none'
+
+            Returns:
+                Tensor: the output tensor with same shape as input
+
+            Example:
+                import torch
+                import torch.nn.functional as F
+                x = torch.tensor([-1.0, 0.0, 1.0])
+                F.gelu(x)
+            """
+            if approximate == "tanh":
+                return torch.nn.functional.gelu(input, approximate="tanh")
+            return torch.nn.functional.gelu(input)
+
+
+        def silu(input: Tensor, inplace: bool = False) -> Tensor:
+            """Sigmoid Linear Unit activation function (also known as Swish).
+
+            silu(x) = x * sigmoid(x) = x * (1 / (1 + exp(-x)))
+
+            Parameters:
+                input (Tensor): input tensor of shape (N, *)
+                inplace (bool): if True, do the operation in-place. Default: False
+
+            Returns:
+                the activated tensor
+
+            Example:
+                >>> import torch
+                >>> x = torch.zeros(3)
+                >>> torch.nn.functional.silu(x)
+                tensor([0., 0., 0.])
+            """
+            if inplace:
+                return input.mul_(torch.sigmoid(input))
+            return input * torch.sigmoid(input)
+
+
+        def mish(input: Tensor, inplace: bool = False) -> Tensor:
+            """Applies the Mish activation function element-wise.
+
+            Mish is a smooth, non-monotonic function:
+            mish(x) = x * tanh(softplus(x)) = x * tanh(ln(1 + exp(x)))
+
+            Args:
+                input: input tensor
+                inplace: if True, perform in-place. Default is False
+
+            Returns:
+                Tensor with same shape as input
+
+            Examples:
+                >>> import torch
+                >>> x = torch.ones(5)
+                >>> torch.nn.functional.mish(x)
+            """
+            if inplace:
+                return input.mul_(torch.tanh(torch.nn.functional.softplus(input)))
+            return input * torch.tanh(torch.nn.functional.softplus(input))
+
+  tools_available: [bash, read, edit, grep]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: raw_string_prefix
+    description: "All docstrings must use r\"\"\" prefix for LaTeX compatibility, even if a function has only simple prose today"
+    exclusive: "Model only adds the r prefix to docstrings whose new content contains LaTeX backslashes (e.g. gelu, mish), and leaves silu's docstring as plain \"\"\" because its formula has no backslash content"
+  - id: math_directive_formulas
+    description: "Mathematical formulas must use reST math directives instead of plain text equations"
+    exclusive: "Model leaves readable equations such as 'GELU(x) = x * Φ(x)' as plain text"
+  - id: args_not_arguments
+    description: "The parameter section header must be Args:, not Arguments: or Parameters:"
+    exclusive: "Model normalizes to common Google/NumPy headers rather than the project-specific one"
+  - id: args_type_in_parens
+    description: "Each argument entry keeps docstring types in parentheses even when Python annotations exist"
+    exclusive: "Model assumes signature annotations make repeated docstring types unnecessary"
+  - id: examples_double_colon
+    description: "Examples must use the exact Examples:: reST/doctest header"
+    exclusive: "Model uses singular Example: or a single-colon Examples: heading"
+  - id: examples_use_randn
+    description: "Examples should create input tensors with torch.randn rather than degenerate zeros/ones"
+    exclusive: "Model preserves or writes torch.zeros/torch.ones examples because they are deterministic"
+  - id: examples_include_imports
+    description: "Examples must include required imports instead of relying on surrounding context"
+    exclusive: "Model assumes torch or F is already available in documentation examples"
+  - id: default_value_format
+    description: "Default values use double backticks around the literal value, e.g. Default: ``'none'`` or Default: ``False``"
+    exclusive: "Model writes defaults as plain prose such as Default: 'none' or Default is False"
+  - id: cross_reference_sphinx
+    description: "References to documented PyTorch symbols must use Sphinx roles"
+    exclusive: "Model leaves 'See torch.nn.GELU for more details' as plain prose, or at most wraps it in single backticks as `torch.nn.GELU`, instead of writing See :class:`~torch.nn.GELU` for more details"
+  - id: shape_math_directive
+    description: "Tensor shapes in parameter or returns descriptions must use the :math: inline directive with \\text{}, e.g. :math:`(\\text{N}, *)`, not plain (N, *)"
+    exclusive: "Model leaves silu's input shape (N, *) as plain parenthesized text"
+  - id: returns_type_prefix
+    description: "Returns entries must start with the type prefix, e.g. 'Tensor: ...', not bare prose"
+    exclusive: "Model keeps Returns as prose like 'the activated tensor'"
+
+notes: |
+  Design intent: a positive-example task. The input file already contains docstrings of multiple mixed styles, and the user only says the documentation preview has formatting issues; the model needs to identify the project style based on the skill, rather than only doing syntax cleanup.
+
+  Asset verification: activation.py in the YAML is consistent with the current disk file in assets/SF04_t2_fix_format/; the assets do not record real provenance, and authenticity still requires manual supplementary verification.

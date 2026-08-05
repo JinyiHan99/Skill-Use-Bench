@@ -1,0 +1,160 @@
+rubric_id: skill_54_k8s_security_t1_harden_nginx
+objective: Evaluate whether the model follows the k8s-security-policies skill, rather than counting ordinary task completion toward the SF score.
+rules:
+  - id: g1_observable_manifest_write
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable write action attempting to generate the nginx production manifest.
+      The gate only checks whether there is an evaluable artifact; it does not judge whether the security configuration is correct.
+    signal:
+      pattern: >-
+        (?s)\b(Write|Edit)\b.*(?:.*/)?output/nginx-production\.yaml\b
+
+  - id: r1_restricted_namespace_labels
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The production Namespace must simultaneously set pod-security.kubernetes.io/enforce, audit, and warn, all to restricted.
+      Skill-exclusive rationale: Without reading the skill, a strong model facing "production review / strict security admission" usually adds a Namespace or only the enforce label; the skill requires all three Pod Security Admission labels to be present and all restricted. The conflict point is "partial / ordinary namespace" vs "complete restricted admission label set."
+    signal:
+      file: output/nginx-production.yaml
+      file_must_contain: >-
+        (?s)kind:\s*Namespace\b(?=(?:(?!---)[\s\S])*?metadata:)(?=(?:(?!---)[\s\S])*?labels:)(?=(?:(?!---)[\s\S])*?pod-security\.kubernetes\.io/enforce:\s*restricted)(?=(?:(?!---)[\s\S])*?pod-security\.kubernetes\.io/audit:\s*restricted)(?=(?:(?!---)[\s\S])*?pod-security\.kubernetes\.io/warn:\s*restricted)
+    review:
+      proposed_by: [drafter]
+      challenged_by: [reviewer_A, reviewer_B]
+      consensus: high
+
+  - id: r2_pod_runtime_restricted_context
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The Deployment pod template's pod-level securityContext must explicitly set runAsNonRoot: true, non-zero runAsUser/runAsGroup/fsGroup, and use seccompProfile.type: RuntimeDefault.
+      Skill-exclusive rationale: Without reading the skill, the model may only add runAsUser or only runAsNonRoot; the skill explicitly forbids omitting runAsNonRoot and requires RuntimeDefault seccomp as the restricted baseline. The conflict point is "a few securityContext fields" vs "complete pod-level restricted runtime context."
+    signal:
+      file: output/nginx-production.yaml
+      file_must_contain: >-
+        (?s)kind:\s*Deployment\b(?:(?!---)[\s\S])*?template:\s*\n(?:(?!---)[\s\S])*?spec:\s*\n(?:(?!---)[\s\S])*?securityContext:(?=(?:(?!\n\s*containers:)(?!---)[\s\S])*?runAsNonRoot:\s*true)(?=(?:(?!\n\s*containers:)(?!---)[\s\S])*?runAsUser:\s*[1-9][0-9]*)(?=(?:(?!\n\s*containers:)(?!---)[\s\S])*?runAsGroup:\s*[1-9][0-9]*)(?=(?:(?!\n\s*containers:)(?!---)[\s\S])*?fsGroup:\s*[1-9][0-9]*)(?=(?:(?!\n\s*containers:)(?!---)[\s\S])*?seccompProfile:\s*(?:\{\s*type:\s*RuntimeDefault\s*\}|\n\s*type:\s*RuntimeDefault))
+    review:
+      proposed_by: [drafter]
+      challenged_by: [reviewer_A, reviewer_B]
+      consensus: high
+
+  - id: r3_container_hardening_and_resources
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The nginx container must forbid privilege escalation, drop ALL capabilities, enable readOnlyRootFilesystem, and declare CPU/memory requests and limits.
+      Skill-exclusive rationale: Without reading the skill, the model often only adds resources or partial securityContext; the skill requires every container to fully apply drop ALL, allowPrivilegeEscalation:false, readOnlyRootFilesystem:true, and resource requests/limits. The conflict point is "partial hardening" vs "complete restricted hardening per container."
+    signal:
+      file: output/nginx-production.yaml
+      file_must_contain: >-
+        (?s)kind:\s*Deployment\b(?:(?!---)[\s\S])*?-\s*name:\s*nginx\b(?=(?:(?!\n\s*-\s*name:)(?!---)[\s\S])*?allowPrivilegeEscalation:\s*false)(?=(?:(?!\n\s*-\s*name:)(?!---)[\s\S])*?capabilities:\s*(?:\{\s*drop:\s*\[\s*["']?ALL["']?\s*\]\s*\}|\n\s*drop:\s*(?:\[\s*["']?ALL["']?\s*\]|\n\s*-\s*["']?ALL["']?)))(?=(?:(?!\n\s*-\s*name:)(?!---)[\s\S])*?readOnlyRootFilesystem:\s*true)(?=(?:(?!\n\s*-\s*name:)(?!---)[\s\S])*?requests:(?:(?!\n\s*-\s*name:)(?!---)[\s\S])*?cpu:)(?=(?:(?!\n\s*-\s*name:)(?!---)[\s\S])*?requests:(?:(?!\n\s*-\s*name:)(?!---)[\s\S])*?memory:)(?=(?:(?!\n\s*-\s*name:)(?!---)[\s\S])*?limits:(?:(?!\n\s*-\s*name:)(?!---)[\s\S])*?cpu:)(?=(?:(?!\n\s*-\s*name:)(?!---)[\s\S])*?limits:(?:(?!\n\s*-\s*name:)(?!---)[\s\S])*?memory:)
+      file_must_not_contain: >-
+        (?s)privileged:\s*["']?true["']?|allowPrivilegeEscalation:\s*["']?true["']?|readOnlyRootFilesystem:\s*["']?false["']?|add:\s*(?:\[[^\]]*["']?(?:ALL|SYS_ADMIN)["']?[^\]]*\]|\n\s*-\s*["']?(?:ALL|SYS_ADMIN)["']?)
+    review:
+      proposed_by: [drafter]
+      challenged_by: [reviewer_A, reviewer_B]
+      consensus: high
+
+  - id: r4_readonly_root_has_nginx_writable_emptydirs
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] When readOnlyRootFilesystem is true, explicit emptyDir volumeMounts must be configured for the paths nginx actually needs to write to.
+      Skill-exclusive rationale: Without reading the skill, a strong model that knows about the read-only root filesystem still often forgets that nginx needs writable paths such as /var/cache/nginx, /var/run, or /tmp, making the manifest non-runnable; the skill requires identifying the specific write paths and mounting emptyDir only for those paths. The conflict point is "mechanically enabling read-only root" vs "read-only root + precise writable emptyDir."
+    signal:
+      query: |
+        Based only on the final contents of output/nginx-production.yaml, not on the agent's self-description or planning text:
+        When readOnlyRootFilesystem: true is set for the nginx container, does the manifest configure explicit emptyDir volumes and corresponding nginx volumeMounts for the writable runtime/cache paths nginx actually needs, such as /var/cache/nginx, /var/run, and/or /tmp?
+        Answer YES only if each nginx volumeMount used for these writable paths references an actually defined volume whose volume source is emptyDir.
+        Answer NO if writable path mounts are missing, irrelevant, or refer to volumes that are not defined as emptyDir.
+      acceptable: |
+        The nginx container mounts /var/cache/nginx and /var/run using names that also appear under spec.volumes with emptyDir sources.
+      unacceptable: |
+        The nginx container has readOnlyRootFilesystem: true but no volumeMounts for nginx writable paths, or mounts /var/cache/nginx using a volume name that is not defined as emptyDir.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_default_deny_network_policy_both_directions
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The Namespace must have a default-deny NetworkPolicy, and policyTypes must cover both Ingress and Egress.
+      Skill-exclusive rationale: Without reading the skill, "zero-trust network model" may only prompt the model to write ingress restrictions or some allow policy; the skill explicitly requires a default-deny first, denying both ingress and egress by default. The conflict point is "partial network restrictions" vs "default deny-both baseline."
+    signal:
+      query: |
+        Based only on the final contents of output/nginx-production.yaml, does the manifest include a true default-deny NetworkPolicy for the namespace?
+        Answer YES only if a NetworkPolicy has an empty podSelector, policyTypes including both Ingress and Egress, and no allow-style ingress or egress rule body such as ingress: [{}], egress: [{}], or unrestricted peers/ports.
+        Answer NO if the policy is name-only, only denies one direction, or includes allow-all rule bodies.
+      acceptable: |
+        A NetworkPolicy with podSelector: {}, policyTypes containing Ingress and Egress, and absent/empty ingress and egress rule lists.
+      unacceptable: |
+        A NetworkPolicy named default-deny but with ingress: [{}], egress: [{}], or only policyTypes: [Ingress].
+    review:
+      proposed_by: [drafter]
+      challenged_by: [reviewer_A]
+      consensus: medium
+
+  - id: r6_dedicated_sa_rbac_least_privilege
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The workload must use a dedicated ServiceAccount, the ServiceAccount must disable token auto-mounting, and it must be paired with a Role and RoleBinding, with no * verbs/resources granted.
+      Skill-exclusive rationale: Without reading the skill, the model often keeps the default ServiceAccount or creates an SA but does not write a RoleBinding; the skill requires every production workload to have explicit RBAC following least privilege. The conflict point is "default identity / broad permissions or no binding" vs "dedicated SA + token disabled + non-wildcard RBAC."
+    signal:
+      query: |
+        Based only on the final contents of output/nginx-production.yaml, does the Deployment use a dedicated non-default ServiceAccount, and is that same ServiceAccount linked through a coherent RoleBinding to a Role with least-privilege, non-wildcard permissions?
+        Answer YES only if the ServiceAccount has automountServiceAccountToken: false, Deployment.spec.template.spec.serviceAccountName references it, RoleBinding.subjects references the same ServiceAccount, RoleBinding.roleRef references the defined Role, and the Role has no wildcard (*) verbs or resources.
+        Answer NO if any link is missing, the default ServiceAccount is used, token automount is not false, or verbs/resources contain *.
+      acceptable: |
+        Deployment serviceAccountName: nginx-sa; ServiceAccount nginx-sa automountServiceAccountToken: false; RoleBinding subject name: nginx-sa and roleRef name: nginx-role; Role nginx-role has exact verbs/resources only.
+      unacceptable: |
+        The Deployment omits serviceAccountName, uses default, has a RoleBinding to a different ServiceAccount, or a Role with verbs: ["*"] or resources: ["*"].
+    review:
+      proposed_by: [drafter]
+      challenged_by: [reviewer_A, reviewer_B]
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The task requires generating a complete nginx production manifest, containing at least the original nginx workload and the companion resources for production review.
+    signal:
+      file: output/nginx-production.yaml
+      file_must_contain: >-
+        (?s)^(?=[\s\S]*kind:\s*Deployment\b)(?=[\s\S]*name:\s*nginx)(?=[\s\S]*kind:\s*Namespace\b)(?=[\s\S]*kind:\s*NetworkPolicy\b)(?=[\s\S]*kind:\s*ServiceAccount\b)(?=[\s\S]*kind:\s*Role\b)(?=[\s\S]*kind:\s*RoleBinding\b)

@@ -1,0 +1,112 @@
+rules:
+  - id: g1_observable_resource_revision_attempt
+    type: required-tool
+    provenance: gate
+    locus: trace
+    verifier: regex
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The trace must show an observable attempt to write or edit one of the requested Promise output files. This only gates evaluability and does not affect skill-following score.
+    signal:
+      pattern: '(("tool_name"\s*:\s*"(Write|Edit)"|tool:?\s*(Write|Edit))[^}]{0,1200}file_path"?\s*:\s*"[^"]*output/promises(_resource_notes)?\.(mdx|md)"|file_path"?\s*:\s*"[^"]*output/promises(_resource_notes)?\.(mdx|md)"[^}]{0,1200}("tool_name"\s*:\s*"(Write|Edit)"|tool:?\s*(Write|Edit)))'
+
+  - id: r1_audit_note_uses_skill_audit_dimensions
+    type: order
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    severity: hard
+    weight: 1.0
+    spec: |
+      [SKILL] The editor note should document resource keep/remove/update/replace decisions using the skill's audit dimensions: link accessibility, content accuracy/freshness, outdated patterns, description quality, and section-level gaps.
+      Skill-exclusive rationale: without reading the skill, strong models will write a brief keep/remove/update/replace note per the task; the skill requires driving decisions using these specific audit dimensions. Default behavior X = only list changes, skill requires Y = explain by dimensions such as link health/freshness/outdated/description/gap, conflict point Z = whether it reflects a resource-audit methodology rather than an ordinary edit log.
+    signal:
+      query: >
+        In output/promises_resource_notes.md, do the actual written notes justify resource keep/remove/update/replace decisions using multiple skill audit dimensions, with at least two of link accessibility, freshness/publication date, outdated syntax/patterns, description specificity, and section/resource-count gaps? Judge only the final file contents actually written, not the agent's self-description. Answer YES if the notes connect decisions to these audit dimensions; answer NO if they only list changed titles or give generic reasons.
+      acceptable: "Kept MDN Promise because it is the authoritative reference; trimmed method-level MDN cards because the Reference section exceeded the 2-4 target; rewrote one-line blurbs because they lacked specific value; replaced stale Promise.try coverage with a current source."
+      unacceptable: "Kept some links, removed old links, updated descriptions, added videos."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_resource_mix_matches_skill_targets
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    exclusive: true
+    severity: hard
+    weight: 1.0
+    spec: |
+      [SKILL] The refreshed resource shelf should follow the skill's target mix: 2-4 Reference/official cards, 4-6 Articles, and 3-4 Videos, instead of preserving an archive-like shelf.
+      Skill-exclusive rationale: without reading the skill, strong models may keep all six existing MDN/method reference cards or append more Promise.try/withResolvers links because the task mentions newer APIs; the skill requires controlling section counts by explicit target ranges. Default behavior X = the more the better, skill requires Y = control by 2-4/4-6/3-4, conflict point Z = whether to proactively trim an over-long Reference and preserve the learning path.
+    signal:
+      file: "output/promises.mdx"
+      file_must_contain:
+        - '(?is)## Reference\b(?=(?:(?:(?!## Articles\b).)*?<Card\b){2})(?!(?:(?:(?!## Articles\b).)*?<Card\b){5})'
+        - '(?is)## Articles\b(?=(?:(?:(?!## Videos\b).)*?<Card\b){4})(?!(?:(?:(?!## Videos\b).)*?<Card\b){7})'
+        - '(?is)## Videos\b(?=(?:(?:(?!## (?:Courses|Books|Related|Next|$)).)*?<Card\b){3})(?!(?:(?:(?!## (?:Courses|Books|Related|Next|$)).)*?<Card\b){5})'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_resource_descriptions_follow_two_sentence_value_formula
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    severity: hard
+    weight: 0.75
+    spec: |
+      [SKILL] Almost all external resource card descriptions should be specific and valuable, allowing at most one exception: normally two sentences where sentence 1 states what is unique or specifically covered and sentence 2 states why the reader should click or who benefits.
+      Skill-exclusive rationale: without reading the skill, strong models often keep or write one-line blurbs like "Complete reference for the Promise object"; the skill requires a two-sentence value proposition. Default behavior X = brief summary of the title, skill requires Y = coverage + click value, conflict point Z = whether descriptions serve resource selection rather than placeholders.
+    signal:
+      query: >
+        In output/promises.mdx, do the external resource Card descriptions in the Reference, Articles, and Videos sections almost all follow the two-sentence value formula, allowing at most one exception? Judge only the final file contents actually written. Answer YES if all but at most one resource card has two meaningful sentences where one sentence covers specific content/unique angle and the other gives reader value, use case, or target audience; answer NO if two or more cards remain one sentence or use generic phrases such as "complete reference", "great tutorial", or "comprehensive guide" without specific value.
+      acceptable: "Official MDN documentation covering Promise states, static methods, and browser compatibility. Use it when you need exact API behavior or links into method-level details."
+      unacceptable: "Complete reference for the Promise object and all its methods"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_resources_ordered_as_guided_learning_path
+    type: order
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    severity: soft
+    weight: 0.5
+    spec: |
+      [SKILL — supporting signal] Within resource sections, order foundational/beginner-friendly and official/highly recommended resources before advanced, niche, or supplemental resources. This is a weak-exclusive supporting signal because the task also hints at a guided path.
+      Skill-exclusive rationale: without reading the skill, strong models may preserve the original archive order or group by original placement only; the skill requires organizing resources into a guided path. Default behavior X = keep existing order, skill requires Y = official/foundational first and advanced later, conflict point Z = whether ordering reflects a learning path.
+    signal:
+      query: >
+        In output/promises.mdx, are resource cards within the final Reference, Articles, and Videos sections ordered as a guided learning path, with official/foundational/beginner-friendly resources before advanced, niche, or supplemental ones? Judge only the final file contents actually written. Answer YES if the ordering clearly starts with MDN/javascript.info/beginner or high-value overview resources and moves toward deeper or specialized resources; answer NO if ordering appears unchanged, random, or places niche/advanced resources before foundations.
+      acceptable: "MDN/Using Promises before method-specific references; JavaScript.info basics before Nolan Lawson deep-dive; short beginner video before internals-heavy talk."
+      unacceptable: "Advanced niche Promise pitfalls first, beginner MDN/javascript.info resources last, with no apparent learning progression."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The requested revised Promise page and editor note exist and contain the core requested content.
+    signal:
+      query: >
+        Based only on final file contents actually written, do output/promises.mdx and output/promises_resource_notes.md both exist, with output/promises.mdx preserving the substantive Promise concept-page body, containing actual resource Card entries under Reference, Articles, and Videos sections, and output/promises_resource_notes.md being non-empty with substantive keep/remove/update/replace resource decisions and reasons? Answer YES or NO.
+      acceptable: "Both files exist; the MDX keeps the Promise explanation and has ## Reference/## Articles/## Videos Card sections with real cards; the note includes keep/remove/update/replace decisions with reasons."
+      unacceptable: "Only promises.mdx exists, the concept body was replaced by a resource-only shell, resource sections have no Cards, or the notes file is empty/generic."

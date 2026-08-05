@@ -1,0 +1,129 @@
+rules:
+  - id: g1_observable_input_review
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable real tool-call attempt that reads the t2 payment example input code; this is only a soft gate and does not judge report quality."
+    signal:
+      pattern: >-
+        (?is)^(?:Read|Bash)\b[\s\S]{0,2000}?assets/app_store_review_t2_digital_payments/input
+
+  - id: r1_stripe_not_storekit_for_digital_content
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK-DIAGNOSTIC — not counted toward SF] The report can diagnose that if the Stripe PaymentSheet/Checkout flow is used for digital-content purchases in an iPhone app, it cannot replace StoreKit / In-App Purchase; Apple Pay configuration also does not equal IAP, unless there is an explicit Apple rule exception or entitlement.
+      Downgrade/merge rationale: with the skill masked, "iPhone paid-content purchase" in the task description is enough to trigger IAP/StoreKit common sense; distinguishing Apple Pay from IAP is a misjudgment defense line of the same payment-compliance semantics, so it is merged into this baseline diagnostic and not counted toward the SF main score.
+    signal:
+      query: >
+        Looking only at the actual report text in the final answer, does it explicitly state that if Stripe PaymentSheet/Checkout in `PaymentsUICompleteScreen.tsx` is used for iOS digital-content purchases, it cannot replace StoreKit/In-App Purchase, and that Apple Pay configuration also does not satisfy the digital-content IAP requirement, and only an Apple entitlement/rule exception allows external payment? Answer YES only if it includes the StoreKit/IAP requirement and does not treat Apple Pay/Stripe as sufficient for digital goods. Answer NO if it only reviews Stripe integration quality, or says Apple Pay/Stripe is acceptable without IAP caveat.
+      acceptable: "`PaymentsUICompleteScreen.tsx:156-224` initializes Stripe PaymentSheet and `:347-357` opens checkout; for paid digital content on iPhone this must use StoreKit/IAP unless a specific App Store entitlement or exception applies, and `applePay` in PaymentSheet is not equivalent to IAP."
+      unacceptable: "Stripe PaymentSheet supports Apple Pay, so the purchase flow is ready for iOS digital content."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_C"]
+      consensus: low
+
+  - id: r3_crypto_onramp_financial_compliance_branch
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] The report must classify the Crypto Onramp entry in `HomeScreen.tsx` under the App Store Business/Legal cryptocurrencies / financial compliance high-risk review branch, rather than as a normal Stripe example navigation or generic financial risk.
+      Skill-exclusive rationale: without reading the skill, a strong model may only treat Crypto Onramp as an example menu or generic financial risk; the skill's risk table explicitly lists cryptocurrencies as a high-risk business model requiring dedicated verification, and the conflict point is "normal example entry" vs "App Store cryptocurrency/financial compliance high-risk feature".
+    signal:
+      query: >
+        Looking only at the actual report text in the final answer, does it explicitly point out that the Crypto Onramp/crypto link user entry in `HomeScreen.tsx` belongs to the App Store review context's Business/Legal cryptocurrencies or financial compliance high-risk review branch? Answer YES if it names crypto/onramp and frames it as App Store Business/Legal financial/cryptocurrency compliance risk. Answer NO if it only says crypto has generic regulatory risk, omits crypto, or treats it only as a generic Stripe navigation/demo feature.
+      acceptable: "`HomeScreen.tsx:586-613` exposes Crypto Onramp and crypto user registration; App Store Business/Legal review treats cryptocurrency/financial services as high-risk and requires separate compliance review."
+      unacceptable: "The HomeScreen contains many sample navigation buttons, including crypto."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_crypto_requires_region_license_entitlement_check
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] For Crypto Onramp, the report must propose concrete pre-submission action recommendations: at least covering one of the regional availability or license/qualification dimensions, and one of the Apple rule boundary, entitlement, or exception-basis dimensions.
+      Skill-exclusive rationale: without reading the skill, a model may only give a generic reminder like "watch out for financial regulations"; the skill requires concrete App Store pre-listing compliance verification for cryptocurrency business models, and the conflict point is "generic regulatory reminder" vs "dedicated verification of region/license + Apple rule boundary/entitlement/exception".
+    signal:
+      query: >
+        Looking only at the actual report text in the final answer, does it propose concrete pre-submission action recommendations for Crypto Onramp, covering at least one of regional availability or license/qualification, and one of Apple rule boundary, entitlement, or exception basis? Answer YES if the crypto recommendation is concrete in those two dimensions. Answer NO if it only gives a vague "check regulations" statement or lacks either dimension.
+      acceptable: "Before submission, verify Crypto Onramp availability by region or required money-transmission/crypto licenses, and verify whether Apple permits the flow or requires an entitlement/exception."
+      unacceptable: "Crypto may have regulatory concerns; check compliance."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_test_payment_configuration_submission_risk
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK-DIAGNOSTIC — not counted toward SF] The report can diagnose that test configurations in the payment example (e.g., `pk_test_...`, `googlePay.testEnv: true`) should not enter the production/App Store submission version, and should be explicitly attributed as an App Store completeness/review risk, rather than a generic configuration cleanup.
+      Downgrade rationale: "test key/testEnv should not enter production submission" is general release-preparation common sense and can likely be inferred even with the skill masked; it is only kept as a baseline diagnostic.
+    signal:
+      query: >
+        Looking only at the actual report text in the final answer, does it point out that test payment configurations such as `pk_test_...` or `googlePay.testEnv: true` should not enter the production/App Store submission version, and explicitly attributes this as an App Store completeness/review risk or pre-submission review completeness risk? Answer YES if it frames test config as App Store completeness/review risk. Answer NO if it merely says to clean config, says publishable keys are harmless, or does not require production configuration before submission.
+      acceptable: "`HomeScreen.tsx:583` uses a `pk_test` key and `PaymentsUICompleteScreen.tsx:163-166` sets Google Pay testEnv; replace with production App Store-ready payment configuration because test settings create an App Store completeness/review risk."
+      unacceptable: "The publishable key is safe to expose, so no issue."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_C"]
+      consensus: low
+
+  - id: r6_console_log_app_store_risk
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] The report must classify `console.log` in production code as an App Store submission/production completeness review risk, rather than a generic code-quality or debugging-cleanup suggestion.
+      Skill-exclusive rationale: without reading the skill, a strong model may only treat console.log as a normal release cleanup; the skill's Medium-Risk patterns explicitly list production `console.log`, and the conflict point is "normal code hygiene" vs "App Store submission/production completeness review risk".
+    signal:
+      query: >
+        Looking only at the actual report text in the final answer, does it explicitly classify production `console.log` in the payment example as an App Store submission, production completeness, or review risk, rather than only as a generic code-quality/debugging-cleanup suggestion? Answer YES if it connects console.log to App Store submission or production completeness review. Answer NO if it only says remove console logs for cleanliness/debugging, or omits console.log.
+      acceptable: "`console.log` statements should be removed or guarded before App Store submission because production logging is a Medium-Risk App Review/completeness issue."
+      unacceptable: "Clean up console.log statements for code quality."
+    review:
+      proposed_by: ["reviewer_B", "reviewer_C"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: "[TASK — not counted toward SF] Does the final answer provide a pre-submission review risk report for the t2 payment example, covering both `PaymentsUICompleteScreen.tsx` and `HomeScreen.tsx`, with at least two concrete listing risk judgments and actual file/code locations?"
+    signal:
+      query: >
+        Looking only at the final answer, does it provide a pre-submission review risk report for the multi-file payment example under `assets/app_store_review_t2_digital_payments/input/`, reviewing both `PaymentsUICompleteScreen.tsx` and `HomeScreen.tsx`, and containing at least two concrete listing risk judgments with corresponding actual file/code locations? Answer YES if all these task-output elements are present; otherwise Answer NO.
+      acceptable: "References both the payment flow at PaymentsUICompleteScreen.tsx:156-224 and the Crypto Onramp at HomeScreen.tsx:586-613, and gives at least two listing risk judgments."
+      unacceptable: "Only reviews one file, or only generic code-style suggestions without file locations or listing risks."

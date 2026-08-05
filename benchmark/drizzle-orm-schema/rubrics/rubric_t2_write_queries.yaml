@@ -1,0 +1,140 @@
+task_id: SF10_t2_write_queries
+skill_id: skill_10_drizzle_orm
+rules:
+  - id: g1_query_file_created
+    type: required-tool
+    provenance: gate
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an actual Write/Edit tool call creating or editing a TypeScript query code file;
+      the task allows the model to choose a reasonable output path; do not judge by a hard-coded path string.
+    signal:
+      judge_question: |
+        Based only on actual Write/Edit tool calls and their target paths, did the agent create or edit
+        a reasonable TypeScript file containing the requested database query implementations?
+        Accept any reasonable project query/module path. Answer YES for real file writes/edits.
+        Answer NO for prompt text, prose, Read calls, or path strings that were not written/edited.
+
+  - id: r1_no_relational_api
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The final query code must not use the `db.query.*` relational API.
+      Skill-exclusive rationale: Drizzle official/common writing naturally uses db.query.* with relations;
+      the skill explicitly forbids it and requires the builder API.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified query code, not prompts, comments, prose, or skill text.
+        Does the final query implementation avoid every use of `db.query.` relational API?
+        Answer YES if no final query code contains `db.query.`. Answer NO if any final query code uses it.
+
+  - id: r2_builder_api_select
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: false
+    weight: 0.5
+    spec: |
+      [SKILL] Queries should use the `db.select()` builder API; this is the positive pairing requirement of r1.
+      Only inspect the actual final code; avoid false positives from plan text in the trace.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified query code. Are the requested database reads implemented
+        using Drizzle builder API calls starting from `db.select(...)` rather than another API style?
+        Answer YES if the actual query implementations use db.select(). Answer NO if db.select() is absent
+        from the final implementation or appears only in prose/comments.
+
+  - id: r3_one_to_many_two_queries
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When fetching one-to-many data for agent + knowledge bases, must use two independent queries then assemble;
+      cannot use a single JOIN or relational `with` to fetch in one go.
+      Skill-exclusive rationale: models by default tend toward single JOIN or relational API; the skill requires splitting into two queries.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified query code. For the function that returns one agent with
+        its associated knowledge bases, does the final implementation use two independent queries and
+        assemble their results into one return value?
+        Helper-function splits are acceptable if the final behavior is still: one query for the agent,
+        a separate query for knowledge bases/junction rows, then assembly.
+        Answer YES if the implementation uses two separate queries and assembles the result.
+        Answer NO if it uses one joined query, db.query.agents.findFirst({ with: ... }), or does not implement this query.
+
+  - id: r4_explicit_select_fields
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0.5
+    spec: |
+      [SKILL] `db.select()` should explicitly list return fields; inline projection object or named projection object is acceptable;
+      bare `.select()`, `.select({ agent: agents })`, or `getTableColumns()` selecting an entire table is not accepted.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified query code. For the implemented db.select() reads, are
+        returned fields explicitly projected as individual columns, either inline or through a named
+        projection object?
+        Accept `.select({ id: agents.id, name: agents.name })` or an equivalent named object.
+        Reject bare `.select()`, `.select({ agent: agents })`, and `getTableColumns(...)`.
+        Answer YES if the relevant selects use explicit individual field projections. Answer NO otherwise.
+
+  - id: r5_type_safe_aggregation
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The query that "aggregates agent count by user and filters > 3" must use a type-safe builder API:
+      drizzle-orm `count()` helper, `.groupBy()`, and `gt/gte/...` comparison operators composed with `.having()`;
+      raw SQL count/having is forbidden. This rule merges the effective semantics of the former r6/r7.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified query code for the aggregation query that groups agents by user
+        and filters users with more than 3 agents. Does it use a type-safe Drizzle builder pattern with:
+        1. `count(...)` helper in the selected projection,
+        2. `.groupBy(...)`, and
+        3. `.having(...)` using a type-safe comparison operator such as `gt(count(...), 3)` or equivalent,
+        without raw SQL templates for count or having?
+        Answer YES only if all conditions are satisfied. Answer NO if the aggregation is missing or uses raw SQL.
+
+  - id: b1_no_raw_sql_queries
+    type: boundary
+    provenance: generic
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [DIAGNOSTIC — not counted toward skill-following] The final query code should not use raw SQL template `sql\`...\``.
+      The raw SQL aggregation-related skill signal is already scored by r5; this rule is only a boundary record.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified query code, not prose or prompts. Does the final query code
+        avoid raw SQL template literals using `sql\`...\``? Answer YES if no raw SQL template is present.
+        Answer NO if any final query implementation uses `sql\`...\``.
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] All three query tasks should be fully implemented; not dependent on a hard-coded output path.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified query code. Are all three requested query functions/operations
+        implemented: a paginated/list agents query, a single agent with knowledge bases query, and an aggregation
+        query that groups users by agent count and filters above 3?
+        Answer YES only if all three are present and substantively implemented. Answer NO otherwise.

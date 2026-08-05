@@ -1,0 +1,34 @@
+task_id: swiftui_performance_audit_t1_feed_jank
+skill_id: swiftui-performance-audit
+description: |
+  We are building a horizontally scrolling feed prototype, and on real devices, quick left-right swiping occasionally drops frames. The code is in `assets/swiftui_performance_audit_t1_feed_jank/input/ContentView.swift`. Help me find the root cause of the scrolling jank in this code, and provide a fix plan; if evidence is insufficient to pinpoint the cause, explain why and tell me what additional performance diagnostic information is needed.
+initial_state:
+  assets:
+    - path: assets/swiftui_performance_audit_t1_feed_jank/input/ContentView.swift
+      source: "https://raw.githubusercontent.com/twostraws/HackingWithSwift/main/SwiftUI/project18/LayoutAndGeometry/ContentView.swift"
+      real_state: "Real SwiftUI tutorial project file; contains multiple commented-out layout experiments. The current active implementation is a ForEach of text cards in a horizontal ScrollView, with 3D rotation applied based on scroll position in a visualEffect closure."
+      preparation: |
+        Downloaded the original Swift file directly from the public repository without modifying content.
+  tools_available:
+    - Read
+    - Grep
+    - Bash
+expected_trigger: true
+skill_constraints_tested:
+  - id: code_first_then_profile_when_inconclusive
+    description: "The skill requires doing a code-first review from available code first; when code review cannot fully explain runtime jank, it should request SwiftUI timeline/Time Profiler and other runtime evidence for the same interaction, rather than directly asserting the root cause."
+    exclusive: "Without reading the skill, the model may first characterize the visualEffect/rotation3DEffect or scroll geometry reading in the active code as the jank root cause, then casually suggest profiling; rather than downgrading these judgments to code-level suspicion and, when evidence is insufficient, requesting SwiftUI timeline, Time Profiler, device/system/build configuration, and reproduction steps for the same interaction to distinguish suspicion from trace-backed evidence."
+  - id: active_code_not_commented_smells
+    description: "The skill requires evidence-based identification of likely causes; the early GeometryReader-per-row example in this asset is commented code, and the current active code should be distinguished from the commented examples."
+    exclusive: "Without reading the skill, the model may scan the commented GeometryReader and frame(in:) and treat them as the current root cause."
+notes: |
+  - Core test point: this is a positive example, but not one that asks the model to unconditionally fix code; it should trigger the SwiftUI performance audit workflow and request profiling evidence when the current code evidence is insufficient.
+  - Expected correct behavior: reference the current active implementation at `assets/swiftui_performance_audit_t1_feed_jank/input/ContentView.swift:174` to `:194`, explain that using scroll position to drive 3D transforms in `visualEffect` may need real-device testing, but the file itself is insufficient to prove the jank cause; should suggest the user provide real device, Release/Debug, reproduction steps, and corresponding timeline/Time Profiler evidence.
+  - Common model error behavior: treating the commented-out GeometryReader example at `assets/swiftui_performance_audit_t1_feed_jank/input/ContentView.swift:137` to `:147`, or the commented-out horizontal ScrollView + GeometryReader old implementation at `:154` to `:172`, as currently running code, directly concluding that per-item GeometryReader / layout thrash causes jank.
+  - baseline_correctness_signals:
+      - The answer mentions having reviewed the given SwiftUI source code, and provides actionable next steps around the horizontal scrolling jank.
+      - The answer includes at least one source code location reference, and the referenced line actually exists.
+  - skill_following_signals:
+      - Clearly distinguishes code-level suspicion from trace-backed evidence; cannot first assert that visualEffect/rotation3DEffect is the root cause and then add a suggestion to profile.
+      - When code review is insufficient to determine the root cause, requests SwiftUI timeline and Time Profiler evidence for the same interaction, and explains the need for device model, iOS version, Debug/Release build configuration, and reproduction steps.
+      - Does not treat the GeometryReader example in commented code as the current root cause.

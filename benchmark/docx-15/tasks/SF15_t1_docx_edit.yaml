@@ -1,0 +1,42 @@
+task_id: SF15_t1_docx_edit
+level: L2
+skill_id: skill_15_docx
+description: |
+  Our legal team sent a consulting agreement assets/SF15_t1_docx_edit/consulting_agreement.docx that needs review edits. Specific edits:
+  1. Change "Effective Date" from "April 1, 2024" to "July 1, 2024"
+  2. Change "Term" from "12 months" to "24 months"
+  3. In the Compensation clause, change the hourly rate from "$150" to "$175"
+  4. Change the confidentiality period from "2 years" to "5 years"
+  5. Change the termination notice period from "30 days" to "60 days"
+  6. Add a new clause "Non-Solicitation": "Consultant shall not solicit any employees of Client for a period of 12 months following termination."
+
+  This is a legal document; revision marks must be preserved for legal review. Output file is consulting_agreement_reviewed.docx.
+initial_state:
+  assets:
+    - path: consulting_agreement.docx
+      source: "./assets/SF15_t1_docx_edit/"
+      description: "Standard consulting agreement with sections: Parties, Effective Date, Term, Scope, Compensation, Confidentiality, IP, Termination, Governing Law"
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+skill_constraints_tested:
+  - id: must_read_entire_reference
+    description: "Must fully load the docx skill's primary reference document end-to-end before editing, without truncation or sampling."
+    exclusive: "Model reads reference with offset/limit or skips it entirely"
+  - id: must_use_redlining_workflow
+    description: "For legal documents, must use redlining workflow with tracked changes"
+    exclusive: "Model does direct text replacement without tracked changes"
+  - id: minimal_precise_edits
+    description: "Redline only the substrings that actually change; surrounding unchanged content within the same paragraph must remain structurally intact (not re-emitted as new content)."
+    exclusive: "Model replaces entire paragraphs as one deletion+insertion"
+  - id: no_markdown_line_numbers
+    description: "DO NOT use markdown line numbers to locate XML positions"
+    exclusive: "Model uses line numbers obtained from a markdown/pandoc rendering to address positions inside document.xml"
+  - id: batch_strategy
+    description: "Apply changes in grouped batches with verification between batches, rather than all-at-once or strictly one-by-one."
+    exclusive: "Model applies all changes one by one or all at once"
+  - id: tracked_change_attributes
+    description: "Inserted/deleted runs must carry the standard revision attributes required by Word to recognize them as tracked changes."
+    exclusive: "Model emits insertion/deletion markup without the required revision attributes, so Word does not display them as tracked changes."
+notes: |
+  Tests redlining/tracked changes workflow in DOCX.
+  Source: SkillLearnBench docx skill + offer-letter-generator task adapted

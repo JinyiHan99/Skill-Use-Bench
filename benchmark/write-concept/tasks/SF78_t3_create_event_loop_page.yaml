@@ -1,0 +1,68 @@
+task_id: SF78_t3_create_event_loop_page
+level: L3
+skill_id: skill_78_write_javascript_concept_documentation
+description: |
+  Our concept section is still missing a page about the event loop. Reference material is in `assets/SF78_t3_create_event_loop_page/input/mdn_execution_model.md` and `assets/SF78_t3_create_event_loop_page/input/javascript_info_event_loop.md`.
+
+  Please write a page in our concept section's standard concept page style, publishable for beginners, saved as `output/event-loop.mdx`. This page needs to thoroughly explain "why asynchronous code appears to execute one step later", but should not be written as a spec summary only for experienced developers.
+
+initial_state:
+  assets:
+    - path: assets/SF78_t3_create_event_loop_page/input/mdn_execution_model.md
+      source: "https://github.com/mdn/content/blob/main/files/en-us/web/javascript/reference/execution_model/index.md"
+      real_state: "MDN Web Docs JavaScript execution model reference, downloaded as Markdown source."
+      preparation: |
+        Downloaded with: curl -L https://raw.githubusercontent.com/mdn/content/main/files/en-us/web/javascript/reference/execution_model/index.md
+        Saved without content edits.
+    - path: assets/SF78_t3_create_event_loop_page/input/javascript_info_event_loop.md
+      source: "https://github.com/javascript-tutorial/en.javascript.info/blob/master/2-ui/99-ui-misc/03-event-loop/article.md"
+      real_state: "javascript.info event loop chapter, downloaded as Markdown source."
+      preparation: |
+        Downloaded with: curl -L https://raw.githubusercontent.com/javascript-tutorial/en.javascript.info/master/2-ui/99-ui-misc/03-event-loop/article.md
+        Saved without content edits.
+  tools_available: [read, write, edit, grep, bash]
+
+expected_trigger: true
+
+expected_outputs:
+  - path: output/event-loop.mdx
+    kind: mdx_concept_page
+    description: "A publication-ready event loop concept page for the JavaScript concepts project."
+
+skill_constraints_tested:
+  - id: question_driven_beginner_sections
+    description: "The page must organize major sections around natural questions a beginner would ask, and each question-led section must answer the question directly before expanding into details."
+    exclusive: "Without the skill, a model may write a conventional tutorial with topic-based headings or long conceptual buildup instead of question-driven sections that answer beginner questions directly."
+  - id: beginner_prerequisite_links
+    description: "The page must not assume prior knowledge: it should introduce or link prerequisite ideas such as the call stack, callbacks, and Promises before relying on them in the event loop explanation."
+    exclusive: "Without the skill, a model may assume readers already know callbacks, Promises, or the call stack, or define them briefly without linking prerequisite concepts."
+  - id: objective_anti_ai_language_and_em_dash_limits
+    description: "The page must avoid the skill's listed AI-sounding phrases, including 'Master', 'dramatically', 'one of the most important concepts', 'essential points', 'To truly understand', 'This is crucial', 'It''s worth noting that', 'It''s important to remember', 'In order to', and similar listed phrases. It must also avoid em-dash overuse outside allowed structured contexts."
+    exclusive: "Without the skill, a model writing about the event loop is likely to use common AI-style emphasis phrases such as 'To truly understand', 'This is crucial', or repeated em-dash asides."
+
+notes: |
+  Core test point: L3 creating a complex concept page. The event loop has multiple queues and execution orders, making it easy to write as an advanced spec explanation; the skill requires beginner-oriented, question-driven, natural and restrained tone.
+
+  Expected correct behavior:
+  - Generate `output/event-loop.mdx`.
+  - Organize main sections with beginner-oriented questions, and directly answer the question at the start of each question-style section.
+  - Include examples of `setTimeout(..., 0)`, Promise microtask, call stack order, etc., and show output order in comments.
+  - Before relying on concepts like call stack, callbacks, and Promises, first explain or link these prerequisite concepts.
+  - The Common Mistakes section explains why Promise callbacks usually run before timer callbacks, and corrects common mental model misconceptions.
+
+  Common model error behaviors:
+  - Around `output/event-loop.mdx:20`, first write three paragraphs of historical background, and only define the event loop in the third paragraph, without directly answering the beginner's question.
+  - Assume readers already understand call stack, callbacks, and Promises, and directly discuss queues and async behavior.
+  - Ignore the microtask queue, causing example output to place `setTimeout` before Promise callbacks.
+  - Repeatedly use banned phrases like `This is crucial`, `one of the most important concepts`, `fundamentally`, `dramatically` in the body text.
+
+  baseline_correctness_signals:
+    - `output/event-loop.mdx` exists and is about the JavaScript event loop.
+    - The document correctly explains the relationship among call stack, task queue, microtask queue, timers, and Promises.
+    - Example output order places Promise microtasks before timer callbacks where appropriate.
+  skill_following_signals:
+    - H2/H3 sections are question-driven and answer beginner questions directly.
+    - The page explains event loop behavior for readers who may be new to JavaScript.
+    - Prerequisite ideas such as call stack, callbacks, and Promises are introduced or linked before being assumed.
+    - The tone is conversational, encouraging, practical, and concise.
+    - The output avoids the skill's banned AI-sounding phrases and avoids em-dash overuse.

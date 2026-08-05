@@ -1,0 +1,32 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/copilot/plugin/v2.2/schema.json",
+  "schema_version": "v2.2",
+  "name_for_human": "GitHub Issue Triage",
+  "namespace": "githubIssueTriage",
+  "description_for_human": "Review repository issues for release triage.",
+  "description_for_model": "Use this plugin to inspect GitHub issues and pull requests for release triage conversations.",
+  "functions": [
+    {
+      "name": "ListRepositoryIssues",
+      "description": "Returns GitHub repository issues and pull requests with labels, author, state, and links.",
+      "capabilities": {
+        "response_semantics": {
+          "data_path": "$.items",
+          "properties": {
+            "title": "$.title",
+            "subtitle": "$.state",
+            "url": "$.html_url"
+          }
+        }
+      }
+    }
+  ],
+  "runtimes": [
+    {
+      "type": "OpenApi",
+      "auth": { "type": "None" },
+      "spec": { "url": "./openapi.yaml" },
+      "run_for_functions": ["ListRepositoryIssues"]
+    }
+  ]
+}

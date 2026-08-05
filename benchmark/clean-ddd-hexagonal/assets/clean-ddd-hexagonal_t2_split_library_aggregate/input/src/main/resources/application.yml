@@ -1,0 +1,28 @@
+server:
+    servlet:
+        context-path: /dddsample
+
+logging:
+    level:
+        jdbc: debug
+        'se.citerus.dddsample': debug
+
+uploadDirectory: /tmp/upload
+parseFailureDirectory: /tmp/failed
+
+brokerUrl: "vm://localhost?broker.persistent=false&broker.useJmx=false"
+
+spring:
+    dataSource:
+        url: jdbc:hsqldb:mem:dddsample
+        username: sa
+        password: ""
+
+jdbc:
+    datasource-proxy:
+        enabled: true
+        query:
+            logger-name: jdbc
+            enable-logging: true
+        multiline: false
+        include-parameter-values: true

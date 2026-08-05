@@ -1,0 +1,155 @@
+rules:
+  - id: g1_observable_write_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable write attempt to the target deliverable output/public_post_polished.md."
+    signal:
+      pattern: >-
+        (?ms)^(?:Write|Edit)\s*:\s*\{.{0,5000}?["'](?:file_path|path)["']\s*:\s*["'][^"'\n]*output/public_post_polished\.md["']
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r1_human_voice_with_rhythm_break
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The polished body must pull back from neutral explanation to a "real person talking" state, with a genuine author voice and at least one short standalone sentence or obvious rhythm break, rather than continuing in a manual or project-introduction tone.
+      Skill-exclusive rationale: Without reading the skill, strong models do conventional colloquial polishing but may not proactively add rhythm breaks, deliberately break rigor, or introduce moderate imperfection; the skill explicitly requires "soul injection" and "deliberate breaking within discourse." The conflict point is that ordinary smooth polishing avoids these unpolished human-voice traces.
+    signal:
+      file: "output/public_post_polished.md"
+      query: >
+        Only check the polished body actually written to output/public_post_polished.md, ignoring the quality report, edit statistics, final reply, and agent self-description. Does the body simultaneously have a genuine author's conversational tone and at least one short standalone sentence or obvious rhythm break? Answer only YES or NO.
+        Answer YES if the body has a natural human voice and a short standalone sentence or paragraph that creates rhythm.
+        Answer NO if it remains a polished neutral explainer, a list-style project description, or merely adds words like "其实/我觉得" (actually/I think) while all paragraphs remain uniformly smooth.
+      acceptable: "我有时候也会被这种文字骗过去。\n\n但读两行，就露馅了。"
+      unacceptable: "Uses colloquial words like '其实' (actually) and '我觉得' (I think), but all paragraphs are uniformly smooth, still reading like a smooth explainer."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2a_cleanup_banned_punctuation_in_body
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.4
+    spec: |
+      [SKILL] The polished body must clean up the colons, em dashes, and Chinese/English double quotes explicitly banned by the skill's L1.
+      Skill-exclusive rationale: Without reading the skill, public account polishing may retain colons, quotes, and em dashes because they are acceptable in ordinary Chinese; the skill lists them as L1 hard scan items requiring zero hits in the body.
+    signal:
+      file: "output/public_post_polished.md"
+      file_must_not_contain: >-
+        (?s)##\s*润色后全文(?:(?!\n##\s*质检报告).)*(?:：|:|——|—|["“”])
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2b_cleanup_banned_structures_in_body
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.35
+    spec: |
+      [SKILL] The polished body must clean up negation-style parallelism and consecutive lists of three or more items.
+      Skill-exclusive rationale: Without reading the skill, public account polishing may retain lists like "有观点、变化节奏、承认复杂性……" (have viewpoints, vary rhythm, acknowledge complexity...) and patterns like "不只是……更是……" (not just... but even more...); the skill treats these structures as AI flavor that needs to be broken up.
+    signal:
+      file: "output/public_post_polished.md"
+      query: >
+        Only check the polished body actually written to output/public_post_polished.md, ignoring the quality report, edit statistics, URLs, final reply, and agent self-description. Does the body contain no negation-style parallelism and no consecutive lists of three or more items using enumeration commas, regular commas, or bullets? Any residual means answer NO. Answer only YES or NO.
+        Answer YES if structures such as "不只是……更是……" (not just... but even more...), "不单单是……也是……" (not merely... but also...), "不是……而是……" (not... but...), and three-or-more-item lists are absent from the body.
+        Answer NO if any banned structure remains, including a retained "有观点、变化节奏、承认复杂性、适当使用……" sequence.
+      acceptable: "好的文字先得有态度。节奏也不能一路平。偶尔承认自己没想明白，反而像人。"
+      unacceptable: "这不只是工具问题，更是内容创作的问题。好的写作要有观点、变化节奏、承认复杂性、适当使用我。"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3a_has_l1_l4_report
+    type: termination
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] The deliverable file should include a humanizer quality inspection report covering L1, L2, L3, and L4.
+      Skill-exclusive rationale: Without reading the skill, ordinary polishing typically does not generate a four-layer quality inspection report; the skill uses L1-L4 self-check as a closing format. The conflict point is that the deliverable must have not only the body but also a verifiable quality check.
+    signal:
+      file: "output/public_post_polished.md"
+      file_must_contain:
+        - "质检报告"
+        - "\\bL1\\b"
+        - "\\bL2\\b"
+        - "\\bL3\\b"
+        - "\\bL4\\b"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3b_report_consistent_with_body
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The L1-L4 quality inspection report's conclusions on banned punctuation, structures, colloquialism/rhythm, content quality, and human-likeness must be verifiable against the actual body, not just empty pass items.
+      Skill-exclusive rationale: The skill requires "do another pass before ending each round" and four-layer self-check; default polishing does not require the report to correspond item by item to the body. The conflict point is that the self-check report must reflect the real body rather than formalistic checkmarks.
+    signal:
+      file: "output/public_post_polished.md"
+      query: >
+        Based on the polished body and quality inspection report actually written to output/public_post_polished.md, ignoring agent plan self-description, are the report's conclusions on banned punctuation/structure fixes, rhythm/colloquialism, content quality, and human-likeness consistent with the body and supported by concrete evidence? Answer only YES or NO.
+        Answer YES if the report's L1-L4 claims are supported by the body.
+        Answer NO if the report is empty boilerplate, only says "L1 pass, L2 pass, L3 pass, L4 pass" without concrete counts/items/evidence, or claims banned punctuation was fixed while the body still contains it.
+      acceptable: "The quality inspection report lists L1 banned punctuation zero hits, L2 rhythm pass, L3 content on track, L4 more human-like, and the body actually supports these judgments."
+      unacceptable: "Only writes L1 pass, L2 pass, L3 pass, L4 pass, with no concrete hit counts, fix items, or body evidence."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_no_outline_or_elevated_ending
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] The polished body should remove project-manual-style list skeletons and formulaic elevated endings, rather than retaining an overly structured outline feel.
+      Skill-exclusive rationale: Without reading the skill, strong models may preserve manual structure and list skeletons to ensure "preserving order"; the skill requires avoiding over-structuring and formulaic endings. The conflict point is that "structural fidelity" must not become "template feel retention."
+    signal:
+      file: "output/public_post_polished.md"
+      query: >
+        Only check the polished body actually written to output/public_post_polished.md, ignoring the quality report and agent self-description. Does the body retain no project-manual-style list skeleton and no formulaic elevated ending? Answer only YES or NO.
+        Answer YES if the prose flows like a post rather than an outline.
+        Answer NO if it keeps "本项目适用于：一、二、三" (this project applies to: one, two, three) style skeletons or ends with broad slogans about the future/significance of AI.
+      acceptable: "先聊 AI 写作的腔调，再带到 Humanizer-zh，最后落到人类声音怎么回来。"
+      unacceptable: "Retains '本项目适用于：一、二、三' or ends with '这将推动内容创作迈向新时代' (this will propel content creation into a new era)."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: low
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] output/public_post_polished.md exists and contains a complete rewritten Chinese public account post revolving around AI writing, human voice, and text naturalness."
+    signal:
+      file: "output/public_post_polished.md"
+      file_must_contain:
+        - "\\S"
+        - "AI|人工智能|写作|Humanizer|文字"
+        - "人类声音|自然|真人|人味"

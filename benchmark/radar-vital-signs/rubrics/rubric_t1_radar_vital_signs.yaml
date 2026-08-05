@@ -1,0 +1,210 @@
+task_id: SF40_t1_radar_vital_signs
+skill_id: skill_40_radar_vital_signs
+
+rules:
+
+  # ── GATE ──
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: llm-judge
+    weight: 0
+    signal:
+      query: >-
+        Based on actual tool calls in the trajectory, did the agent make an observable attempt
+        to read radar recording files (.bin/.json) and execute Python signal-processing code?
+        Answer YES if: trajectory contains Read/Bash tool calls that access recording files
+        AND Bash/Write tool calls that execute or write Python code performing signal processing.
+        Answer NO if: the agent only discusses plans or mentions Python/numpy/scipy in
+        conversation text without any actual tool-mediated file access or code execution.
+    spec: "[GATE] Trajectory contains observable tool-call evidence of reading radar recordings and executing Python signal-processing code"
+
+  # ── Skill-Following rules (scored) ──
+
+  - id: r1_phase_not_magnitude
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] Must use phase extraction (np.angle / np.arctan2 / equivalent) as the
+      core signal source for HR and BR estimation. Using np.abs(iq) as the primary signal for
+      frequency estimation violates this rule. np.abs() used solely for diagnostics/plotting
+      does not count as a violation.
+      Skill-exclusive rationale: facing complex I/Q signals, a model that has not read the skill will default to using np.abs(iq) for
+      FFT/PSD (magnitude is more intuitive). The skill notes that phase has ~40 dB more SNR than magnitude.
+    signal:
+      query: >-
+        Based on the Python code written (via Write/Edit) or executed (via Bash) in the trajectory,
+        does the agent use phase extraction (np.angle(), np.arctan2(), or equivalent manual phase
+        computation from I/Q components) as the PRIMARY signal input for the HR/BR estimation
+        pipeline (filtering → PSD → peak detection)?
+        IMPORTANT: Only examine the code path that actually produces the final HR/BR estimates.
+        Ignore code used solely for diagnostics, visualization, or abandoned attempts.
+        Answer YES if: phase extraction feeds into the filtering/PSD/peak-detection chain that
+        produces the final HR and BR values.
+        Answer NO if: np.abs(iq) or magnitude is the primary signal source for frequency estimation,
+        or no phase extraction is performed on the estimation path.
+      acceptable: "phase = np.unwrap(np.angle(iq)); ... welch(phase_filtered, ...)"
+      unacceptable: "signal = np.abs(iq); f, p = welch(signal, ...)"
+
+  - id: r2_clutter_before_angle
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] Static clutter removal (temporal mean subtraction on complex I/Q) must
+      be executed BEFORE extracting phase via np.angle(). That is, iq -= iq.mean() before np.angle(iq).
+      Skill-exclusive rationale: a model that has not read the skill defaults to taking the phase first then doing phase -= phase.mean(), or not doing
+      clutter removal. The skill requires subtracting the mean on the complex IQ, otherwise DC offset exhausts the ±π unwrap budget.
+    signal:
+      query: >-
+        Based on the Python code written or executed in the trajectory, on the code path that
+        produces the final HR/BR estimates, is the temporal mean of the complex I/Q signal
+        subtracted BEFORE calling np.angle() or np.arctan2()?
+        Equivalent one-liner forms (e.g., np.angle(iq - iq.mean())) and function-encapsulated
+        implementations are fully acceptable — the key requirement is that mean subtraction
+        operates on the complex I/Q domain logically prior to phase extraction.
+        Answer YES if: complex I/Q mean subtraction precedes phase extraction on the estimation path.
+        Answer NO if: mean subtraction is only applied to the phase signal after extraction
+        (e.g., phase -= phase.mean() without prior iq mean removal), or no clutter removal is done.
+      acceptable: "iq -= iq.mean(); phase = np.unwrap(np.angle(iq))  OR  np.angle(iq - iq.mean())"
+      unacceptable: "phase = np.unwrap(np.angle(iq)); phase -= phase.mean()  # only phase-domain removal"
+
+  - id: r3_decimate_before_bandpass
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] For 2 kHz sample-rate signals, must decimate/downsample to ~50-200 Hz
+      before applying the sub-Hz BR bandpass filter. Simple slice downsampling without anti-alias
+      filtering (e.g., x[::40]) does NOT count as proper decimation.
+      Skill-exclusive rationale: a model that has not read the skill will directly design a 0.08-0.5 Hz bandpass at 2 kHz,
+      but SciPy biquad will NaN at extremely low normalized cutoff frequencies.
+    signal:
+      query: >-
+        Based on the Python code written or executed in the trajectory, on the code path that
+        produces the final BR estimate, is the phase signal downsampled from 2 kHz to approximately
+        50-200 Hz BEFORE the sub-Hz bandpass filter is applied?
+        Acceptable methods: scipy.signal.decimate, resample, resample_poly, or explicit low-pass
+        filter followed by downsampling.
+        NOT acceptable: bare slice downsampling (e.g., phase[::40]) without any anti-aliasing filter.
+        Answer YES if: the signal is properly downsampled before BR bandpass filtering.
+        Answer NO if: the BR bandpass filter is applied directly at the original 2 kHz sampling rate,
+        or no downsampling occurs before filtering.
+      acceptable: "phase_ds = decimate(phase, q=40, ftype='iir', zero_phase=True); fs_new=50"
+      unacceptable: "b, a = butter(4, [0.08, 0.5], btype='band', fs=2000); filtfilt(b, a, phase)"
+
+  - id: r4_br_lower_edge_008
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] BR band lower edge must be ~0.08 Hz (tolerance 0.07-0.09 Hz), not the textbook 0.1 Hz.
+      Applies to bandpass filter cutoff, PSD search window lower bound, or equivalent frequency mask.
+      Skill-exclusive rationale: textbooks default to 0.1 Hz; the skill requires 0.08 Hz to cover slow-breathing populations.
+    signal:
+      query: >-
+        Based on the Python code written or executed in the trajectory, what is the low-frequency
+        cutoff/bound actually used for breathing rate (BR) estimation? This may appear as a bandpass
+        filter parameter (butter, firwin, etc.), a PSD frequency mask lower bound, or a peak-search
+        window lower limit.
+        Answer YES if: the effective BR low-frequency bound is approximately 0.08 Hz (range 0.07-0.09 Hz).
+        Answer NO if: the BR low-frequency bound is 0.1 Hz or higher, or no BR band is defined.
+      acceptable: "butter(4, [0.08, 0.5], ...) or PSD mask f >= 0.08"
+      unacceptable: "butter(4, [0.1, 0.5], ...) or PSD mask f >= 0.1"
+
+  - id: r5_hr_band_edges
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — auxiliary, weak exclusivity] HR frequency band must cover approximately [0.7, 3.0] Hz
+      (low 0.65-0.75, high 2.8-3.3), not textbook [0.8, 2.5] Hz. This dataset lacks boundary samples,
+      so this rule tests method-level compliance rather than outcome-driven necessity.
+      Skill-exclusive rationale: textbooks default to [0.8, 2.5] Hz; the skill requires [0.7, 3.0] Hz to cover bradycardia/tachycardia.
+      Discriminative power is weaker than r1/r2/r3/r6, because strong models may autonomously widen based on experience.
+    signal:
+      query: >-
+        Based on the Python code written or executed in the trajectory, what frequency band is
+        used for heart rate (HR) estimation (bandpass filter, PSD mask, or search window)?
+        Answer YES if: low cutoff is in 0.65-0.75 Hz AND high cutoff is in 2.8-3.3 Hz.
+        Answer NO if: low cutoff >= 0.8 Hz OR high cutoff <= 2.5 Hz, or textbook [0.8, 2.5] Hz is used.
+      acceptable: "butter(4, [0.7, 3.0], ...) or search window [0.7, 3.0]"
+      unacceptable: "butter(4, [0.8, 2.5], ...)"
+
+  - id: r6_hr_harmonic_rejection
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] Must implement HR sub-harmonic check: examine f_peak/2, and if its PSD
+      power exceeds ~50% of the peak power (tolerance 0.4-0.6), select f_peak/2 as the true heart rate.
+      Equivalent implementations (interpolation, nearest-bin, peak matching) are acceptable as long as
+      the check can conditionally replace the final HR estimate.
+      Skill-exclusive rationale: the standard practice is direct argmax; the skill notes that the heartbeat second harmonic is often stronger than the fundamental.
+    signal:
+      query: >-
+        Based on the Python code written or executed in the trajectory, on the code path that
+        produces the final HR estimate, did the agent implement a sub-harmonic check—specifically
+        evaluating whether PSD power at approximately f_peak/2 is significant (roughly > 50% of peak
+        power), and conditionally replacing the HR peak frequency with f_peak/2?
+        Equivalent implementations (np.interp, nearest bin lookup, candidate peak comparison) are
+        all acceptable. The key requirement is that the check can ACTUALLY MODIFY the final HR output.
+        Answer YES if: sub-harmonic check exists on the HR estimation path and can conditionally
+        update the final heart rate value.
+        Answer NO if: the agent simply takes argmax of PSD in the HR band with no harmonic check.
+      acceptable: "f_sub = f_peak/2; if p_sub > 0.5*p_top: f_peak = f_sub"
+      unacceptable: "hr_hz = freqs[np.argmax(psd)]  # no harmonic check"
+
+  - id: r7_welch_zero_pad
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] PSD estimation for final HR/BR peak detection must use zero-padding with
+      nfft >= 4×nperseg (skill recommends 8×nperseg). Applies to welch() nfft parameter or
+      equivalent manual FFT zero-padding.
+      Skill-exclusive rationale: default Welch uses nfft=nperseg; the skill requires large zero-padding to improve frequency resolution.
+    signal:
+      query: >-
+        Based on the Python code written or executed in the trajectory, does the PSD estimation
+        used for final HR/BR peak detection employ substantial zero-padding?
+        This includes: welch(..., nfft=N*nperseg) where N >= 4, or manual zero-padding of the
+        time-domain signal by >= 4x before FFT, or periodogram with equivalent padding.
+        Answer YES if: nfft >= 4×nperseg (or equivalent zero-padding >= 4x segment length).
+        Answer NO if: default nfft (= nperseg) is used, or nfft < 4×nperseg, or no zero-padding.
+      acceptable: "welch(x, nperseg=N, nfft=8*N) or np.fft.fft(np.pad(x, (0, 7*len(x))))"
+      unacceptable: "welch(x, nperseg=1024) with no nfft parameter"
+
+  # ── Task-completion record (not scored) ──
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    signal:
+      file: "results.csv"
+    spec: |
+      [TASK — not scored] Verify final file state:
+      YES if ALL of the following hold:
+        1. results.csv exists at the expected path
+        2. Header line is exactly: recording_id,heart_rate_bpm,breathing_rate_bpm
+        3. Exactly 15 data rows, covering rec_001 through rec_015 (no duplicates, no missing)
+        4. heart_rate_bpm and breathing_rate_bpm are finite positive numbers (not NaN, Inf, negative, or zero)
+        5. Values are formatted to one decimal place (e.g., 72.3)
+      NO otherwise.

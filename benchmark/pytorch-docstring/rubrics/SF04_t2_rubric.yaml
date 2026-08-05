@@ -1,0 +1,269 @@
+# Compact scoring rubric for skill_04_pytorch_docstring — SF04_t2_fix_docstring_format
+# Goal: evaluate whether the model applied PyTorch/reST docstring conventions to existing bad docs.
+
+version: 4
+task_id: SF04_t2_fix_docstring_format
+skill_id: skill_04_pytorch_docstring
+expected_trigger: true
+artifact_main: src/nn/functional/activation.py
+target_functions: [gelu, silu, mish]
+weight_scale: {high: 3, mid: 2, low: 1, zero: 0}
+scoring_policy:
+  trigger_gate: "If g1 fails, following checks are reported as null. Do not infer trigger from final docstring style."
+  adherence: "Weighted: max(0, Σw(MD passed) - Σw(MN violated)) / Σw(MD applicable)."
+  scope: "All MD/MN checks operate only on the docstrings of gelu, silu, and mish."
+  verifier_priority: "Use deterministic AST/section-scoped regex state checks. No llm-judge is required."
+
+rules:
+- id: g1_target_functions_evaluable
+  type: required-tool
+  provenance: gate
+  signal_dimension: trigger
+  verifier: state-check
+  exclusive: false
+  weight: 0
+  outcome_field: process
+  spec: |
+    [GATE] The exact target file exists, parses, and contains gelu, silu, and
+    mish with syntactic docstring attempts. Parse/semantic damage is separately
+    recorded by T1 and must not be hidden by an artifact-derived trigger gate.
+  signal:
+    file: src/nn/functional/activation.py
+    method: ast_python
+    checks:
+      - ast.parse succeeds
+      - locate FunctionDef gelu, silu, and mish
+      - each target function's first body node is a string literal
+    passed_condition: all checks pass
+
+- id: MD1_all_docstrings_raw_and_signature_first_line
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: high
+  outcome_field: must_do
+  spec: |
+    [SKILL] Each public function docstring must use a raw string literal and start
+    with a PyTorch signature line.
+    Skill-exclusive reason: the skill requires raw literals and signature-first
+    PyTorch API docs; a generic docstring fixer may only rewrite prose/sections.
+  signal:
+    file: src/nn/functional/activation.py
+    scope: function_docstrings:gelu,silu,mish
+    method: ast_source_and_regex
+    raw_literal_check: each target docstring opening literal starts with r/R triple quote
+    first_non_empty_line_patterns:
+      gelu: >-
+        ^gelu\(input,\s*approximate=(["'])none\1\)\s*->\s*Tensor\s*$
+      silu: >-
+        ^silu\(input,\s*inplace=False\)\s*->\s*Tensor\s*$
+      mish: >-
+        ^mish\(input,\s*inplace=False\)\s*->\s*Tensor\s*$
+    passed_condition: raw_literal_check is true for all targets and each first non-empty line matches its target pattern
+
+- id: MD2_section_order_preserved_all_functions
+  type: order
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: mid
+  outcome_field: must_do
+  spec: |
+    [SKILL] Present block-level sections in each target docstring must preserve
+    PyTorch order: signature/description, .. math::, Args:, Returns:, Examples::.
+    Cross-reference roles are not section-order markers.
+    Skill-exclusive reason: the skill defines this reST section sequence; generic
+    docstring fixes may leave or create different ordering.
+  signal:
+    file: src/nn/functional/activation.py
+    scope: function_docstrings:gelu,silu,mish
+    method: section_marker_offsets
+    section_markers:
+      - name: math
+        pattern: '(?m)^\s*\.\.\s+math::\s*$'
+      - name: args
+        pattern: '(?m)^\s*Args:\s*$'
+      - name: returns
+        pattern: '(?m)^\s*Returns:\s*$'
+      - name: examples
+        pattern: '(?m)^\s*Examples::\s*$'
+    ignored_markers:
+      - Sphinx inline roles such as :class:, :func:, :math:
+    passed_condition: for every target docstring, offsets of present section_markers are monotonically increasing
+
+- id: MD3_plain_formulas_converted_to_math_blocks
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: high
+  outcome_field: must_do
+  spec: |
+    [SKILL] The formula-bearing activation docstrings must represent formulas
+    with non-empty reST .. math:: blocks, and readable plain equations should not
+    remain outside math blocks.
+    Skill-exclusive reason: the skill requires Sphinx math directives for
+    mathematical formulations instead of plain ASCII/prose formulas.
+  signal:
+    file: src/nn/functional/activation.py
+    scope: function_docstrings:gelu,silu,mish
+    method: math_block_and_residual_regex
+    math_block_required_pattern: '(?ms)^\s*\.\.\s+math::\s*\n\s*\n?(\s+\S.*)$'
+    preprocessing:
+      - strip .. math:: blocks before residual formula checks
+      - strip Examples:: blocks before residual formula checks
+    forbidden_residual_equation_lines:
+      - '(?m)^\s*(GELU|SiLU|silu|Mish|mish)\s*\([^)]*\)\s*='
+      - '(?m)^\s*x\s*\*\s*(sigmoid|tanh)\b'
+    passed_condition: each target docstring has a non-empty math block and no forbidden_residual_equation_lines remain after preprocessing
+
+- id: MD4_args_defaults_returns_pytorch_style
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: high
+  outcome_field: must_do
+  spec: |
+    [SKILL] Args/Returns must use PyTorch format: Args header, parameter entries
+    as name (Type):, optional/default parameters marked optional with Default:
+    ``...``, and Returns with Tensor:.
+    Skill-exclusive reason: the skill mandates PyTorch Args/Returns syntax and
+    double-backtick defaults rather than Google/NumPy/plain defaults.
+  signal:
+    file: src/nn/functional/activation.py
+    scope: function_docstrings:gelu,silu,mish
+    method: section_scoped_regex
+    sections:
+      args: "text between block-level Args: and block-level Returns:"
+      returns: "text between block-level Returns: and block-level Examples:: or end"
+    required_args_patterns:
+      gelu:
+        - '(?m)^\s{4}input\s*\(Tensor\):'
+        - >-
+          (?ms)^\s{4}approximate\s*\([^)]*optional[^)]*\):.*?Default:\s*``(["']none["'])``
+      silu:
+        - '(?m)^\s{4}input\s*\(Tensor\):'
+        - '(?ms)^\s{4}inplace\s*\([^)]*optional[^)]*\):.*?Default:\s*``False``'
+      mish:
+        - '(?m)^\s{4}input\s*\(Tensor\):'
+        - '(?ms)^\s{4}inplace\s*\([^)]*optional[^)]*\):.*?Default:\s*``False``'
+    returns_pattern: '(?m)^\s{4}Tensor\s*:'
+    forbidden_header_patterns:
+      - '(?m)^\s*(Arguments|Parameters|Params):\s*$'
+    passed_condition: required Args patterns match only inside Args sections, returns_pattern matches only inside Returns sections, and forbidden headers do not appear in target docs
+
+- id: MD5_examples_fixed_to_pytorch_doctest
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: high
+  outcome_field: must_do
+  spec: |
+    [SKILL] Examples must be exact PyTorch doctest blocks with Examples::, a blank
+    line before >>>, explicit import torch, input from torch.randn, and a call to
+    the corresponding function.
+    Skill-exclusive reason: the skill requires PyTorch doctest examples and
+    torch.randn inputs rather than arbitrary prose/example style.
+  signal:
+    file: src/nn/functional/activation.py
+    scope: function_docstrings:gelu,silu,mish
+    method: examples_section_regex
+    examples_block: "text from block-level Examples:: to end of docstring"
+    common_required_patterns:
+      - '(?m)^\s*Examples::\s*\n\s*\n\s*>>>'
+      - '(?m)^\s*>>>\s+import\s+torch\b'
+      - 'torch\.randn\s*\('
+    function_call_patterns:
+      gelu: '(?m)^\s*>>>\s*(?:torch\.nn\.functional\.|F\.)?gelu\s*\('
+      silu: '(?m)^\s*>>>\s*(?:torch\.nn\.functional\.|F\.)?silu\s*\('
+      mish: '(?m)^\s*>>>\s*(?:torch\.nn\.functional\.|F\.)?mish\s*\('
+    passed_condition: each Examples block exists and matches all common patterns plus its target function_call_pattern
+
+- id: MD6_sphinx_cross_reference_for_gelu
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: low
+  outcome_field: must_do
+  spec: |
+    [SKILL] The GELU reference should use an explicit Sphinx role rather than
+    plain torch.nn.GELU prose.
+    Skill-exclusive reason: the skill requires Sphinx roles for documented symbol
+    references; a generic formatter often leaves plain references intact.
+  signal:
+    file: src/nn/functional/activation.py
+    scope: function_docstring:gelu
+    method: regex
+    allowed_role_patterns:
+      - ':class:`~?torch\.nn\.GELU`'
+      - ':func:`~?torch\.nn\.functional\.gelu`'
+    forbidden_plain_pattern: '\bSee\s+torch\.nn\.GELU\b|\btorch\.nn\.GELU\b(?!`)'
+    passed_condition: one allowed_role_pattern matches and forbidden_plain_pattern does not match outside legal role spans
+
+- id: MN1_old_or_non_skill_style_remnants
+  type: forbidden-arg
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: mid
+  outcome_field: must_not
+  spec: |
+    [SKILL] Target docstrings must not retain old non-skill style remnants:
+    Arguments:/Parameters:/Params:, single-colon Example/Examples, plain Default:
+    False/default none, or bare See torch.nn.GELU without a Sphinx role.
+    Skill-exclusive reason: these are the old Google/plain style artifacts the
+    PyTorch docstring skill is meant to replace. Non-raw and tensor factory checks
+    are handled by positive MD rules to avoid duplicate scoring.
+  signal:
+    file: src/nn/functional/activation.py
+    scope: function_docstrings:gelu,silu,mish
+    method: scoped_regex
+    violation_patterns:
+      old_headers: '(?m)^\s*(Arguments|Parameters|Params):\s*$'
+      single_colon_examples: '(?m)^\s*Example:\s*$|(?m)^\s*Examples:(?!:)\s*$'
+      plain_default: >-
+        Default:\s*(False|["']?none["']?)\b(?!``)
+      bare_gelu_reference: '\bSee\s+torch\.nn\.GELU\b'
+    passed_condition: passed = not any violation_patterns match in target docstrings after stripping legal Sphinx role spans
+
+- id: T1_task_artifact_integrity
+  type: task-completion
+  provenance: task
+  signal_dimension: task_completion
+  verifier: state-check
+  exclusive: false
+  weight: 0
+  outcome_field: outcome
+  spec: |
+    [TASK — not counted in skill adherence] All three functions have non-empty
+    docstrings and their signatures/bodies remain semantically intact. Use an
+    initial-state AST snapshot when the harness provides one; otherwise perform
+    final artifact structural checks.
+  signal:
+    file: src/nn/functional/activation.py
+    method: ast_python
+    baseline_policy: compare against initial-state AST when available, ignoring only the docstring Expr
+    structural_checks_without_baseline:
+      - FunctionDef gelu, silu, mish exist
+      - target functions have non-empty docstrings
+      - gelu parameters include input and approximate with default 'none'
+      - silu and mish parameters include input and inplace with default False
+      - function bodies still contain non-docstring executable statements
+    passed_condition: baseline AST comparison passes when available; otherwise all structural_checks_without_baseline pass
+
+implementation_hints:
+  helpers: |
+    Implement extract_function_docstring_source_and_text(src, fn_name), extract_section(doc, name),
+    strip_math_blocks(doc), strip_examples_block(doc), and strip_sphinx_role_spans(doc). All scoring
+    checks are deterministic AST/section-scoped regex checks.

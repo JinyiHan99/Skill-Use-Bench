@@ -1,0 +1,58 @@
+openapi: 3.0.3
+info:
+  title: GitHub Status Reader
+  version: 1.0.0
+servers:
+  - url: https://www.githubstatus.com/api/v2
+paths:
+  /components.json:
+    get:
+      operationId: GetGitHubComponents
+      summary: Get public GitHub status components
+      responses:
+        '200':
+          description: Current GitHub status components
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      url:
+                        type: string
+                  components:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StatusComponent'
+components:
+  schemas:
+    StatusComponent:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        position:
+          type: integer
+        description:
+          type: string
+          nullable: true
+        showcase:
+          type: boolean
+        only_show_if_degraded:
+          type: boolean

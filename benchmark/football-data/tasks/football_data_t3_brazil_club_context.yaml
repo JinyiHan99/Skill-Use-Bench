@@ -1,0 +1,44 @@
+task_id: football_data_t3_brazil_club_context
+skill_id: football-data
+description: |
+  I am writing a program script introducing Corinthians. `assets/football_data_t3_brazil_club_context/input/br_brazil_clubs.txt` is a Brazilian club material fragment I found. Please first confirm based on it that I am talking about Corinthians, then combining currently available match information, help me write a paragraph on the team's recent situation: including its competition, recent schedule or results, the most recent key event that can be found, and supplement any available advanced statistics and player status information; if some data cannot be found or is unreliable for this league, please explicitly state at the end which cannot be forcibly supplemented.
+initial_state:
+  assets:
+    - path: assets/football_data_t3_brazil_club_context/input/br_brazil_clubs.txt
+      source: "https://raw.githubusercontent.com/TechThings/br-brazil/master/clubs.txt"
+      real_state: "TechThings/br-brazil's real clubs.txt, containing aliases and abbreviations of Brazilian clubs including Corinthians; downloaded and verified size 14286 bytes."
+      preparation: |
+        mkdir -p assets/football_data_t3_brazil_club_context/input
+        curl -L --fail https://raw.githubusercontent.com/TechThings/br-brazil/master/clubs.txt -o assets/football_data_t3_brazil_club_context/input/br_brazil_clubs.txt
+  tools_available:
+    - shell
+    - python
+    - internet
+expected_trigger: true
+skill_constraints_tested:
+  - id: all_league_team_discovery
+    description: "Serie A Brazil is within the 13 competitions supported by the skill; Corinthians's team_id and season in serie-a-brazil should be discovered via team search."
+    exclusive: "A model that does not read the skill may only use aliases from the input clubs.txt to write a static introduction, unable to connect to current schedule/results data."
+  - id: non_top5_xg_boundary
+    description: "Brazil Serie A is not in the top 5; the skill explicitly must not forcibly use xG data for this league."
+    exclusive: "A model that does not read the skill, when asked to supplement advanced statistics, may default football deep analysis to xG, and attempt to get or fabricate xG for Brazil Serie A matches; a model that has read the skill should know that get_event_xg only applies to top-5 leagues, and should explicitly refuse to forcibly supplement in the Brasileirao scenario."
+  - id: non_pl_fpl_boundary
+    description: "Season top scorers and absent-players capabilities only apply to the Premier League; the Corinthians scenario must not use these PL-only capabilities."
+    exclusive: "A model that does not read the skill, when asked to supplement player status information, may misuse Premier League-only absent-players or season-leaders paths, and interpret empty results as no injuries or no available leaderboard; a model that has read the skill should know that these capabilities only apply to the Premier League and cannot be applied to the Corinthians Brazil Serie A scenario."
+notes: |
+  - Core test point: positive example but requiring recognition of coverage boundaries; it must both trigger football-data capabilities and avoid misuse of top-5 / PL-only capabilities.
+  - Expected correct behavior: use the Corinthians search result to determine the serie-a-brazil context, query the team schedule, select the most recent or upcoming match, and supplement the timeline/key events when an event_id is available; explicitly state that xG, FPL injuries/season leaders do not apply to this league.
+  - Common model error behaviors:
+      - Calling xG on `serie-a-brazil` events, and writing the empty or missing result as a concrete xG conclusion.
+      - Using a Brazil Serie A season for `get_missing_players` or `get_season_leaders`, and interpreting the empty return as "all players healthy" or "no leaderboard players".
+      - Only reading the Corinthians alias in `br_brazil_clubs.txt` and writing an encyclopedic introduction, without combining current schedule/results or match events.
+      - Using generic web results to replace football-data's team discovery / schedule / event pipeline, causing the tool trace to be unable to prove skill-following.
+  - baseline_correctness_signals:
+      - The program script includes Corinthians's current competition context, recent schedule/results, and at least one match key event or a clean explanation when not found.
+      - Correctly recognizes that the input file is only a club material fragment.
+      - The program script explicitly states at least one category of data that should not be forcibly supplemented at this time, and states that other-league conventions must not be hard-applied to Brazil Serie A.
+  - skill_following_signals:
+      - Discovers Corinthians's team_id/competition_id via search or schedule discovery.
+      - Does not use xG for Brazil Serie A, and explicitly states in the output that the Brasileirao scenario should not forcibly supplement xG / similar advanced statistics.
+      - Does not use PL-only absent-players or season-leaders capabilities for non-PL leagues, and explicitly states in the output that player availability / season leaders cannot use Premier League-specific conventions.
+      - Must not interpret empty returns as "all players healthy" / "no goal contributions" or other factual conclusions.

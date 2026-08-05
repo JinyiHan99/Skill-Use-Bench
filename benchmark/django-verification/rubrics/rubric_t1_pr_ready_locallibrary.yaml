@@ -1,0 +1,132 @@
+# Rubric for skill_57_django-verification — t1_pr_ready_locallibrary
+# Evaluation goal: whether the agent performs pre-PR verification following the Django Verification Loop, rather than just doing ordinary project checks.
+
+rules:
+  - id: g1_observable_verification_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable local verification attempt, such as unpacking the target archive, running Django/pytest/coverage commands, or reading unpacked project files.
+      The gate only confirms evaluable behavior exists; it does not judge skill-following quality.
+    signal:
+      pattern: '(?s)(Bash.{0,1200}?(tar\s+-[xztf]|python.{0,200}?tarfile|manage\.py|pytest|coverage|showmigrations|makemigrations|check\s+--deploy)|Read.{0,1200}?django-locallibrary-tutorial.{0,300}?(manage\.py|settings\.py|requirements\.txt|models\.py|migrations)|Grep.{0,1200}?django-locallibrary-tutorial.{0,300}?(manage\.py|settings\.py|requirements\.txt|models\.py|migrations))'
+
+  - id: r1_multiphase_pr_verification_report
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Pre-PR verification should form a staged Django verification report covering environment, code quality/Django checks, migrations, test coverage, security/deploy configuration, and conclusions.
+      skill-exclusive rationale: without reading the skill, a strong model would typically unpack the project, run tests, or do a simple check of whether it starts; the skill requires aggregating evidence following a Django-specific flow of environment → quality → migrations → test coverage → security/deploy → conclusion. The conflict point is "scattered generic checks" vs "structured Django PR gate".
+    signal:
+      query: |
+        Based on actual tool calls, command output, read project files, and the final report content — not the agent's self-described plan — answer YES/NO: does the final report organize this PR readiness verification as a Django-specific multi-stage gate, and do these stages have tool output, project file evidence, or BLOCKED markers backed by actual failure output / static file evidence?
+        Answer YES if the report has evidence-backed or evidence-blocked sections for environment/dependencies, Django/code quality checks, migration safety, tests with coverage, security/deploy configuration, and a clear PR recommendation.
+        Answer NO if it only has empty phase headings, a generic summary, unsupported blocked claims, or omits most Django-specific phases.
+      acceptable: "The report lists Environment, Code Quality/manage.py check, Migrations, Tests + Coverage, Security/Deploy config, Recommendation, and cites actual command results; if a stage is blocked, there is failure output or file-read evidence."
+      unacceptable: "The report only states pytest pass/fail and gives a ready-for-review verdict, or only lists phase headings without evidence for migrations, coverage, or deploy/security gate."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_migration_safety_evidence
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Must explicitly verify Django migration safety, e.g. showmigrations, makemigrations --check, migrate --plan, or, when the environment is constrained, report migration check blocking based on evidence.
+      skill-exclusive rationale: without reading the skill, a strong model may think only tests and lint are needed before PR; the skill treats pending migrations, missing migrations, and migration plan as a distinct stage. The conflict point is "tests pass = ready for review" vs "migration safety must be included in the review-readiness judgment".
+    signal:
+      query: |
+        Based on actual Bash/Read/Grep tool calls and command output — not the agent's intent statements — answer YES/NO: did the agent perform migration safety verification on this Django project (e.g. showmigrations, makemigrations --check, migrate --plan, checking models.py and migrations files), or, when execution is impossible due to dependency/database limitations, mark this verification as BLOCKED/risk with migration command failure output or concrete project file evidence?
+        Answer YES if migration state or migration-generation safety is evidenced, or blocked status is backed by migration command failure output or concrete reads of models.py/migrations/settings.
+        Answer NO if migrations are not checked, are only mentioned generically, or blocked is asserted without command/file evidence.
+      acceptable: "Run python manage.py makemigrations --check or migrate --plan; if it fails, the report states that migration check is blocked due to missing config, citing failure output or models/migrations/settings evidence."
+      unacceptable: "Only runs pytest, then reports 'no migration risk'; or only says migration check is blocked without command failure or project file evidence."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_tests_with_coverage_gate
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The test phase should use coverage, and interpret PR readiness with the skill's Overall ≥80% target; adapt to the real project structure rather than mechanically using the example apps path.
+      skill-exclusive rationale: without reading the skill, a strong model will naturally run pytest or Django test, but may not collect coverage, and even less use the 80% gate to affect the conclusion; the skill requires a coverage report and threshold judgment. The conflict point is "tests pass is enough" vs "tests + coverage meeting threshold supports review readiness".
+    signal:
+      query: |
+        Based on actual test commands, output, and the final report — not the agent's self-described plan — answer YES/NO: does the agent simultaneously satisfy three points: 1) run or attempt to run tests with coverage (e.g. pytest --cov=catalog, pytest --cov=., coverage run/report); 2) in the report, support whether the PR can be reviewed by whether overall coverage reaches 80% or by an evidence-backed blocking reason for coverage generation failure; 3) the coverage target path adapts to the real project structure, rather than only mechanically using a nonexistent --cov=apps?
+        Answer YES if coverage evidence or evidence-backed blocked reason is included and tied to the 80% readiness gate.
+        Answer NO if only pass/fail tests are reported, coverage is ignored, any of the three conditions is missing, or only an irrelevant placeholder path such as --cov=apps is used without correction.
+      acceptable: "pytest --cov=catalog, pytest --cov=., or coverage report has results, and states whether overall coverage reaches 80%; or coverage command fails due to dependency/config issues and is treated as a blocker."
+      unacceptable: "pytest passes but there is no coverage; or the command only writes pytest --cov=apps while the project has no apps directory, and it is not corrected or explained."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_deploy_security_gate
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Pre-PR must also do a Django deploy/security gate, including manage.py check --deploy or equivalent config checks, focusing on DEBUG, SECRET_KEY, ALLOWED_HOSTS, HTTPS/HSTS, cookie security; dependency/code security scanning can only serve as a supplement.
+      skill-exclusive rationale: without reading the skill, code review of a tutorial project often overlooks production security config; the skill explicitly front-loads deployment security checks into PR/release verification. The conflict point is "only look at functionality/tests" vs "deployment security defects will block review or release".
+    signal:
+      query: |
+        Based on actual tool calls, file reads, and the final report — not the agent's self-described plan — answer YES/NO: did the agent execute manage.py check --deploy, or substantively check deployment-security-critical items in Django settings such as DEBUG, SECRET_KEY, ALLOWED_HOSTS, HTTPS/HSTS, secure cookies, and incorporate the findings or evidence-backed reasons for non-execution into the PR conclusion?
+        Answer YES if Django deploy/config security checks are evidenced and influence the recommendation; dependency/code scans may support but cannot replace this.
+        Answer NO if security/deploy readiness is omitted, asserted without evidence, or only pip-audit/bandit/dependency scanning is used with no Django deploy/config review.
+      acceptable: "Read settings.py and point out DEBUG/ALLOWED_HOSTS/SECRET_KEY/HSTS risks, or run manage.py check --deploy and report the result."
+      unacceptable: "Only run pip-audit or bandit then write 'no security issues', without any Django deploy/config check evidence."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_clear_go_no_go_and_blockers
+    type: termination
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The final output should give an unambiguous recommendation, blockers/risks, and next steps; this report quality requirement mainly comes from task completion and is not used as the skill-following main score.
+    signal:
+      query: |
+        Looking only at the final report and actual command evidence — not the agent's planning talk — answer YES/NO: does the final output give an unambiguous "ready for review / hold for review / conditional review" conclusion, and list blockers/risks that would block review or subsequent release along with next steps?
+        Answer YES if the recommendation is unambiguous and blockers/next steps are tied to evidence.
+        Answer NO if the conclusion is vague or lacks blocker/next-step handling.
+      acceptable: "RECOMMENDATION: hold for review; Blockers: migrations check failed, coverage unavailable; Next steps: install deps and rerun..."
+      unacceptable: "Overall it's okay, suggest taking another look."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Whether the user-requested local pre-PR check report is completed.
+    signal:
+      query: |
+        Based on the final answer and actual tool results, answer YES/NO: did the agent actually unpack the project corresponding to assets/SF57_t1_pr_ready_locallibrary/input/django-locallibrary-tutorial-main.tar.gz, run project-level commands on the unpacked project or read project files, and finally produce a PR readiness check report containing evidence, risks, an unambiguous conclusion, and next steps?
+        Answer YES if the correct archive was unpacked and a substantive evidence-backed report for the extracted project exists.
+        Answer NO if the archive was only listed, the project was not processed after unpacking, no report is produced, or the conclusion lacks evidence/risk/next steps.
+      acceptable: "The report for the django-locallibrary project includes post-unpack project check evidence, risks, and a ready/hold-for-review conclusion."
+      unacceptable: "Only lists tar contents or only restates the task, without a command/file-level check report on the unpacked project."

@@ -1,0 +1,209 @@
+# Rubric for skill_03 (pdftk) — t1_merge_unordered
+#
+# Scoring boundary:
+# - Rules with provenance=skill enter the skill-following score, evaluating only whether the model follows the skill's trigger conditions, tool boundaries, workflow steps, empirical lessons, and termination discipline.
+# - Rules with provenance=task only record task completion rate (0/1) and do not enter the skill-following score.
+# - Rules with provenance=gate only judge whether the trajectory is evaluable and do not enter the score.
+
+# ── GATE: evaluability, does not represent skill-following ─────────────
+rules:
+  - id: g1_observable_pdf_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The trajectory should contain at least one PDF-processing-related Bash command invocation.
+      The gate does not require the tool or workflow to be correct.
+    signal:
+      command_pattern: '\.(pdf|PDF)\b'
+      pattern: '\.(pdf|PDF)\b'
+
+  # ── COMPLIANCE: only skill-derived behavior is scored ────────────────
+  - id: r1_uses_pdftk_for_pdf_merge
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — tool boundary] PDF structural operations must use pdftk; the model's prior-preferred
+      Python PDF libraries or alternative CLI tools must not be used to complete the merge.
+    signal:
+      command_pattern: '\bpdftk\b.*\bcat\b.*\boutput\b'
+      pattern: '\bpdftk\b.*\bcat\b.*\boutput\b'
+
+  - id: r2_alphabetical_order_when_user_unspecified
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL — ordering rule] When the user does not use ordering language such as
+      first/then/followed by/in this order, the merge inputs should be processed in
+      case-insensitive alphabetical order by filename. This is the skill's trigger
+      condition and default workflow; final content correctness is not evaluated.
+    signal:
+      judge_question: |
+        Consider only executed pdftk merge commands, not plans or explanations.
+        The expected alphabetical input order is:
+          docs/nist_cybersecurity_framework.pdf,
+          docs/nist_sp800_53.pdf,
+          docs/rfc9000_quic.pdf,
+          docs/rfc9110_http_semantics.pdf,
+          docs/rfc9114_http3.pdf.
+        Did the agent's pdftk cat command(s) reflect this case-insensitive
+        alphabetical ordering? Shell globs like docs/*.pdf count as NO.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+
+  - id: r3_batches_more_than_four_inputs
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — batching rule] When merging more than 4 PDFs, they must be split into batches of at most 4 inputs each,
+      producing intermediate results first, then merging the intermediate results. This evaluates whether that workflow is followed, not whether the final
+      PDF is correct.
+    signal:
+      judge_question: |
+        Consider only executed pdftk commands. Did the agent batch the merge so
+        that no single pdftk cat command took more than 4 original input PDFs,
+        and then combine intermediate PDFs in a separate step?
+        Answer NO if all original input PDFs were passed to one pdftk cat command.
+        Shell globs count as unknown and should be NO.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+
+  - id: r4_validates_each_input_before_merge
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — input validation] Before any pdftk merge operation, dump_data should be run on the input PDFs to confirm file validity and obtain page counts. Switched to a tool-call verifier to check
+      whether the actually executed Bash commands contain a pdftk dump_data call.
+    signal:
+      command_pattern: '\bpdftk\b\s+\S*\.pdf\s+dump_data\b'
+      pattern: '\bpdftk\b\s+\S*\.pdf\s+dump_data\b'
+
+  - id: r5_verifies_merged_output_after_merge
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — output verification] After merging, dump_data should be run on the output PDF for verification.
+      Switched to a tool-call verifier to avoid LLM judge misjudgment.
+    signal:
+      command_pattern: '\bpdftk\b\s+\S*merged_\S*\.pdf\s+dump_data\b'
+      pattern: '\bpdftk\b\s+\S*merged_\S*\.pdf\s+dump_data\b'
+
+  - id: r6_uses_tmp_workspace_for_batch_intermediates
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.7
+    spec: |
+      [SKILL — intermediate-file discipline] Intermediate files for batched/multi-step PDF operations should be placed in
+      /tmp/pdftk_workspace/. Using a tool-call verifier to match only actual commands.
+    signal:
+      command_pattern: '/tmp/pdftk_workspace'
+      pattern: '/tmp/pdftk_workspace'
+
+  - id: r7_default_merge_output_naming
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.4
+    spec: |
+      [SKILL — default naming] When the user does not provide an output name, the merge default name is
+      merged_<first_input_stem>.pdf. Switched to a tool-call verifier to match only the output filename in actual pdftk commands.
+    signal:
+      command_pattern: 'merged_nist_cybersecurity_framework\.pdf'
+      pattern: 'merged_nist_cybersecurity_framework\.pdf'
+
+  # ── BOUNDARY: skill-forbidden out-of-scope behavior ──────────────────
+  - id: b1_no_forbidden_pdf_tools
+    type: forbidden-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — forbidden tools] When pdftk can handle the PDF structural operation, using Python PDF libraries or alternative CLI tools to bypass the skill is forbidden. Weight reduced from 2.0 to 1.5 to avoid double-scoring with r1.
+    signal:
+      command_must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b'
+      must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b'
+      pattern: '[\s\S]*'
+
+  - id: b2_does_not_overwrite_inputs
+    type: boundary
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: false
+    weight: 0.4
+    spec: |
+      [SKILL — output boundary] No input PDF may be overwritten. Weight reduced from 1.0 to 0.4,
+      because not overwriting inputs is general engineering common sense (~85% baseline pass rate), not skill-specific.
+    signal:
+      command_must_not_match: '\boutput\s+\S*docs/(nist_cybersecurity_framework|nist_sp800_53|rfc9000_quic|rfc9110_http_semantics|rfc9114_http3)\.pdf\b'
+      must_not_match: '\boutput\s+\S*docs/(nist_cybersecurity_framework|nist_sp800_53|rfc9000_quic|rfc9110_http_semantics|rfc9114_http3)\.pdf\b'
+      pattern: '[\s\S]*'
+
+  # ── TASK COMPLETION: only records completion rate, does not enter the skill-following score ──
+  - id: task_completion_binary
+    type: task-completion
+    provenance: task
+    locus: final-output
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Deterministic verification of whether the merged PDF output is correct.
+    signal:
+      judge_question: |
+        Based ONLY on concrete tool calls, command outputs, and observable results in the trace
+        (not the agent's self-claims or plans):
+        1. Was a merged PDF file successfully created via a pdftk cat command that included ALL five
+           source documents (nist_cybersecurity_framework.pdf, nist_sp800_53.pdf, rfc9000_quic.pdf,
+           rfc9110_http_semantics.pdf, rfc9114_http3.pdf)?
+        2. Did the merge command(s) complete without errors? (no "Error", "failed", "Exception" in output)
+        3. Does the trace show NO subsequent error or failure after the final merge output was produced?
+        Answer YES only if ALL three conditions are met with evidence in the trace. Answer NO if any
+        condition fails or lacks evidence.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - final_answer
+        - tool_results_first_n: 15

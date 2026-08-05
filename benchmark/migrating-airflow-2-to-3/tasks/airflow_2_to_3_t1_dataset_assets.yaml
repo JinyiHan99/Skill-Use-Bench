@@ -1,0 +1,45 @@
+task_id: airflow_2_to_3_t1_dataset_assets
+skill_id: migrating-airflow-2-to-3
+description: |
+  We're preparing the example DAG at `assets/airflow_2_to_3_t1_dataset_assets/input/dags/example_datasets.py` for our next major Airflow runtime. Please update the project so this DAG set is ready for that runtime without changing its runtime triggering behavior, and leave a brief rollout note in `rollout_note.txt` for the release owner about anything they should verify during rollout.
+
+initial_state:
+  assets:
+    - path: assets/airflow_2_to_3_t1_dataset_assets/input/dags/example_datasets.py
+      source: "https://raw.githubusercontent.com/apache/airflow/2.10.5/airflow/example_dags/example_datasets.py"
+      real_state: "Apache Airflow 2.10.5 public example DAG demonstrating dataset-based scheduling, with Airflow 2-era dataset and operator imports."
+      preparation: |
+        Downloaded the file unchanged from the Apache Airflow 2.10.5 repository into the task input DAG folder.
+  tools_available:
+    - filesystem
+    - shell
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: dataset_to_asset_migration
+    description: "Airflow 2 Dataset terminology must be migrated consistently to the Airflow 3 Asset API, including `airflow.sdk.Asset`, asset object construction, schedule/outlet expressions, and timetable usage such as `DatasetOrTimeSchedule`/`datasets=` where present."
+    exclusive: "A model relying only on general Airflow 3 knowledge may update the obvious `Dataset(...)` constructors or guess an Asset import, but it is more likely to miss the full dataset-to-asset surface, especially the exact `airflow.sdk.Asset` import and timetable-level migration such as `DatasetOrTimeSchedule` with its dataset expression argument. The skill explicitly directs a systematic datasets-to-assets migration."
+  - id: rollout_version_guidance
+    description: "The migration note should warn that the safe rollout path is Airflow 2.11 first and then at least Airflow 3.0.11, ideally 3.1."
+    exclusive: "Without the skill, a strong model may suggest a generic direct upgrade to Airflow 3.0 or omit the version-path warning; the skill contains a specific rollback-safety recommendation."
+
+notes: |
+  - Positive task.
+  - Core test point: migration of real Airflow 2.10.5 dataset-scheduled DAG code to Airflow 3-compatible asset terminology and imports without altering the DAG dependency semantics.
+  - Expected correct behavior includes replacing `from airflow.datasets import Dataset` at `assets/airflow_2_to_3_t1_dataset_assets/input/dags/example_datasets.py:57` and every `Dataset(...)` construction such as lines 64, 99, 123, and 189 with the Airflow 3 Asset equivalent from the SDK.
+  - Expected correct behavior includes changing `from airflow.operators.bash import BashOperator` at `assets/airflow_2_to_3_t1_dataset_assets/input/dags/example_datasets.py:59` to the Airflow 3 standard provider import.
+  - Expected correct behavior includes updating `from airflow.timetables.datasets import DatasetOrTimeSchedule` and the `DatasetOrTimeSchedule(..., datasets=...)` schedule expression to the Airflow 3 asset equivalent while preserving the combined cron-or-asset triggering behavior.
+  - Common incorrect behavior: the model updates only `BashOperator` but leaves `dag1_dataset = Dataset("s3://dag1/output_1.txt", ...)` at line 64 and `schedule=[dag1_dataset]` at line 94 using the old Dataset object.
+  - Common incorrect behavior: the model rewrites schedules as simple cron strings or removes the dataset expression DAGs at lines 149, 159, 169, and 179, losing the original data-aware scheduling behavior.
+  - Common incorrect behavior: the rollout note says only "upgrade to Airflow 3" and omits the skill-required Airflow 2.11 -> at least 3.0.11 / ideally 3.1 guidance.
+  - baseline_correctness_signals:
+      - The DAG file remains present and syntactically plausible Python.
+      - Producer and consumer DAG IDs and task IDs from the input remain recognizable.
+      - Dataset/asset scheduling relationships and outlets are preserved rather than deleted.
+      - Standard operator imports use Airflow 3 standard provider locations.
+      - A short rollout note is produced in `rollout_note.txt`.
+  - skill_following_signals:
+      - Legacy Dataset imports and constructors are replaced with Airflow 3 Asset API usage.
+      - Timetable-level dataset terminology is migrated, including `DatasetOrTimeSchedule` usage and its dataset expression argument, so the time-or-data-triggered schedule keeps the same semantics under Airflow 3 asset terminology.
+      - The release note includes the specific safe upgrade path: Airflow 2.11 first, then at least Airflow 3.0.11, ideally 3.1, and cautions that early 3.0 versions have many bugs / rollback limitations.

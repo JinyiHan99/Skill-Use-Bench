@@ -1,0 +1,84 @@
+rules:
+  - id: g1_observable_brief_output
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trajectory contains an observable write or edit attempt to output/slack_docs_brief/brief.md."
+    signal:
+      pattern: '(?is)^(?:Write|Edit)\b[\s\S]{0,1000}?output/slack_docs_brief/brief\.md'
+
+  - id: r1_boundary_no_bot_scaffold
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — negative example] This task is a concept brief for product/operations and must not trigger the slack-bot-builder implementation pattern; no Slack app source code, package/requirements scaffolding, event handlers, OAuth install flows, or Block Kit payload artifacts may be created in any actual Write/Edit output.
+      Skill-exclusive rationale: with the skill masked, the task itself only asks for a brief, and strong models usually will not write a bot; but the skill docs are full of Bolt app, Socket Mode, OAuth, and Block Kit patterns that may induce over-triggering. This negative example evaluates boundary judgment: the skill is only used when building/modifying/validating Slack apps, and the conflict point is that related-topic materials do not mean implementation code needs to be produced.
+    signal:
+      query: >
+        Based on the file paths and contents written by all actual Write/Edit tool calls, not the agent's self-statements, answer YES/NO: does the model avoid creating Slack bot/app implementations or scaffolding (e.g. app.js, app.py, package.json, requirements.txt, @slack/bolt dependency, App()/SocketModeHandler initialization, OAuth flow, event/action/command handlers, Block Kit payload code), delivering only brief.md or necessary documentation-type files?
+        Answer YES if no Slack app code/scaffold files are created anywhere in the actual written outputs and the output is documentation-focused.
+        Answer NO if any bot implementation/scaffold file or substantial app code/payload is written for this task, even outside output/slack_docs_brief/.
+      acceptable: "Only output/slack_docs_brief/brief.md is written, containing a non-engineering conceptual explanation."
+      unacceptable: "Creates app.js/app.py/package.json/requirements.txt with Bolt App initialization, SocketModeHandler, app.command(...), or Block Kit payload code."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_boundary_not_developer_setup_guide
+    type: boundary
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/DIAGNOSTIC — not counted toward SF] The main body of brief.md should be a concept explanation readable by product/operations, and must not turn the content into a development implementation tutorial such as "create an App, register a command handler, initialize a SocketModeReceiver/Handler, configure a token and run a service"; product-side configuration entry explanations about the Slack admin/App Settings/Slash Commands page/Socket Mode page are acceptable.
+      Downgrade reason: the task already explicitly targets product and operations, a Chinese briefing, and scenarios/configuration entry/misunderstandings; even with the skill masked, this can be inferred, mainly testing task compliance/writing style rather than SF.
+    signal:
+      file: "output/slack_docs_brief/brief.md"
+      query: >
+        Based only on the contents of the finally written output/slack_docs_brief/brief.md file, not the agent's self-statements, answer YES/NO: does the main body of the document avoid becoming a development implementation tutorial, and instead explain to product/operations the use cases, configuration entry points, and common misunderstandings of Slack commands and real-time connection modes? Configuration entry explanations about the Slack admin/App Settings/Slash Commands/Socket Mode pages are acceptable; implementation steps such as npm install, app.command(...), SocketModeHandler, export SLACK_BOT_TOKEN, node app.js as the main body are not acceptable.
+        Answer YES if implementation steps/code are absent or only used sparingly to explain concepts, and the main structure is non-technical conceptual guidance.
+        Answer NO if the main body is a developer checklist such as creating a Slack app, registering handlers, configuring tokens, initializing SocketModeReceiver/Handler, and running a service.
+      acceptable: "Sections like 'suitable scenarios', 'where to configure', 'common misunderstandings', using plain-language explanations."
+      unacceptable: "Main sections are 'npm install @slack/bolt', 'app.command(...)', 'new SocketModeReceiver(...)', 'export SLACK_BOT_TOKEN', 'node app.js'."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_no_unrelated_skill_hardening_sprawl
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — negative example] The brief should not over-extend into implementation-hardening topics unrelated to this task, such as token/credential encryption, OAuth state/CSRF, installationStore, multi-workspace tokens, Block Kit limits, production-deployment hardening, etc.; these are only relevant when building a Slack app.
+      Skill-exclusive rationale: without reading the skill, writing a brief around commands and real-time connection modes is sufficient; the skill's security/OAuth/Block Kit/production-deployment sections may induce the model to pile on implementation details. The conflict point is that the skill's internal best practices should not be generically output in a non-implementation brief.
+    signal:
+      file: "output/slack_docs_brief/brief.md"
+      query: >
+        Based only on the contents of the finally written output/slack_docs_brief/brief.md file, not the agent's self-statements, answer YES/NO: does the document avoid expanding implementation-hardening details unrelated to this brief, such as token/credential encryption, OAuth state/CSRF, installation store, multi-workspace tokens, Block Kit limits, HTTP vs Socket Mode production-deployment hardening, as important content?
+        Answer YES if such topics are absent, or occupy less than about 20% and are only passing clarifications for a misconception.
+        Answer NO if they appear as standalone sections, repeated bullets, or a significant portion of the brief focused on unrelated implementation hardening.
+      acceptable: "Brief focuses on slash commands and Socket Mode concepts; only says 'tokens are configured by the engineering team' in passing."
+      unacceptable: "Includes long sections or repeated bullets on encrypting bot tokens, validating OAuth state, Block Kit 50-block limits, database installation stores, or production HTTP hardening."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether output/slack_docs_brief/brief.md exists and explains in Chinese the concepts, scenarios, configuration entry points, and common misunderstandings of Slack commands and real-time connection modes."
+    signal:
+      file: "output/slack_docs_brief/brief.md"
+      file_must_contain: "(?s)^(?=(?:.*[\\u4e00-\\u9fff]){80,})(?=.*(命令|slash command|斜杠命令))(?=.*(实时连接方式|Socket Mode|实时连接|连接方式))(?=.*(使用场景|适用场景|场景))(?=.*(配置入口|设置入口|配置界面|Slack 后台|后台配置))(?=.*(误解|常见误解|误区))"

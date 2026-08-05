@@ -1,0 +1,54 @@
+task_id: using_git_worktrees_t2_already_linked
+level: L2
+skill_id: skill_88_using-git-worktrees
+description: |
+  The project code is in `assets/using_git_worktrees_t2_already_linked/input/project/`. I will need to adjust the plural copy in the humanize output later. At this stage, please first take over this directory and prepare it as a development environment ready to start; once ready, tell me whether the next step can proceed to code changes.
+initial_state:
+  assets:
+    - path: assets/using_git_worktrees_t2_already_linked/input/project/
+      source: "https://github.com/arrow-py/arrow (open-source Arrow Python library snapshot reused from ./assets/SF22_t1_setup_fuzzing/repo)."
+      real_state: "Linked Git worktree on branch profile-formatting-fix; its .git file points to ../origin_repo/.git/worktrees/project and shares common Git metadata with origin_repo."
+      preparation: |
+        Copied the real Arrow Python library snapshot, initialized origin_repo as a Git repository on main, committed all files, added .worktrees/ to .gitignore, then created a linked worktree at input/project on branch profile-formatting-fix. The project/.git pointer was made relative for portability inside the asset directory.
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+skill_constraints_tested:
+  - id: detect_existing_linked_worktree_before_action
+    description: "Before deciding whether to create or prepare isolation, the model must compare git-dir vs git-common-dir and check superproject state to determine whether the current checkout is already a linked worktree."
+    exclusive: "Without the skill, a strong model may simply run git status or inspect the branch and proceed in the provided directory, without performing the git-dir/common-dir comparison plus superproject guard required by the skill."
+  - id: report_reused_isolated_workspace_state
+    description: "After detecting an existing linked worktree, the model must explicitly report that it is reusing the existing isolated workspace at the given path and name the current branch before proceeding."
+    exclusive: "Without the skill, a model may report only generic git status or the current branch, but not connect that branch information to the conclusion that the directory is already an isolated linked worktree."
+  - id: continue_to_setup_and_baseline_after_reuse
+    description: "After deciding to reuse the existing isolated workspace, the model must continue with project setup and baseline verification instead of treating detection as the end of the task."
+    exclusive: "This is a workflow-continuation requirement after the skill-specific detection step, not a standalone skill-exclusive behavior."
+notes: |
+  Core test points:
+  - This is a positive example; the asset is already a linked worktree. The skill's divergence point is not "whether to isolate", but whether the model first performs Step 0 detection and, after finding it is already isolated, reuses the existing workspace.
+  - "Not creating a new worktree" in the result is not sufficient to prove skill compliance; the detection trace must be examined.
+
+  Expected correct behavior:
+  - Output the startup announcement required by the skill at the start.
+  - In `assets/using_git_worktrees_t2_already_linked/input/project/`, first compare git-dir with git-common-dir.
+  - Execute superproject guard to rule out submodule misidentification.
+  - Determine that this directory is already a linked worktree, report that the existing isolated workspace is being reused and the current branch is `profile-formatting-fix`.
+  - Do not create a new worktree, nested copy, or reinitialize the repository.
+  - Continue with reasonable Python project setup / baseline verification; if it fails, report the failure reason and ask whether to continue.
+
+  Common model error behaviors:
+  - Only running `git status` or `git branch --show-current`, without comparing git-dir/common-dir and without executing superproject guard.
+  - Creating another workspace in `assets/using_git_worktrees_t2_already_linked/input/project/.worktrees/` or nearby.
+  - Misidentifying the `.git` file as an anomaly, attempting to delete or reinitialize the repository.
+  - Directly modifying the plural copy in `assets/using_git_worktrees_t2_already_linked/input/project/arrow/locales.py` without first completing the takeover preparation.
+  - Stopping after finding the existing branch, without continuing with environment preparation or baseline verification.
+
+  skill_following_signals:
+    - Before deciding whether to create/prepare an isolated workspace, executed or explicitly stated the comparison of git-dir with git-common-dir.
+    - Executed or explicitly stated superproject guard to rule out submodule misidentification.
+    - Based on the above detection results, explicitly declared that the current directory is already a reusable isolated linked worktree.
+    - Did not create a new worktree; subsequent actions continue in `assets/using_git_worktrees_t2_already_linked/input/project/`.
+
+  baseline_correctness_signals:
+    - Reports current branch / workspace status.
+    - Executes reasonable Python project setup or baseline verification; does not force binding to a specific install command.
+    - If baseline fails, reports first and asks whether to continue; if it passes, reports ready.

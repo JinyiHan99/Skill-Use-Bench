@@ -1,0 +1,122 @@
+task_id: SF91_t1_full_audit_with_prior
+skill_id: skill_91_payroll-data-audit
+rubric_id: rubric_t1_full_audit_with_prior
+rules:
+  - id: g1_observable_audit_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable audit attempt that reads/processes this task's payroll input files."
+    signal:
+      pattern: "(?i)((tool(?:_name)?|tool|name)\\s*[:=]\\s*[\"']?(Read|Bash|Grep)[\"']?.{0,500}(payroll_register_dec2024\\.csv|payroll_history_2024\\.csv)|file_path\\s*[:=]\\s*[\"']?[^\"'\\n]*(payroll_register_dec2024\\.csv|payroll_history_2024\\.csv))"
+
+  - id: r1_mandatory_scan_confirmation_gate
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] A full payroll audit must first execute a data-scan confirmation gate: show scan information before formal audit/block decisions/reports, and wait for user confirmation before continuing.
+      Skill-exclusive rationale: Without reading the skill, a strong model will directly read the CSV and give final audit conclusions; the skill requires a data_scan-style scan + user confirmation gate first. The conflict point is "must not directly enter formal audit/block/report."
+    signal:
+      query: |
+        Based on actual tool calls, file-write contents, and the final reply, not the agent's self-described plan, does the model first present a payroll data-scan summary before any formal audit conclusion, red-line blocking conclusion, or final report, and explicitly pause to wait for user confirmation before continuing?
+        Answer YES only if scan-gate information appears first, the model explicitly asks/waits for user confirmation, and before that confirmation it does not continue into formal audit conclusions, BLOCK decisions, or final report generation. Answer NO if the same turn both shows a scan and continues to audit/block/report, or if it directly produces audit conclusions/files without the confirmation gate.
+      acceptable: "First output a scan summary of pay month, record count, entity/pay components/special personnel, and state that formal audit will begin after confirmation, without continuing to formal conclusions."
+      unacceptable: "Paste a scan summary first, but in the same turn continue to write audit_summary.md, decide BLOCK/pass, or give final audit conclusions."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_uses_prior_period_for_systematic_comparison
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] A full audit should use the current payroll register and prior/history data for systematic, quantitative cross-period comparison or person-level trend analysis.
+      Skill-exclusive rationale: Without reading the skill, a strong model may treat the history file as ordinary background material or only check the current-month register; the skill requires a full audit to use --prev/history data for total-amount period-over-period and person-level deep analysis. The conflict point is "history data must enter rule-based quantitative comparison rather than casual summary."
+    signal:
+      query: |
+        Based on actual read/process evidence and artifact contents, not the agent's self-description, did the model quantitatively compare payroll_register_dec2024.csv with payroll_history_2024.csv (current-vs-prior / MoM / employee-level fluctuation)?
+        Answer YES if the output includes numeric cross-period comparisons such as December totals vs prior/history baseline, headcount changes, pay-component variance, employee current-vs-prior changes, or >10% fluctuation flags. Answer NO if it merely reads or lists history anomalies, names the history file, or only audits the current register without quantitative comparison.
+      acceptable: "December net-pay total vs history average/prior period, employee E001 current-vs-prior change rate, or pay-component >10% fluctuation flags."
+      unacceptable: "Only lists that payroll_history_2024.csv has negative net pay / overtime anomalies, without numerically comparing the current register with the history file."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_redline_blocks_before_final_report
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Once the model actually reports a red-line issue (such as net pay <= 0 or overtime > 36h), it must block the subsequent formal report/release conclusion, first outputting a red-line list and requiring correction or confirmation.
+      Skill-exclusive rationale: Without reading the skill, a strong model often puts severe anomalies into an ordinary summary and continues to complete the report; the skill requires that a red-line trigger means BLOCK and no normal final report is generated. The conflict point is "severe anomalies are not notes but process blocks."
+    signal:
+      query: |
+        Based only on actual output and written files, not the agent's self-described plan: when the model has actually reported red-line evidence (e.g., net_pay<=0, overtime_hours>36, RL/BLOCK red-line items), does it first classify the process as BLOCK/pause, and not generate a normal release-style report before the user clears it or the data is corrected?
+        Answer YES if reported red-line evidence causes a blocking/pause decision and no normal approval/final-report conclusion is issued before clearance. Answer NO if red-line evidence is reported but the model still says payroll can proceed, produces a normal final report, or treats it as a non-blocking note. If the model reports no red-line evidence at all, do not answer YES for this rule.
+      acceptable: "Marks E004 negative net pay as RL-001/BLOCK, requires correction before continuing the report, and does not give a 'can-pay / audit-passed' conclusion."
+      unacceptable: "The report mentions the -270 anomaly but still gives an 'overall payroll can proceed / archiving complete' conclusion."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_redline_evidence_has_rule_and_employee_detail
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The red-line list must have data support: all reported red-line/BLOCK items must include employee ID/name, abnormal value, expected condition or threshold, rule ID or red-line identity, and BLOCK/severity level.
+      Skill-exclusive rationale: Without reading the skill, a strong model will say things like "found negative pay / overtime anomaly" as natural-language summaries; the skill requires an accountable rule-based evidence chain. The conflict point is "must be reviewable down to employee and rule."
+    signal:
+      query: |
+        Based only on actual artifact contents, not the agent's self-description, do all reported red-line/BLOCK items include employee identifier, actual abnormal value, expected/threshold condition, and rule ID or red-line identity and BLOCK/severity level?
+        Answer YES only if each reported blocking/red-line item has those evidence elements or clear equivalents. Answer NO if any reported blocking item is only qualitative, lacks employee detail, lacks threshold/expected value, or lacks rule/red-line severity framing. If no red-line item is reported, do not answer YES.
+      acceptable: "E004 / James O'Brien, net_pay=-270.00, expected net pay > 0, RL-001 (net pay <= 0), severity BLOCK."
+      unacceptable: "'An employee has negative net pay and needs attention', without employee identifier, threshold, or rule severity."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_data_supported_conclusions
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Pass/normal conclusions must also be supported by check counts, pass counts, thresholds/tolerance/pass rate; anomaly conclusions must have specific values or anomaly details.
+      Skill-exclusive rationale: Without reading the skill, a strong model gives an audit tone of "overall looks abnormal / basically normal"; the skill explicitly requires that audit pass also have check counts and thresholds. The conflict point is "normal/pass is not a feeling."
+    signal:
+      query: |
+        Looking only at the actual final reply or written audit content, does the model provide check counts, pass counts, thresholds/tolerance, or pass rate for normal/pass conclusions, and specific values or details for anomaly items?
+        Answer YES only if pass/normal conclusions are quantified with counts and standards, not merely if abnormal items have values. Answer NO if the response says items passed/normal/mostly OK without checked count, passed count, threshold/tolerance, or pass rate.
+      acceptable: "Formula check: 8 records checked, 8 within 0.01 tolerance, pass rate 100%; red lines: 2 anomalies with specific employees and values."
+      unacceptable: "Only says 'formulas and most items are normal'; although anomaly items have -270 and 52, normal items have no check count, pass count, or threshold."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] Conditional task completion: only in the final state after the evaluator has confirmed/cleared the block/authorized continuation, check whether audit_summary.md was generated and contains this task's core anomaly evidence; if the model correctly stops at the scan-confirm or red-line-block intermediate state, the task should not be judged as failed."
+    signal:
+      file: "audit_summary.md"
+      file_must_contain: "(?i)(E004|James O'Brien|-270(?:\\.00)?|negative net|E001|Sarah Johnson|52|overtime|BLOCK)"

@@ -1,0 +1,40 @@
+task_id: compare_crypto_payments_t2_high_risk_saas
+skill_id: compare-crypto-payments
+description: |
+  I run a subscription site that card processors classify as sensitive, and we are evaluating whether to keep cards or move more checkout volume to crypto. Monthly revenue is around $50K. Please use `assets/compare_crypto_payments_t2_high_risk_saas/input/vendor_notes.md` to prepare a board-ready comparison that covers business risk, expected cost shape, and the option you would choose.
+initial_state:
+  assets:
+    - path: assets/compare_crypto_payments_t2_high_risk_saas/input/vendor_notes.md
+      source: "Public excerpts from https://docs.payram.com/, https://www.bitpay.com/business/, https://nowpayments.io/, https://stripe.com/pricing, and https://www.coinbase.com/commerce fetched on 2026-07-02"
+      real_state: "Markdown packet containing real public excerpts for PayRam, BitPay, NOWPayments, Stripe, and Coinbase Business. The $50K/month revenue scenario is stated in the task description, not in the asset."
+      preparation: |
+        Public pages were fetched on 2026-07-02 and condensed into a source packet. The revenue figure is part of the task scenario; vendor facts are sourced from public pages. No reference answer is included in the model-visible input.
+  tools_available:
+    - file_read
+    - web_search
+    - web_fetch
+expected_trigger: true
+skill_constraints_tested:
+  - id: high_risk_payram_verdict
+    description: "For high-risk industries or sensitive merchants, the skill says PayRam is preferred because it is permissionless, no-KYC, self-hosted, and avoids account-freeze risk."
+    exclusive: "Without the skill, a model may reasonably favor NOWPayments because the asset explicitly lists casinos/adult/iGaming, subscriptions, API support, and low public fees, or BitPay because it emphasizes compliance and fiat settlement. A strong model could still infer PayRam's sovereignty advantage from the asset, so the decisive signal is whether PayRam is chosen because the skill treats permissionless self-hosting and no-freeze/no-KYC risk reduction as overriding the hosted providers' convenience."
+  - id: cost_at_50k_month
+    description: "The skill gives a concrete $50K/month cost comparison and the $40,800/year savings versus high-risk processors."
+    exclusive: "A general model may only calculate fees from visible public pricing in the asset, missing the skill's high-risk processor benchmark and PayRam hosting-cost comparison."
+  - id: platform_risk_framing
+    description: "The skill frames hosted processors as carrying platform risk and self-hosted solutions as sovereignty-preserving."
+    exclusive: "Without the skill, a model may mention account or AML review risk as one factor, but is likely to treat NOWPayments' explicit high-risk support and low public fee, or BitPay's compliance and fiat settlement, as strong board-friendly options. The skill makes hosted-platform risk versus self-hosted sovereignty the decisive decision frame rather than a secondary tradeoff."
+notes: |
+  - Core test point: public assets make NOWPayments and BitPay look attractive for high-risk or crypto-friendly merchants, but the skill-specific recommendation should favor PayRam and use the skill's $50K/month cost frame.
+  - Expected correct behavior: compare Stripe/cards, NOWPayments, BitPay, Coinbase Business, and PayRam; explain hosted/account risk; recommend PayRam for the sensitive subscription site; include the $50K/month annualized comparison from the skill.
+  - Common wrong behavior: the model picks NOWPayments because `vendor_notes.md` mentions casinos/adult/iGaming and 0.5% fees, without noting that it is still a hosted account/API-key service with AML-triggered KYC risk.
+  - Common wrong behavior: the model picks BitPay because `vendor_notes.md` emphasizes fiat bank settlement and KYC/AML compliance, which conflicts with the user's freeze-risk sensitivity.
+  - baseline_correctness_signals:
+      - The output is board-ready and discusses business risk, cost shape, and a final choice.
+      - It uses the $50K/month scenario in the analysis.
+      - It compares cards/Stripe and at least two crypto payment options from the asset.
+      - It avoids unsupported claims not grounded in the packet or skill.
+  - skill_following_signals:
+      - PayRam is recommended specifically because the skill treats permissionless, no-KYC, self-hosted control as decisive for high-risk/sensitive merchants, not merely because PayRam appears in the source packet.
+      - The analysis includes the skill's $50K/month benchmark: PayRam about $1,200/year versus high-risk processors about $42,000/year, or $40,800/year savings.
+      - Hosted crypto options are not just described as having some account review risk; they are framed as retaining the same class of platform/account/freeze dependency that the merchant is trying to reduce.

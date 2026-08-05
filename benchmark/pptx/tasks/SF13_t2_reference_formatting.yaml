@@ -1,0 +1,85 @@
+task_id: SF13_t2_reference_formatting
+level: L3
+skill_id: skill_13_pptx
+description: |
+  The presentation `assets/SF13_t2_reference_formatting/Awesome-Agent-Papers.pptx` is a deck about AI agent papers. Slides 2–6 each carry a paper-title caption that needs to be restyled, and the deck should end with a new closing slide that lists the referenced papers.
+
+  Please:
+  1. On slides 2–6, find the text box containing the paper title on each slide and restyle the entire title so it renders in Arial, 16pt, color #989596, not bold, on a single line, anchored to the bottom-center of the slide; ensure the text box is wide enough that the title does not wrap.
+  2. Append a new final slide titled "Reference" that lists each unique paper title from slides 2–6 as an auto-numbered list. Deduplicate the papers, listing each unique title once.
+  3. Do not alter any other content on slides 1–6 (body text, images, layouts, master, theme, speaker notes).
+  4. Save the result as `output.pptx`.
+initial_state:
+  assets:
+    - path: assets/SF13_t2_reference_formatting/Awesome-Agent-Papers.pptx
+      source: "./assets/SF13_t2_reference_formatting/Awesome-Agent-Papers.pptx"
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+expected_outputs:
+  - path: output.pptx
+
+# === verifier_only: the fields below MUST NOT be shown to the model under test ===
+verifier_only:
+  skill_constraints_tested:
+    - id: use_ooxml_unpack_pack
+      description: "All edits must go through the OOXML unpack → edit → validate → pack workflow (skills/pptx/ooxml/scripts/{unpack,validate,pack}.py). Throughout the entire run there must be no `import pptx` / `from pptx`, no use of python-pptx in any form, and no direct `zipfile.*write*` / `shutil.make_archive` / shell `zip`/`unzip` rewrite of the .pptx. Mixing python-pptx with the OOXML scripts is also forbidden."
+      exclusive: "Default model writes a python-pptx script (its most familiar API) to set font/size/color and add a new slide, bypassing the OOXML workflow."
+    - id: validate_with_original_per_edit
+      description: "After EACH XML edit (each slide{N}.xml on slides 2–6, each of slide7.xml and the three registration files for the new slide), run `python ooxml/scripts/validate.py <unpacked_dir> --original assets/SF13_t2_reference_formatting/Awesome-Agent-Papers.pptx`, and resolve any reported diff before the next edit. `validate.py` must be invoked at least 6 times (≥6 covers 5 caption slides + at least 1 validation pass for the slide7 registration block). Batching all edits and validating only at the end is forbidden."
+      exclusive: "Default model batches all XML edits, then validates only the final package, missing per-edit diffs."
+    - id: register_new_slide_in_package
+      description: "Adding the closing slide requires creating ppt/slides/slide7.xml AND updating ppt/_rels/presentation.xml.rels (Relationship), [Content_Types].xml (Override), and ppt/presentation.xml (<p:sldIdLst>). Just dropping a slide7.xml file on disk is insufficient and produces a corrupt pptx."
+      exclusive: "Default model edits XML files in isolation and forgets to register the new slide in package metadata."
+    - id: native_auto_numbering_no_inline_digits
+      description: "The Reference list must use native OOXML auto-numbering (`<a:buAutoNum type=\"arabicPeriod\"/>`) on each `<a:p>`; the run text `<a:t>` must NOT contain leading '1.', '2.', '•', '-', or '*' — those would double up with the auto-number. Using <a:buChar> or <a:buNone> as a substitute is also forbidden."
+      exclusive: "Default model writes plain paragraphs with hand-typed '1. Title' instead of native auto-numbering, or mixes both and produces '1. 1. Title'."
+    - id: caption_located_by_text_not_index
+      description: "The caption shape on each of slides 2–6 must be located by matching the (concatenated-runs) paper-title text against the known title, NOT by hard-coded shape index — each slide contains multiple text frames and indices are unreliable."
+      exclusive: "Default model picks the n-th `<p:sp>` and ends up restyling a body paragraph or annotation."
+    - id: concat_runs_then_dedup_ordered
+      description: "When extracting titles from slides 2–6 to build the Reference list, all `<a:t>` runs inside the same title `<p:sp>` must be concatenated before comparison. Deduplication must preserve insertion order (e.g. dict.fromkeys / ordered scan); using an unordered `set()` is forbidden."
+      exclusive: "Default model reads only the first `<a:t>` run per shape and/or uses set() and loses order."
+    - id: preserve_unrelated_xml_byte_for_byte
+      description: "Slides 1–6 must be byte-for-byte equivalent to the originals EXCEPT for the title caption shape on slides 2–6 (where its run properties, paragraph alignment, and `<p:xfrm>` may change). Body text, images, theme, masters, layouts, speaker notes, and any non-caption shapes must be untouched. Color values on the restyled caption must be encoded as `<a:srgbClr val=\"989596\"/>` (uppercase 6-hex, no leading '#'); positions must be in EMU, not points or inches."
+      exclusive: "Default model rewrites whole slide XML through python-pptx (which reflows attributes), or writes color as '#989596' / lowercase, or uses points instead of EMU."
+  asset_reality:
+    - "Slide 1 (cover): 'Awesome-Agent-Papers'."
+    - "Slide 2 paper title: 'Foam-Agent: Towards Automated Intelligent CFD Workflows'."
+    - "Slide 3 paper title: 'ReAct: Synergizing Reasoning and Acting in Language Models' (split across runs: 'ReAct' + ': Synergizing Reasoning and Acting in Language Models')."
+    - "Slide 4 paper title: 'ReAct: Synergizing Reasoning and Acting in Language Models' (duplicate of slide 3 — dedup required)."
+    - "Slide 5 paper title: 'Why Do Multi-Agent LLM Systems Fail?'."
+    - "Slide 6 paper title: 'MultiAgentBench : Evaluating the Collaboration and Competition of LLM agents' (split across multiple `<a:t>` runs — concatenation required)."
+    - "Deck has exactly 6 slides on disk; new Reference slide is slide 7."
+  sr_verification:
+    artifact_checks:
+      - "Slides 2–6 caption shapes: `<a:latin typeface=\"Arial\"/>`, `<a:rPr sz=\"1600\" b=\"0\">`, `<a:srgbClr val=\"989596\"/>`, `<a:pPr algn=\"ctr\">`, `<p:xfrm>` y-offset in lower band of slide, `cx` wide enough that the title fits one line."
+      - "Slide 7 exists, registered in [Content_Types].xml, ppt/_rels/presentation.xml.rels, and ppt/presentation.xml `<p:sldIdLst>`."
+      - "Slide 7 title shape contains 'Reference'."
+      - "Slide 7 list paragraphs each carry `<a:buAutoNum>`, and `<a:t>` text matches the 5 deduplicated titles in original first-appearance order: Foam-Agent…, ReAct…, Why Do Multi-Agent LLM Systems Fail?, MultiAgentBench…. No leading digits/bullets in the text."
+      - "Diff vs original: outside the caption shape on slides 2–6 and the new slide7 + registration files, every other unpacked file must be byte-equal."
+      - "Slide 7 registration: <p:sldId> id must be ≥256 and unique within <p:sldIdLst>; [Content_Types].xml Override PartName must start with \"/\" (e.g., \"/ppt/slides/slide7.xml\")."
+    process_log_checks:
+      - "Process log MUST contain `unpack.py` (≥1), `validate.py ... --original ...` (≥6), `pack.py` (≥1)."
+      - "Process log MUST NOT contain `import pptx`, `from pptx`, `zipfile.*writestr`, `zipfile.ZipFile(... 'w'`, `shutil.make_archive`, or shell `zip`/`unzip` invocations against the .pptx."
+  source: ./assets/SF13_t2_reference_formatting
+  # tc1_spec: Structured task-completion expectations for rubric tc1 (verifier: pptx-check) to make deterministic assertions.
+  # Corresponds one-to-one with tc1.signal / r4.signal in rubric_t2_reference_formatting.yaml.
+  tc1_spec:
+    output: output.pptx
+    must_be_valid_ooxml: true
+    required_parts: ["[Content_Types].xml", "ppt/presentation.xml"]
+    slides:
+      min_count: 7
+      new_slide:
+        part: ppt/slides/slide7.xml
+        title: Reference
+        registered_in: ["[Content_Types].xml", "ppt/_rels/presentation.xml.rels", "ppt/presentation.xml"]
+        list: native-auto-number      # buAutoNum, no inline digits
+        dedup_titles: 4               # number of reference entries after dedup (ReAct duplicates merged into one)
+    caption_format:                   # slides 2-6 title caption (fine-grained assertions, optionally augment tc1.signal)
+      typeface: Arial
+      size_pt: 16
+      bold: false
+      color_srgb: "989596"            # uppercase 6-hex, no leading #
+      align: ctr
+      single_line: true

@@ -1,0 +1,131 @@
+rules:
+  - id: r1_announced_skill_before_workflow
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] Before any Git/workspace/setup/test related tool call, must announce that the using-git-worktrees skill is being used to set up an isolated workspace.
+      skill-exclusive reason: without reading the skill, a strong model will directly inspect the repository or run setup; the skill requires first outputting a specific skill startup announcement. The conflict is "silently starting work" vs "declaring using-git-worktrees workflow first".
+    signal:
+      query: >
+        Based on actual message order and tool call evidence, not post-hoc descriptions: did the model, before the first Git, workspace/worktree, setup, dependency install, or baseline test related tool call, output a startup announcement containing `using-git-worktrees` and expressing the meaning of setting up an isolated workspace?
+        Answer YES only if the pre-tool-call announcement explicitly contains `using-git-worktrees` (case-insensitive; minor punctuation/capitalization differences allowed) and indicates isolated workspace setup.
+        Answer NO if the announcement is absent, appears only after commands, omits `using-git-worktrees`, or is only a generic paraphrase such as "I will create a worktree."
+      acceptable: "First say `I'm using the using-git-worktrees skill to set up an isolated workspace.`, then run git rev-parse or worktree/setup commands."
+      unacceptable: "First run `git status`, `git worktree add`, `npm install`, or `pytest`; or only say 'I will prepare an isolated environment' but without `using-git-worktrees`."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_detected_existing_isolation_before_creation
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] Before creating/entering an isolated workspace, setup, dependency install, or baseline test, must first detect at the current target path whether already in an isolated workspace: compare git-dir with git-common-dir, query the current branch, and execute superproject/submodule guard.
+      skill-exclusive reason: without reading the skill, a strong model facing "prepare an environment that does not affect the current workspace" typically directly creates a worktree, switches branches, or sets up in the original directory; the skill requires first determining whether the current path is already isolated and ruling out submodule misidentification.
+    signal:
+      query: >
+        Based on actual Bash/tool call evidence, not agent self-report: before any EnterWorktree, git worktree add, git switch/checkout -b, dependency install, setup, or test command, did the model complete current-path-level isolation detection at the current target path: run `git rev-parse --git-dir` and `git rev-parse --git-common-dir` (or an equivalent way to determine whether the current path is a linked worktree), branch query (e.g., `git branch --show-current`), and run superproject/submodule guard (e.g., `git rev-parse --show-superproject-working-tree`)?
+        Answer YES only if all required checks happen before creation/setup/test actions. A standalone `git worktree list` is NOT sufficient because it does not by itself prove the current path is or is not a linked worktree.
+        Answer NO if detection is missing, incomplete, occurs after workspace/setup/test actions, or relies only on `git worktree list`/`git status`.
+      acceptable: "First run git rev-parse --git-dir, --git-common-dir, git branch --show-current, git rev-parse --show-superproject-working-tree in the target repo, then create/enter workspace or setup/test."
+      unacceptable: "Directly call EnterWorktree, git worktree add, git checkout -b, pip install, or pytest; or only run git worktree list and then judge."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_preferred_native_worktree_tool_over_raw_git
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] This native_preferred task is handled as if a native/deferred worktree mechanism is available; must first search/call native worktree tools (e.g., EnterWorktree, WorktreeCreate, /worktree, or equivalent native tool), and only allow raw `git worktree add` fallback after native attempt fails or is clearly unavailable.
+      skill-exclusive reason: without reading the skill, a strong model often directly writes `git worktree add`; the skill requires using the harness/native tool first to avoid phantom state.
+    signal:
+      query: >
+        Based on actual tool call evidence, not agent self-report: this task should be treated as having a native/deferred worktree mechanism. Did the model, before any raw `git worktree add`, first use `ToolSearch` to find native worktree tools, call/attempt to call `EnterWorktree` or equivalent native tool, or have clear evidence of native attempt failure before falling back?
+        Answer YES if it searches/calls native worktree tooling first, uses EnterWorktree/equivalent, or falls back only after a recorded native-tool failure/unavailability.
+        Answer NO if it never searches/tries native tooling and directly runs `git worktree add` or only uses git checkout/switch in place.
+      acceptable: "First ToolSearch/DeferExecuteTool call EnterWorktree; or after EnterWorktree clearly fails, fall back to raw git."
+      unacceptable: "Without searching/trying native tools, directly run `git worktree add .worktrees/... -b ...` in Bash."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_verified_ignore_before_manual_project_local_fallback
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] Only when using raw Git fallback and creating a worktree in a project-local directory, must verify with Git ignore semantics before creation that the chosen `.worktrees` or `worktrees` directory is ignored; if not ignored, must first fix .gitignore and commit before continuing.
+      skill-exclusive reason: without reading the skill, a strong model may see an existing local worktree directory and directly create; the skill requires first verifying with the Git ignore engine to prevent worktree contents from entering version control.
+    signal:
+      query: >
+        Based on actual Bash/file modification tool call evidence, not agent self-report: if the model uses `git worktree add` to create a workspace under project-local `.worktrees` or `worktrees`, did it run `git check-ignore` or equivalent Git ignore semantic check to verify the chosen directory/target subpath before the creation command, and add .gitignore rules and commit when not ignored?
+        Answer YES if no manual project-local git worktree fallback was used, or if Git ignore semantic verification/fix occurred before git worktree add.
+        Answer NO if project-local `git worktree add` happens without prior Git ignore semantic verification. Merely reading/grepping `.gitignore` is not sufficient.
+      acceptable: "First run `git check-ignore -q .worktrees` or `git check-ignore -- .worktrees/<branch>`, confirm ignored, then `git worktree add .worktrees/branch -b branch`."
+      unacceptable: "Only Read/Grep `.gitignore` then directly `git worktree add .worktrees/parser-errors -b parser-errors`."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_setup_and_baseline_occurred_after_isolation_not_original_checkout
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] If setup, dependency install/detection, or baseline test is executed, these actions must occur after the isolated workspace is established/entered, or after Step 0 detects the current is already a linked worktree; must not run in the original checkout first.
+      skill-exclusive reason: the task requires preparing environment/confirming baseline, but the skill-exclusive part is the location and order of setup/test: must isolate or confirm already isolated first, then setup/test.
+    signal:
+      query: >
+        Based on actual tool call evidence, not agent self-report: if any setup, dependency install/detection, or baseline test occurs, is it executed after the isolated workspace is established/entered, or after detecting the current path is already a linked worktree?
+        Answer YES if setup/test commands occur only after isolation creation/entry or existing-isolation detection. Do not require baseline to exist for this skill-following score; absence/quality of baseline is task-completion.
+        Answer NO if setup/tests run in the original checkout before isolation/detection, even if a worktree is created later.
+      acceptable: "EnterWorktree then run `pip install`/`pytest`; or first detect as existing linked worktree then setup/test."
+      unacceptable: "Run pytest or install in the original `input/repo` directory first, then prepare worktree."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: "[TASK — not counted toward SF] Whether the final answer explains the development environment/test status, and does not claim to have implemented business changes; this item only evaluates the final statement, does not verify trace authenticity."
+    signal:
+      query: >
+        Looking only at the final answer: does the final answer clearly state that changes can begin, or report baseline test failure and wait for user decision; and does not claim to have implemented the date parsing error message change? This item only records whether the final statement meets the task reporting requirements, does not verify test status authenticity.
+        Answer YES if it reports ready/test passing or reports test failure with next-step question, and does not claim implementation.
+        Answer NO if it lacks environment/test status or claims the feature change was implemented.
+      acceptable: "Worktree ready... Tests passing... Ready to implement the parser error message change."
+      unacceptable: "Already modified error messages; or only says completed without any test/baseline status."

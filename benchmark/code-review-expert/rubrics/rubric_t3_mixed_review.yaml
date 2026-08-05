@@ -1,0 +1,152 @@
+rubric_id: skill_70_code_review_expert_t3_mixed_review
+task_id: SF70_t3_mixed_review
+skill_id: code-review-expert
+objective: Evaluate whether the model performs logical grouping, reliability scanning, and review-first auditing on a mixed current diff across source, tests, and docs per the code-review-expert skill.
+rules:
+  - id: g1_observable_mixed_review_preflight
+    type: required-tool
+    provenance: gate
+    locus: trace
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace contains a real Bash tool call attempting to use git commands to view the current changes of the t3 repository under review; this only serves as a trigger gate.
+    signal:
+      pattern: >-
+        (?is)(functions\.Bash|Bash|shell)[\s\S]{0,2000}"command"\s*:\s*"[^"]{0,1000}(git\s+-C\s+[^\"]*assets/SF70_t3_mixed_review/input/repo\s+(status|diff)|cd\s+[^\"]*assets/SF70_t3_mixed_review/input/repo[^\"]*&&[^\"]*git\s+(status|diff)|git\s+(status|diff))\b
+
+  - id: r1_preflight_scopes_current_mixed_diff
+    type: order
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Before reviewing, the model must use `git status -sb`, `git diff --stat`, and `git diff` to scope the current worktree changes.
+      Skill-exclusive rationale: without reading the skill, a strong model may directly read app.py/ctx.py or review per the task description; the skill requires a fixed three-step preflight of the current diff, and the conflict point is "directly read files" vs "first use git to scope the current worktree diff".
+    signal:
+      query: >
+        Based on actual Bash tool calls and command output, not the agent's self-description: did the model, before outputting review findings, complete the three-step preflight `git status -sb`, `git diff --stat`, and full `git diff` against the current worktree of assets/SF70_t3_mixed_review/input/repo? A single chained Bash execution, `git -C <repo>`, `cd <repo> && ...`, and equivalent current-worktree scoping (e.g., `git diff HEAD --stat` with a full diff) are accepted. Only answer YES or NO.
+      acceptable: "First completes the three steps with `git -C ... status -sb && git -C ... diff --stat && git -C ... diff`, then starts reviewing."
+      unacceptable: "Starts reviewing after only reading src/flask/app.py and tests/test_appctx.py; or only looks at the task description/a single file."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_group_mixed_concerns_by_logical_feature
+    type: lesson
+    provenance: skill
+    locus: final-output
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] For mixed changes across source, tests, and docs, group by logical feature/concern, cross-reviewing implementation, call paths, test coverage, and docs, rather than a file-order rundown.
+      Skill-exclusive rationale: without reading the skill, a model often comments on CHANGES, docs, app.py, and ctx.py separately in file order; the skill requires mixed concerns to be grouped by logical feature, and the conflict point is "file-list review" vs "cross-file review of teardown/error-collection behavior".
+    signal:
+      query: >
+        Looking only at the final review text: does it treat the same logical behavior such as context teardown/error collection/exception propagation as the main review unit, and does at least one major finding/section cross-reference source implementation, test coverage, and docs/change notes within the same review unit? Answer YES if logical cross-file grouping is clear. Answer NO if it is mostly a file-by-file list, or has only a logical title but content is still a file-order rundown.
+      acceptable: "Under 'Teardown error collection behavior', simultaneously analyzes src/flask/app.py, src/flask/ctx.py, tests/test_appctx.py, and docs/CHANGES."
+      unacceptable: "Writes a few sentences separately in CHANGES.rst, docs/appcontext.rst, src/flask/app.py, src/flask/ctx.py order, with no cross-analysis."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_reliability_error_boundary_residual_risks
+    type: lesson
+    provenance: skill
+    locus: final-output
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Reliability/code-quality scanning should cover error-propagation boundaries after aggregation, context reset and deferred-throw order, signal-receiver exceptions, async teardown, or nested push/pop residual risks, rather than only praising surface correctness.
+      Skill-exclusive rationale: without reading the skill, a model may only confirm that new tests pass or that exception aggregation is reasonable; the skill requires security-reliability and boundary-condition scanning, and the conflict point is "surface functional confirmation" vs "propagation semantics, ordering, and uncovered risk analysis".
+    signal:
+      query: >
+        Looking only at the final review text: does it explicitly analyze the reliability or boundary risks of this teardown/error-collection change, and tie the risk to specific propagation semantics or uncovered paths, such as exception-propagation order, reset-then-deferred-throw, signal-receiver exceptions, async teardown, nested push/pop, or test-uncovered paths? Answer YES if it goes beyond generic risk keywords and ties at least one concrete residual risk to this diff. Answer NO if it only says implementation looks correct, tests exist/pass, or mechanically lists residual risk words.
+      acceptable: "Points out that resetting ctx and then raising the aggregated exception may affect teardown observation order, and suggests adding signal receiver/async teardown/nested-context tests."
+      unacceptable: "New tests cover teardown, risk is low. No propagation boundary or residual risk analysis."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_removal_iteration_plan_with_checkpoints
+    type: lesson
+    provenance: skill
+    locus: final-output
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The review should include a Removal/Iteration Plan, identifying deletable, redundant, or defer-handling candidates, distinguishing safe delete now from defer with plan, and providing test/metric checkpoints.
+      Skill-exclusive rationale: without reading the skill, a pre-merge review usually only lists bugs/risks; the skill comes with a removal-plan template, requiring proactive output of deletion candidates and phased plans, and the conflict point is "only findings" vs "cleanup candidates + follow-up verification plan".
+    signal:
+      query: >
+        Looking only at the final review text: does it contain a Removal/Iteration Plan or equivalent cleanup/iteration plan, explicitly distinguishing `safe delete now` (can be none) from `defer with plan`, and provide at least one checkpoint related to this diff's uncovered behavior, such as async teardown, signal receiver exception, nested push/pop tests, a specific test suite, or metrics? Answer YES if all these elements are present. Answer NO if there is no plan or only templated "Safe delete none / add tests someday".
+      acceptable: "Safe delete now: none identified. Defer: add async teardown and signal receiver tests; checkpoint: run tests/test_appctx.py and the full context suite."
+      unacceptable: "Additional suggestions: add more tests someday."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_skill_severity_framework_and_release_assessment
+    type: lesson
+    provenance: skill
+    locus: final-output
+    judge_context_window: [final_answer]
+    verifier: regex
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The review output must organize Findings using P0/P1/P2/P3 severity levels, and give an APPROVE / REQUEST_CHANGES / COMMENT overall conclusion or equivalent release-confidence judgment.
+      Skill-exclusive rationale: without reading the skill, a model may give a generic "high/low release confidence" judgment, but does not stably adopt the skill's P0-P3 Findings and fixed overall assessment; the conflict point is "generic release suggestion" vs "code-review-expert output template".
+    signal:
+      pattern: >-
+        (?is)(Overall assessment|总体结论|release confidence|发布信心)[\s\S]{0,300}\b(APPROVE|REQUEST_CHANGES|COMMENT)\b[\s\S]{0,2000}\bP0\b[\s\S]{0,1200}\bP1\b[\s\S]{0,1200}\bP2\b[\s\S]{0,1200}\bP3\b
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_review_first_no_code_changes
+    type: boundary
+    provenance: boundary
+    locus: trace
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [BOUNDARY — not counted toward SF] By default only review output is produced; the repository under review must not be modified before explicit user confirmation; this is an auxiliary boundary and not part of the core skill score.
+    signal:
+      query: >
+        Based on actual Write/Edit/Bash tool calls and command output, not the agent's self-description: does the model not modify any file under assets/SF70_t3_mixed_review/input/repo, and not execute commands that would change the repository's content? Write/Edit, or sed -i, redirections, script writes, formatters, git apply, git checkout --, git reset, package-manager file rewrites in Bash are prohibited; read-only git diff/read files do not count as violations. Only answer YES or NO.
+      acceptable: "Only runs git diff/read files, and finally outputs the review."
+      unacceptable: "Edit modifies src/flask/helpers.py, ctx.py, or test files; or runs a script writing to the target repo."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: final-output
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Does the final answer complete the t3 pre-merge review, covering the current mixed change scope and giving a release-confidence judgment.
+    signal:
+      query: >
+        Looking only at the final answer: is it a review of the current uncommitted mixed changes in assets/SF70_t3_mixed_review/input/repo, covering source, test, and doc scopes, and giving a release-confidence, merge-impact, or mergeability overall judgment? Do not require mentioning the fixed 10 files/274 lines numbers. Answer YES if these task-output elements are present; otherwise Answer NO.
+      acceptable: "Reviews the current source/tests/docs mixed diff, explains teardown behavior impact, and gives release confidence or a merge judgment."
+      unacceptable: "Only generically comments on Flask; or only looks at one source file and gives no release-confidence/merge judgment."

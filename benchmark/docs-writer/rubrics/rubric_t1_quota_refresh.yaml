@@ -1,0 +1,134 @@
+# Rubric for docs-writer — docs_writer_t1_quota_refresh
+rules:
+  - id: g1_docs_page_edit_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must show an observable attempt to edit or write the quota
+      and pricing Markdown page.
+    signal:
+      pattern: '(?m)^(?:Edit|Write|replace|write_file):.{0,800}assets/docs_writer_t1_quota_refresh/input/docs/resources/quota-and-pricing\.md'
+
+  - id: r1_investigate_billing_implementation_before_docs_edit
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Before modifying documentation, the model must investigate relevant
+      implementation code, here `packages/core/src/billing.ts`, before editing the
+      docs page.
+      skill-exclusive reason: Without the skill, a strong model can satisfy the
+      task by editing the existing prose from the task description alone. The
+      skill requires code-first accuracy work, so the conflict is generic docs
+      editing from visible requirements versus checking the billing implementation
+      before changing user-facing docs.
+    signal:
+      query: |
+        Based only on actual tool-call evidence, not the agent's statements or
+        plans, did the model inspect the contents of
+        `assets/docs_writer_t1_quota_refresh/input/packages/core/src/billing.ts`
+        with Read/read_file, Grep/grep_search, or an equivalent content-inspection
+        tool before its first actual Edit/Write/replace/write_file call targeting
+        `assets/docs_writer_t1_quota_refresh/input/docs/resources/quota-and-pricing.md`?
+        Answer YES only if the billing implementation was successfully inspected
+        before the first docs-page edit. Answer NO if the file was not inspected,
+        was inspected only after editing, or was only mentioned in prose.
+      acceptable: "A Read/read_file or Grep/grep_search call for billing.ts appears before the first Edit/Write/replace/write_file call for quota-and-pricing.md."
+      unacceptable: "The trace edits quota-and-pricing.md first, or only says it will check billing.ts without an actual content-inspection tool call."
+
+  - id: r2_credit_overage_content_reflects_code_specific_gates
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The updated docs must accurately reflect implementation-specific
+      credit-overage behavior from billing.ts, including eligible Google One AI
+      credits and the minimum-credit gate rather than generic pay-as-you-go advice.
+      skill-exclusive reason: The task only says users may have eligible credits;
+      a generic editor would naturally add a broad note about credits. The skill
+      requires matching the current codebase, whose distinctive behavior includes
+      Google One AI credits and a 50-credit minimum gate.
+    signal:
+      file: "assets/docs_writer_t1_quota_refresh/input/docs/resources/quota-and-pricing.md"
+      file_must_contain: '(?is)(?=.{0,20000}\bGoogle One AI\b)(?=.{0,20000}\b(?:50|fifty)\s+credits?\b)'
+
+  - id: r3_quota_limit_terminology_distinguishes_bucket_and_ceiling
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] In edited resource-capacity content, use "quota" for the
+      administrative allocation/bucket and "limit" for numerical ceilings.
+      skill-exclusive reason: Without the skill, a model commonly treats quota
+      and limit as synonyms in billing docs. The skill imposes a project-specific
+      distinction, so the conflict is interchangeable terminology versus a
+      bucket-versus-ceiling distinction.
+    signal:
+      file: "assets/docs_writer_t1_quota_refresh/input/docs/resources/quota-and-pricing.md"
+      query: |
+        Judge only the newly added or modified credit, overage, daily request,
+        quota, or limit guidance, using the diff/new_string evidence or final-file
+        evidence for those edited passages. Does the edited guidance use "limit"
+        for numeric request ceilings and avoid using "quota" as the word for those
+        numeric ceilings? Ignore pre-existing unmodified text elsewhere in the
+        file. Answer YES if the edited content keeps quota for allocation/bucket
+        concepts and limit for numeric ceilings. Answer NO if the edited content
+        says things like "quota limit," "daily request quota" for a numeric
+        ceiling, or treats quota and limit interchangeably.
+      acceptable: "If you reach your daily request limit, eligible Google One AI credits can continue requests..."
+      unacceptable: "If you exhaust your daily request quota limit, credits increase your quota..."
+
+  - id: r4_markdown_alert_has_prettier_ignore_if_used
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] If the update uses a GitHub-flavored Markdown alert callout, the
+      alert must have `<!-- prettier-ignore -->` immediately before the callout.
+      skill-exclusive reason: The task asks for an easy-to-notice short note, so
+      a generic model may use `> [!NOTE]` directly. The skill requires a
+      formatter-preserving comment immediately before Markdown alerts.
+    signal:
+      file: "assets/docs_writer_t1_quota_refresh/input/docs/resources/quota-and-pricing.md"
+      file_must_not_contain: '(?m)(?<!<!-- prettier-ignore -->\n)^>\s*\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]'
+
+  - id: r5_docs_internal_links_are_relative_if_introduced
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] If the edit introduces documentation-internal links from this docs
+      page, those links must be relative to the current file and must not include
+      a leading or embedded `/docs/` segment.
+      skill-exclusive reason: Generic Markdown documentation often uses site-root
+      `/docs/...` paths or GitHub URLs. The skill requires portable relative
+      links inside docs, so the conflict is common absolute docs links versus
+      project-relative docs links.
+    signal:
+      file: "assets/docs_writer_t1_quota_refresh/input/docs/resources/quota-and-pricing.md"
+      file_must_not_contain: '\]\((?:/docs/|docs/|https://github\.com/[^)]*/docs/)'
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not included in skill-following] The quota-and-pricing page was
+      updated so users can notice what happens when included usage runs out while
+      eligible credits are available.
+    signal:
+      file: "assets/docs_writer_t1_quota_refresh/input/docs/resources/quota-and-pricing.md"
+      file_must_contain: '(?is)(?=.{0,20000}\bcredits?\b)(?=.{0,20000}\b(?:continue|continuation|requests?|usage)\b)'

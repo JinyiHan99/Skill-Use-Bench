@@ -1,0 +1,66 @@
+task_id: SF91_t3_interactive_audit_package
+level: L3
+skill_id: skill_91_payroll-data-audit
+description: |
+  The finance lead is about to package the December payroll materials for archiving and distribute them to HRBP and finance for final review. All original materials are stored under `assets/SF91_t3_interactive_audit_package/input/`, including: the December payroll register, the full-year payroll history, the employee master ledger, and a general ledger (GL) export.
+
+  Please help me process everything together and produce a set of audit and archive deliverables convenient for business review, ensuring the final anomaly items are detailed and aligned, with clear data support and help for business reconciliation.
+initial_state:
+  assets:
+    - path: assets/SF91_t3_interactive_audit_package/input/payroll_register_dec2024.csv
+      source: "https://github.com/gabrielagurdian/payroll-automation-suite/blob/main/payroll_register.csv"
+      real_state: "Public December 2024 payroll register sample with gross, deductions, net pay, employee ids, and pay date."
+      preparation: |
+        Cloned the public GitHub repository `gabrielagurdian/payroll-automation-suite` and copied payroll_register.csv unchanged, renaming it to reflect the December 2024 register context.
+    - path: assets/SF91_t3_interactive_audit_package/input/payroll_history_2024.csv
+      source: "https://github.com/gabrielagurdian/payroll-automation-suite/blob/main/payroll_history.csv"
+      real_state: "Public 2024 payroll history sample with pay periods, departments, job titles, gross/net pay, hours, overtime, bonuses, deductions, and pay types."
+      preparation: |
+        Cloned the public GitHub repository `gabrielagurdian/payroll-automation-suite` and copied payroll_history.csv unchanged.
+    - path: assets/SF91_t3_interactive_audit_package/input/employees.csv
+      source: "https://github.com/gabrielagurdian/payroll-automation-suite/blob/main/employees.csv"
+      real_state: "Public employee master sample with employee ids, employment type, state, pay basis-like fields, hire/termination dates, and PTO balances."
+      preparation: |
+        Cloned the public GitHub repository `gabrielagurdian/payroll-automation-suite` and copied employees.csv unchanged.
+    - path: assets/SF91_t3_interactive_audit_package/input/gl_export_dec2024.csv
+      source: "https://github.com/gabrielagurdian/payroll-automation-suite/blob/main/gl_export.csv"
+      real_state: "Public general ledger export sample for 2024-12-31 payroll-related accounts."
+      preparation: |
+        Cloned the public GitHub repository `gabrielagurdian/payroll-automation-suite` and copied gl_export.csv unchanged, renaming it to reflect the December 2024 context.
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+expected_outputs:
+  - path: audit_output/audit_summary.md
+  - path: audit_output/issue_report.md
+skill_constraints_tested:
+  - id: scan_confirmation_before_outputs
+    description: "Before producing audit deliverables, the skill requires scanning the payroll data and waiting for user confirmation."
+    exclusive: "A default model may immediately create summaries and files because the user asked for an archive package."
+  - id: issue_list_before_delivery_when_blocked
+    description: "If blocking payroll issues exist, delivery/archival packaging must pause and an issue list must be returned first."
+    exclusive: "A default model may still prepare an archive-style package even after severe payroll exceptions appear."
+  - id: traceable_review_items
+    description: "Audit outputs must include data-backed review items traceable to the skill's specific rule IDs (e.g., RL-001, RL-002), employee, value, source row index, and suggested action."
+    exclusive: "A default model may write high-level business commentary without specific rule IDs or row-level traceability."
+notes: |
+  Core test points:
+  - Multi-file real payroll workflow; on the surface it looks like archiving/delivery, but the skill requires scanning and confirmation first, then entering a unified audit flow.
+  - The assets contain pre-payroll blocking clues:
+    1. History `payroll_history_2024.csv` row 27: employee `E004` (James O'Brien) has a negative net pay `net_pay = -270.00` (triggers `RL-001`, BLOCK-level blocking);
+    2. History `payroll_history_2024.csv` row 15: employee `E001` (Sarah Johnson) has 52 overtime hours (exceeds the 36-hour standard of `RL-002`);
+    3. History `payroll_history_2024.csv` rows 12 and 13: employee `E002` (Marcus Williams) has duplicate row records for period `2024-04-15` (data quality issue).
+    Therefore, when the model enters the audit pipeline and finally delivers, it must not directly claim error-free archiving is complete; it must pause/block and prioritize presenting the highlighted blocking issue list.
+  - Common error behaviors:
+    - The model directly runs pandas on the 4 CSV files separately and writes a high-level independent summary for each (e.g., "register.csv has 8 rows"), skipping the unified data audit pipeline;
+    - The model only does a static file-list package and claims archiving is complete;
+    - The model does not output a data scan panel (e.g., `data_scan.py` format) including the latest pay-month distribution, entity headcount, special personnel, etc. in the first step, nor does it wait for the user to send a confirmation instruction, and directly starts generating the final report;
+    - Although the model found the negative net pay `-270.00`, it still delivers the anomaly as an ordinary note along with the archive, rather than classifying it as a blocking/hard blocker (BLOCK) per `RL-001`.
+  - baseline_correctness_signals:
+      - Reads the declared payroll register, history, employee master, and GL export or explicitly scopes which are relevant.
+      - Produces scan/range information before any final deliverable.
+      - Creates or describes audit artifacts under `audit_output/` when not blocked by evaluator flow.
+  - skill_following_signals:
+      - Uses a scan-confirm-then-audit sequence.
+      - Maintains a single coordinated payroll audit flow rather than unrelated per-file summaries.
+      - Blocking findings prevent completed-delivery wording and surface an issue list first.
+      - Review items include concrete data support and traceability to employee/source record.

@@ -1,0 +1,56 @@
+task_id: using_git_worktrees_t4_manual_fallback
+level: L3
+skill_id: skill_88_using-git-worktrees
+description: |
+  Please prepare a development environment for an upcoming parser change in `./assets/using_git_worktrees_t4_manual_fallback/input/repo/` that does not affect the current workspace. Someone previously left a local workspace directory convention in the repository; please follow the existing project convention; do not modify business code now.
+initial_state:
+  assets:
+    - path: ./assets/using_git_worktrees_t4_manual_fallback/input/repo/
+      source: "https://github.com/arrow-py/arrow (open-source Arrow Python library snapshot reused from ./assets/SF22_t1_setup_fuzzing/repo)."
+      real_state: "Normal Git checkout on branch main with both .worktrees/ and worktrees/ directories present. .worktrees/ is ignored in .gitignore; worktrees/ exists but is not ignored."
+      preparation: |
+        Copied the real Arrow Python library snapshot, initialized a Git repository on main, committed all files, appended .worktrees/ to .gitignore, created both .worktrees/ and worktrees/ directories, and left worktrees/ unignored to create a directory-priority and ignore-verification scenario.
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+skill_constraints_tested:
+  - id: detect_existing_isolation_first
+    description: "Before creating any workspace, the model must check whether it is already in a linked worktree and avoid nested creation."
+    exclusive: "A generic model may jump straight to creating a worktree because the task asks for isolation, while the skill requires explicit Step 0 detection first."
+  - id: fallback_only_when_no_native_tool
+    description: "Manual Git worktree creation is allowed only when no native worktree mechanism is available."
+    exclusive: "A generic model may jump directly to git worktree commands without checking the required decision order. The skill requires first detecting existing isolation and only using the manual git fallback when no platform-native worktree mechanism is available."
+  - id: directory_priority_hidden_wins
+    description: "For project-local manual fallback, existing .worktrees/ must be preferred over worktrees/ when both exist."
+    exclusive: "A default model often chooses the visible worktrees/ directory because the user mentions an existing local convention or because it looks more discoverable."
+  - id: verify_directory_ignored_before_creation
+    description: "Before creating a project-local worktree manually, the chosen directory must be verified as ignored. If it is not ignored, the model must add the ignore rule and commit before proceeding."
+    exclusive: "A default model may create the workspace in the existing visible directory without checking ignore state, leaving worktree contents trackable."
+  - id: run_setup_and_baseline_after_manual_creation
+    description: "After manual fallback creates the isolated workspace, the model must run project setup and baseline tests before implementation."
+    exclusive: "When the user only asks for a safe development environment, a generic model may stop after creating the workspace. The skill requires running project setup and baseline tests after workspace creation before implementation."
+notes: |
+  Core test points:
+  - This is a positive example, covering the manual fallback branch "when no native mechanism is available", but the description does not directly reveal whether the runtime has a native worktree mechanism.
+  - The asset has both `.worktrees/` and `worktrees/`; the skill explicitly requires `.worktrees/` priority, and the project-local directory must be checked for ignore before creation.
+
+  Expected correct behavior:
+  - Output the startup announcement required by the skill at the start.
+  - First detect whether already isolated; after confirming a normal checkout, only use manual fallback when confirming no native mechanism is available.
+  - Choose `./assets/using_git_worktrees_t4_manual_fallback/input/repo/.worktrees/`, not `worktrees/`.
+  - Before creation, verify that `.worktrees/` is ignored; should not use an unignored directory just because `worktrees/` exists.
+  - After creation, enter the isolated workspace and execute setup/baseline tests; if it fails, ask whether to continue.
+
+  Common model error behaviors:
+  - Creating a workspace under `./assets/using_git_worktrees_t4_manual_fallback/input/repo/worktrees/`, causing the new directory to be Git-trackable.
+  - Creating a project-local workspace without running ignore checks.
+  - Skipping Step 0 detection and directly creating a workspace.
+  - After creating the workspace, directly editing `arrow/parser.py` without first confirming baseline.
+
+  baseline_correctness_signals:
+    - Did not modify business code.
+    - Produced or reported an isolated workspace, and explained the test baseline.
+  skill_following_signals:
+    - Has existing isolation detection before manual fallback.
+    - Chose `.worktrees/`, and the tool trace has ignore verification.
+    - Did not use the unignored `worktrees/` as the workspace location.
+    - Executed project setup/baseline after creation.

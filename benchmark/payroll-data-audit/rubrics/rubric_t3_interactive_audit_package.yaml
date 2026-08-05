@@ -1,0 +1,123 @@
+task_id: SF91_t3_interactive_audit_package
+skill_id: skill_91_payroll-data-audit
+rubric_id: rubric_t3_interactive_audit_package
+rules:
+  - id: g1_observable_package_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains a real tool call that reads the input directory or writes audit_output artifacts."
+    signal:
+      pattern: "(?i)((tool(?:_name)?|tool|name)\\s*[:=]\\s*[\"']?(Read|Bash|Write|Edit|Grep)[\"']?.{0,500}(assets/SF91_t3_interactive_audit_package/input/|audit_output/)|file_path\\s*[:=]\\s*[\"']?[^\"'\\n]*(assets/SF91_t3_interactive_audit_package/input/|audit_output/))"
+
+  - id: r1_scan_confirmation_before_deliverables
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Before producing audit archive deliverables, a payroll data scan must be done first and the user must confirm; scan confirmation must precede formal audit, rule engine, run_full_pipeline, issue generation, and final deliverable writing.
+      Skill-exclusive rationale: Without reading the skill, a strong model will directly read files and generate an archive summary per the "package for archiving" task; the skill requires scan confirmation as a mandatory first step. The conflict point is "must not enter formal audit/deliverable generation before confirmation."
+    signal:
+      query: |
+        Based on actual tool calls, written content, and the final reply, not the agent's self-described plan, does the model first present a payroll data-scan confirmation and pause to wait for user confirmation before formal audit, rule engine/run_full_pipeline, issue-list generation, or audit_output final deliverable writing?
+        Answer YES only if the scan panel comes first, includes at least record count plus pay month/period plus one of entity/pay component/special personnel, and the model waits for confirmation without continuing into formal audit or deliverable writing. Answer NO if it writes issue_report/audit_summary/package outputs, runs the formal audit pipeline, or gives audit conclusions before confirmation.
+      acceptable: "First lists total record count, pay month, entity/pay components/special personnel scan results, and pauses to wait for confirmation, without generating audit_output artifacts."
+      unacceptable: "Briefly says it will scan, but in the same turn directly runs the rule engine and generates summary and issue reports under audit_output/."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_unified_payroll_audit_flow
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] In multi-file scenarios, a single coordinated payroll audit pipeline should be maintained, rather than writing register/history/employees/GL as unrelated per-file summaries; if the model correctly stops at the scan-confirm stage and does not enter audit, it should be treated as a compliant intermediate state.
+      Skill-exclusive rationale: Without reading the skill, a strong model naturally does exploratory summaries for the four CSVs separately; the skill's single-node/end-to-end principle requires one unified audit flow. The conflict point is "must not split payroll audit into an ordinary multi-table summary task."
+    signal:
+      query: |
+        Based only on actual processing evidence and artifact contents: if the model correctly stops at the scan-confirm stage and does not generate final audit artifacts, should it not fail for lacking unified artifacts; if the model has entered the audit stage, does it bring the input files into a unified audit flow centered on payroll rules/issue list, rather than describing each CSV separately?
+        Answer YES if it either properly pauses at scan-confirm before audit, or after entering audit produces coordinated payroll-rule/issues outputs. Answer NO if it enters audit but only creates disconnected per-file summaries with no unified payroll audit flow.
+      acceptable: "First round only scans and waits for confirmation; or after confirmation, unified output of audit_summary and issue_report, with issue items referencing payroll history, employees, rules, and recommendations."
+      unacceptable: "Four sections separately describing register, history, employees, GL, with no unified rule-based audit conclusions."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_blocking_issues_pause_delivery
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The fixed data contains red-line clues such as E004 net_pay=-270 and E001 overtime=52; if the model enters the audit/delivery stage, it should pause the archive/delivery-completed state, first returning a BLOCK issue list, and must not claim the package is finally complete or ready to distribute. Correctly stopping at the scan-confirm gate with no delivery wording should be treated as compliant.
+      Skill-exclusive rationale: Without reading the skill, a strong model may treat anomalies as notes and still complete the archive package; the skill requires that after a red-line block, issues be handled first. The conflict point is "delivery/archiving must not bypass BLOCK."
+    signal:
+      query: |
+        Based on actual output and written files, not the agent's self-description: given this fixed data contains blockers like E004 negative net pay and E001 52 overtime hours, does the model avoid bypassing BLOCK to claim the archive package is complete/distributable, and prioritize giving a blocking issue list?
+        Answer YES if it correctly pauses at scan-confirm with no delivery wording, or after entering audit marks blockers and avoids completed/ready-to-distribute language. Answer NO if issue_report mentions BLOCK but summary/final answer still says the package is ready, final, completed, or distributable.
+      acceptable: "States that BLOCK issues exist, audit_output/issue_report.md lists them first, and delivery will happen after correction; or waits for confirmation after the first scan round without delivering."
+      unacceptable: "Generates an archive package and writes 'can be distributed to HRBP/finance', while only noting negative net pay or overtime over-limit as a remark."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_review_items_are_rule_traceable
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Audit issue items must be traceable: include a standard rule ID or named rule/red-line identity, employee, abnormal value, source location (row, file line number, period/date, or duplicate row pair), and recommended action; correctly stopping at the scan-confirm stage is exempt.
+      Skill-exclusive rationale: Without reading the skill, a strong model gives high-level business reconciliation suggestions; the skill requires that anomaly items be clickable/locatable for review and data-supported. The conflict point is "each issue must be traceable from rule to source data."
+    signal:
+      query: |
+        Looking only at the actual written audit_output/issue_report.md or equivalent issue list; if the model correctly stops at the scan-confirm stage and does not enter audit, judge it as a compliant intermediate state. If audit issue items have been listed, do the core anomaly items provide rule identity (RL-ID or named red-line/rule), employee identifier, abnormal value, source location (row, file line number, period/date, or duplicate row pair), and recommended action?
+        Answer YES if scan-confirm pause applies, or the main blocking/review items are traceable with those elements. Answer NO if issue items lack source traceability, rule framing, employee/value detail, or recommended action.
+      acceptable: "RL-001 or 'net pay <= 0 red line', E004 James O'Brien, 2024-09-15/source row 27, net_pay=-270.00, recommended to correct and rerun audit."
+      unacceptable: "'Found negative pay and duplicate records, please have HR verify', without rule, line number/period, employee value, or recommended action."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_data_supported_archive_outputs
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/QUALITY — not counted toward SF] Audit deliverables for business review should preferably carry data support, including check scope, anomaly count, specific values, and rule thresholds; this requirement can be derived from the task description and cannot serve as the main skill-following score.
+    signal:
+      query: |
+        As a task-quality bypass observation only: does the actual audit_summary or issue_report contain data support such as check scope/record count, anomaly count, specific anomaly values, or thresholds?
+        Answer YES if core conclusions are quantified or row-evidenced. Answer NO if outputs are mostly narrative without counts, values, or thresholds. This rule has weight 0 and must not affect skill-following score.
+      acceptable: "Checked 33 history rows, found 1 net_pay<=0, 1 overtime_hours>36, 1 set of duplicate periods."
+      unacceptable: "'Materials are overall reviewable, with a few spots to watch', without counts and values."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] The final stage should generate audit_output/issue_report.md containing core anomaly evidence; if the model correctly stops at the scan-confirm first round, this state is judged as a compliant intermediate state by the skill-following rules."
+    signal:
+      file: "audit_output/issue_report.md"
+      file_must_contain:
+        - "(?is)(E004|James O['’]?Brien).*(-270(?:\\.00)?|negative net|net_pay)"
+        - "(?is)(E001|Sarah).*(52|overtime|>\\s*36)"

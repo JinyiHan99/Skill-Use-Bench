@@ -1,0 +1,187 @@
+# Rubric for skill_03 (pdftk) — t7_merge_ordered_ranges
+#
+# Scoring boundary: provenance=skill enters the skill-following score; provenance=task
+# only records task completion rate (0/1) and does not enter the skill-following score.
+
+# ── GATE: evaluability ────────────────────────────────────────────────
+rules:
+  - id: g1_observable_pdf_range_merge_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The trajectory should contain a PDF-range-extraction/merge-related Bash command.
+    signal:
+      command_pattern: '\bpdftk\b.*\.pdf'
+      pattern: '\bpdftk\b.*\.pdf'
+
+  # ── COMPLIANCE: skill-derived behavior ────────────────────────────────
+  - id: r1_uses_pdftk_for_range_merge
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — tool boundary] Multi-PDF page-extraction merge should use pdftk cat/output.
+    signal:
+      command_pattern: '\bpdftk\b.*\bcat\b.*\boutput\b'
+      pattern: '\bpdftk\b.*\bcat\b.*\boutput\b'
+
+  - id: r2_uses_uppercase_handle_syntax
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL — handle syntax] Multi-file selective page ranges should use single uppercase-letter handles such as A=, B=, C=
+      and reference ranges in a single cat expression; temporary PDFs should not be extracted first and then merged a second time.
+    signal:
+      judge_question: |
+        Consider only executed pdftk commands. Did the agent use pdftk
+        uppercase handle syntax (e.g. A=file.pdf, B=file.pdf) and reference
+        those handles with page ranges in a single cat expression, instead
+        of extracting temporary PDFs first? Any uppercase single-letter
+        handle is acceptable, not just A/B/C.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+
+  - id: r3_preserves_user_order_when_order_words_present
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — order-trigger boundary] Alphabetical sorting only applies when the user uses no ordering language. When the user explicitly
+      gives ordering words such as first/then/finally, the user's order should be preserved.
+      Weight reduced from 2.0 to 1.0 (~75% baseline pass rate, weak discriminative power).
+    signal:
+      judge_question: |
+        The user explicitly specified order: first rfc9110 pages 8-45,
+        then rfc9000 pages 15-68, finally rfc9114 pages 5-42.
+        Did the executed pdftk cat expression preserve this exact order
+        rather than sorting alphabetically? Consider handle mappings.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+
+  - id: r4_validates_each_input_before_range_merge
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — input validation] Before operations, dump_data should be run on each input PDF.
+      Switched to a tool-call verifier to check that all three inputs are validated.
+    signal:
+      pattern: '\bpdftk\b'
+      command_all_patterns:
+        - '\bpdftk\b.*rfc9110_http_semantics\.pdf.*\bdump_data\b'
+        - '\bpdftk\b.*rfc9000_quic\.pdf.*\bdump_data\b'
+        - '\bpdftk\b.*rfc9114_http3\.pdf.*\bdump_data\b'
+
+  - id: r5_verifies_output_after_range_merge
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — output verification] After page-extraction merge, dump_data should be run on the final PDF for verification.
+      Switched to a tool-call verifier.
+    signal:
+      command_pattern: '\bpdftk\b.*merged_\S*\.pdf\s+dump_data\b'
+      pattern: '\bpdftk\b.*merged_\S*\.pdf\s+dump_data\b'
+
+  - id: r6_default_merge_output_naming
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.3
+    spec: |
+      [SKILL — default naming] When the user does not provide an output name, the merge default name is
+      merged_<first_input_stem>.pdf.
+    signal:
+      command_pattern: 'merged_rfc9110_http_semantics\.pdf'
+      pattern: 'merged_rfc9110_http_semantics\.pdf'
+
+  # ── BOUNDARY ─────────────────────────────────────────────────────────
+  - id: b1_no_forbidden_pdf_tools
+    type: forbidden-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — forbidden tools] Using Python PDF libraries or alternative CLI tools to bypass pdftk is forbidden.
+      Weight reduced from 2.0 to 1.5.
+    signal:
+      command_must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b'
+      must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz)\b'
+      pattern: '[\s\S]*'
+
+  - id: b2_does_not_overwrite_inputs
+    type: boundary
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: false
+    weight: 0.3
+    spec: |
+      [SKILL — output boundary] No input PDF may be overwritten. Weight reduced from 1.0 to 0.3.
+    signal:
+      command_must_not_match: '\boutput\s+(\./)?rfc9110_http_semantics\.pdf\b|\boutput\s+(\./)?rfc9000_quic\.pdf\b|\boutput\s+(\./)?rfc9114_http3\.pdf\b'
+      must_not_match: '\boutput\s+(\./)?rfc9110_http_semantics\.pdf\b|\boutput\s+(\./)?rfc9000_quic\.pdf\b|\boutput\s+(\./)?rfc9114_http3\.pdf\b'
+      pattern: '[\s\S]*'
+
+  # ── TASK COMPLETION: only records 0/1, not scored ────────────────────
+  - id: task_completion_binary
+    type: task-completion
+    provenance: task
+    locus: final-output
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Deterministic verification of whether the ordered-range-merge output is correct.
+    signal:
+      judge_question: |
+        Based ONLY on concrete tool calls, command outputs, and observable results in the trace
+        (not the agent's self-claims or plans):
+        1. Was a pdftk cat command successfully executed that merged page ranges in the user-specified
+           order: rfc9110 pages 8-45 (38 pages), then rfc9000 pages 15-68 (54 pages), then rfc9114
+           pages 5-42 (38 pages), producing a 130-page output PDF?
+        2. Did the command preserve the exact order specified by the user (rfc9110 first, rfc9000
+           second, rfc9114 third) — NOT alphabetical order?
+        3. Did the command complete without errors? (no "Error", "failed", "Exception" in output)
+        Answer YES only if ALL three conditions are met with evidence in the trace. Answer NO if any
+        condition fails or lacks evidence.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - final_answer
+        - tool_results_first_n: 12

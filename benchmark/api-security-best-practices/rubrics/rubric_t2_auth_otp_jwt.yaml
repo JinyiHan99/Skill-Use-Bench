@@ -1,0 +1,64 @@
+task_id: api_security_t2_auth_otp_jwt
+skill_id: api-security-best-practices
+
+rules:
+  - id: g1_observable_review_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The trace should contain an observable pre-launch security review attempt: there must be actual tool calls reading AuthController, OtpServiceImpl, JwtProvider, and SignUpForm. The gate only judges whether the task is evaluable, not the correctness of the content.
+    signal:
+      pattern: >-
+        (?s)(?=.*?\b(?:Read|read_file)\b.{0,2000}AuthController\.java)(?=.*?\b(?:Read|read_file)\b.{0,2000}OtpServiceImpl\.java)(?=.*?\b(?:Read|read_file)\b.{0,2000}JwtProvider\.java)(?=.*?\b(?:Read|read_file)\b.{0,2000}SignUpForm\.java)
+
+  - id: r2_jwt_token_trust_boundary_hardening
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] The JWT review must cover the token trust boundary: reject unsigned/plain JWTs, prevent algorithm confusion, do not trust unverified external JKU/key material, and require signature verification before claims are trusted.
+      Skill-exclusive rationale: without reading the skill, strong models often stop at "check expiration/signature"; the skill requires strong token authentication, weak-verification-behavior protection, and not trusting externally supplied keys, and the conflict point is that controllable headers/unverified-signature claims must not be treated as trusted input.
+    signal:
+      query: >-
+        Based only on the final deliverable, does the delivered review ground its JWT findings in
+        JwtProvider or equivalent code and identify concrete token-trust-boundary flaws? Answer YES if it
+        covers at least three of these four issues plus the remediation principle: reject unsigned/plain
+        tokens, prevent algorithm confusion by pinning allowed algorithms, avoid trusting unvalidated JKU
+        or externally supplied key material, and do not trust claims before signature verification. Answer
+        NO if it only says to check expiration, use a strong secret, or verify signatures generically.
+      acceptable: "JwtProvider must reject PlainJWT/alg=none, pin allowed algorithms and trusted key source, disallow untrusted JKU, and verify signature before reading user claims."
+      unacceptable: "Ensure JWTs are signed and not expired."
+      judge_context_window:
+        - final_answer
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: final-output
+    verifier: llm-judge
+    severity: soft
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Records whether a prioritized account recovery/login API security review issue list was completed; includes remediation and regression verification for major findings, but is not counted toward the skill-following main score.
+    signal:
+      query: >-
+        Based only on the final deliverable, did the agent provide a prioritized issue list for the auth,
+        OTP, JWT, and signup files, with affected code location, risk reason, remediation, and regression
+        validation for each major issue? This is task completion only. Answer YES only if the core
+        requested structure is present, the main findings include corresponding attack-scenario or
+        regression validation, and high-risk token bypass or account-takeover issues are prioritized above
+        weak password policy or generic hygiene items. Answer NO if the answer is an unprioritized generic
+        checklist, lacks validation/remediation sections, or treats low-risk hygiene as the top issue while
+        token/account-takeover risks are present.
+      acceptable: "Prioritized findings with code locations, risk, fix, and validation; JWT bypass/account takeover items appear before password policy or generic hygiene."
+      unacceptable: "Unprioritized generic security checklist or missing validation/remediation sections."
+      judge_context_window:
+        - final_answer

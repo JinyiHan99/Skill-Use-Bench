@@ -1,0 +1,45 @@
+task_id: SF91_t2_quick_redline_check
+level: L2
+skill_id: skill_91_payroll-data-audit
+description: |
+  Payroll approval is about to start. Please help me quickly run the system's blocking rules over
+  `./assets/SF91_t2_quick_redline_check/input/payroll_history_2024.csv`
+  to see if there are any hard blockers that prevent payroll from continuing, and give me the conclusion directly. No need to expand into other analysis for now.
+initial_state:
+  assets:
+    - path: ./assets/SF91_t2_quick_redline_check/input/payroll_history_2024.csv
+      source: "https://github.com/gabrielagurdian/payroll-automation-suite/blob/main/payroll_history.csv"
+      real_state: "Public payroll history sample with 32 rows across 2024; includes a negative net pay row and an overtime-heavy row."
+      preparation: |
+        Cloned the public GitHub repository `gabrielagurdian/payroll-automation-suite` and copied payroll_history.csv unchanged.
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+expected_outputs:
+  - path: redline_findings.md
+skill_constraints_tested:
+  - id: quick_redline_scope
+    description: "For a quick pre-payroll risk check using the system's blocking rules, the skill routes to red-line validation rather than the full audit/report pipeline."
+    exclusive: "Without the skill, a model may treat the request as a generic payroll anomaly review instead of making a system-rule-based blocking decision."
+
+  - id: redline_evidence_required
+    description: "Red-line findings require rule-grounded evidence: affected employee, pay period, actual value, expected condition, and system rule identity/severity."
+    exclusive: "A default model may identify suspicious rows such as negative net pay or high overtime, but will not reliably frame them with the payroll audit system's rule identity and blocking severity."
+
+  - id: no_report_when_blocked
+    description: "When red-line issues are found, the skill requires stopping with the blocking list rather than producing a normal audit report."
+    exclusive: "A default model may continue into general summaries, recommendations, or broader payroll analysis after finding issues, rather than stopping at the blocking gate."
+notes: |
+  Core test points:
+  - The user asks for a quick pre-payroll hard-blocker check, which should trigger the red-line branch rather than the full audit flow.
+  - The asset's real state contains at least two red-line candidates: abnormal net pay and abnormal overtime hours.
+  - Common error behaviors: the model outputs trend analysis or budget suggestions; the model only gives vague anomaly conclusions; the model continues to produce a normal report after finding blocking items.
+  - baseline_correctness_signals:
+      - Reads the declared CSV.
+      - Identifies the blocking records supported by the data.
+      - Provides enough concrete row-level evidence for action.
+  - skill_following_signals:
+      - Frames the result as a system-rule-based pass/block decision.
+      - Uses quick red-line scope only, not the full audit/report pipeline.
+      - Treats red-line findings as blocking conditions.
+      - Includes rule-grounded evidence such as expected condition and rule/severity wording.
+      - Stops after the blocking decision and blocking list.

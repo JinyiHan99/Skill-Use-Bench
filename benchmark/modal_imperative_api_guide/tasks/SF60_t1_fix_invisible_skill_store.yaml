@@ -1,0 +1,40 @@
+task_id: SF60_t1_fix_invisible_skill_store
+level: L2
+skill_id: skill_60_modal_imperative_api_guide
+description: |
+  The skill store entry in the app shows no popup when clicked. Please fix this issue based on the existing code, keeping the existing skill store content, title logic, and opening behavior unchanged.
+
+  The relevant code is under `assets/SF60_t1_fix_invisible_skill_store/input/src/`.
+  Please place the fixed relevant files under `output/src/` at the corresponding paths; if a relevant file needs no modification, copy it through as-is.
+initial_state:
+  assets:
+    - path: assets/SF60_t1_fix_invisible_skill_store/input/src/features/SkillStore/index.tsx
+      source: "https://raw.githubusercontent.com/lobehub/lobe-chat/main/src/features/SkillStore/index.tsx"
+      real_state: "Public LobeChat SkillStore modal entry that opens the feature through the newer modal stack."
+      preparation: |
+        Fetched the real source file from the public LobeChat repository and kept its feature logic unchanged.
+    - path: assets/SF60_t1_fix_invisible_skill_store/input/src/app/AppProviders.tsx
+      source: "Prepared from LobeChat/Lobe UI provider and modal-host conventions, using https://github.com/lobehub/lobe-ui/blob/master/src/base-ui/Modal/index.md as API reference."
+      real_state: "A minimally reconstructed provider composition modeled after LobeHub/Lobe UI partial-migration patterns, with the legacy modal host present and the newer base-ui modal host omitted."
+      preparation: |
+        Reconstructed a minimal provider file from LobeHub/Lobe UI provider and modal-host conventions to model a partial migration state: the legacy host is present, while the base-ui modal host required by the migrated SkillStore entry is missing.
+    - path: assets/SF60_t1_fix_invisible_skill_store/input/README_SOURCE.md
+      source: "Local provenance note for the asset preparation."
+      real_state: "Documents source URLs and preprocessing for this task asset set."
+      preparation: |
+        Written alongside the assets to make provenance and preprocessing reproducible.
+  tools_available: [read, edit, write, grep]
+expected_trigger: true
+skill_constraints_tested:
+  - id: base_ui_host_required
+    description: "When an imperative modal is opened through the newer modal stack, the matching global host from the same stack must be mounted once near the app root."
+    exclusive: "Without the skill, a model may see an existing ModalHost in the provider tree and assume the modal host is already mounted, then debug the click handler, rewrite the entry as a declarative local-state modal, or replace the existing host. The skill-specific requirement is to recognize that the base-ui modal stack needs its own matching host while preserving the existing host."
+  - id: preserve_imperative_entry
+    description: "The existing feature entry should remain an imperative open function instead of being rewritten into local open-state rendering."
+    exclusive: "Without the skill, some models may try to make the modal visible by introducing local React open state or an inline declarative dialog. The skill requires preserving the existing imperative createModal-based entry and fixing the matching host wiring instead."
+notes: |
+  - Positive case.
+  - Correct behavior: add the missing matching host for the newer base-ui modal stack near the app root while preserving the existing legacy host.
+  - Preserve the SkillStore imperative createModal-based entry; do not rewrite it into local React open state or an inline declarative dialog.
+  - Preserve existing SkillStore content and title logic.
+  - Common failures: replacing the existing legacy host instead of adding the base-ui host, importing only the already-present host, changing title/content behavior, or rewriting the feature into a declarative dialog.

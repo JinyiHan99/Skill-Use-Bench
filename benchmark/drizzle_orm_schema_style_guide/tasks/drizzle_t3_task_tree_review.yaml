@@ -1,0 +1,34 @@
+task_id: drizzle_t3_task_tree_review
+skill_id: drizzle
+category: positive
+description: |
+  The team is preparing to merge a database repository-layer change for recursive task-tree reads. The source snapshot is at `assets/drizzle_t3_task_tree_review/input/`.
+  Please review this implementation as a database maintainer for performance, security, or convention issues; fix it directly if necessary, otherwise give a brief explanation.
+initial_state:
+  assets:
+    - path: assets/drizzle_t3_task_tree_review/input/packages/database/src/schemas/task.ts
+      source: "https://raw.githubusercontent.com/lobehub/lobehub/main/packages/database/src/schemas/task.ts"
+      real_state: "LobeHub/Lobe Chat's real task schema, containing task parent-child relationships, user-scope fields, and indexes."
+      preparation: |
+        Downloaded the original schema file from the public repository's main branch, without rewriting content.
+    - path: assets/drizzle_t3_task_tree_review/input/packages/database/src/repositories/taskTreeRepository.ts
+      source: "Schema sourced from LobeHub's real task.ts; repository code is hand-trimmed from its actual query style using pgTable table structure to construct a minimal reproduction scenario, so there is no single upstream same-name source file."
+      real_state: "A minimal reproduction scenario file trimmed from the public repository's real schema and real repository query style; not the original same-name file in the repository."
+      preparation: |
+        Using the public repository's real task schema as the table-structure source, referencing the original query organization in the real repository, deliberately introduces defects such as "hard-coded column/table names", "no type constraints", and "recursive branch missing user filter", forming a starting state that requires the skill to correctly fix.
+  tools_available:
+    - read
+    - write
+    - edit
+    - bash
+expected_trigger: true
+skill_constraints_tested:
+  - id: keep_recursive_cte_raw
+    description: "The current drizzle skill explicitly covers that recursive CTE is a canonical keep-raw case; recursive task-tree reads should preserve the WITH RECURSIVE raw SQL single-round-trip form."
+    exclusive: "Looking only at the task description, a model may rewrite raw SQL into multi-round depth-based select; the skill explicitly requires recursive CTE to preserve raw SQL, making it skill-exclusive."
+  - id: raw_sql_tightening_requirements
+    description: "The current drizzle skill explicitly covers raw SQL tightening: schema refs in interpolations, explicit user scope, narrow row interface, and states that one cannot rely only on execute<T>."
+    exclusive: "Looking only at the task description, a model may only add user filter or only add execute<T>; the skill requires schema interpolation, narrow row interface, and user scope on every CTE leg to be tightened simultaneously, making it skill-exclusive."
+notes: |
+  - The core test points of this task are explicitly covered by the drizzle skill: recursive CTE keep raw, schema interpolation, narrow row interface, scope every leg.
+  - The rubric should focus on verifying these skill-following signals and avoid mixing "just completes the task-tree query" into the skill main score.

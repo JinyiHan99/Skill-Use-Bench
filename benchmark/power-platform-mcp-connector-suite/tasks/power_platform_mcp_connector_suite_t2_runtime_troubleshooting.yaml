@@ -1,0 +1,54 @@
+task_id: power_platform_mcp_connector_suite_t2_runtime_troubleshooting
+skill_id: power-platform-mcp-connector-suite
+description: |
+  I have a Salesforce connector package in `assets/power_platform_mcp_connector_suite_t2_runtime_troubleshooting/input/` that looks fine in the maker portal, but the Copilot Studio test chat fails when the agent asks for available Salesforce context and then reports a generic connector error. Please diagnose and fix the package in `output/salesforce_runtime_fix/`, preserving the existing Salesforce coverage. Include a brief troubleshooting note for the team that will re-import it.
+initial_state:
+  assets:
+    - path: assets/power_platform_mcp_connector_suite_t2_runtime_troubleshooting/input/apiDefinition.swagger.json
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/apiDefinition.swagger.json"
+      real_state: "Real Salesforce connector definition with the agent discovery marker absent from the agent endpoint."
+      preparation: |
+        Downloaded the public connector definition and ensured the protocol extension is absent from the agent endpoint to reproduce a connector that appears normal in portal editing but is not fully discoverable by the agent runtime.
+    - path: assets/power_platform_mcp_connector_suite_t2_runtime_troubleshooting/input/apiProperties.json
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/apiProperties.json"
+      real_state: "Unmodified public connector properties file for the Salesforce connector."
+      preparation: "Downloaded without content changes."
+    - path: assets/power_platform_mcp_connector_suite_t2_runtime_troubleshooting/input/script.csx
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/script.csx"
+      real_state: "Real Salesforce connector script, altered from the public source so agent context requests fall through to a generic HTTP error response."
+      preparation: |
+        Downloaded the public script, removed the context listing/reading cases from the agent method dispatcher, and changed unknown method handling from an agent-compatible error envelope to a generic HTTP bad-request response.
+    - path: assets/power_platform_mcp_connector_suite_t2_runtime_troubleshooting/input/readme.md
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/readme.md"
+      real_state: "Unmodified public connector documentation for the Salesforce connector."
+      preparation: "Downloaded without content changes."
+  tools_available:
+    - filesystem
+    - json_editor
+    - text_editor
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: json_rpc_runtime_handling
+    description: "The skill requires the connector script to handle the agent communication flow with JSON-RPC 2.0 style success and error envelopes."
+    exclusive: "Without the skill, a model may return ordinary HTTP errors for unknown or unsupported agent calls, which is natural web API behavior but wrong for this integration."
+  - id: supported_resource_boundary
+    description: "The skill requires Salesforce context/resource behavior to remain available to Copilot Studio through runtime-compatible script outputs or equivalent supported tool-result behavior, instead of being removed or treated as an unsupported prompt/resource-only feature."
+    exclusive: "Without the skill, a model may either ignore the resource/context path after fixing the generic connector error, or mechanically restore generic MCP resources/list and resources/read without recognizing Copilot Studio's supported resource exposure boundary. The skill-specific behavior is to preserve Salesforce context availability while documenting or implementing it in a Copilot Studio-compatible way."
+  - id: integration_marker_and_script_alignment
+    description: "The skill requires the connector definition and script behavior to agree on the agent endpoint and transformation workflow."
+    exclusive: "A model may patch only the C# script or only the Swagger definition, leaving the package inconsistent at runtime."
+notes: |
+  - Core test: distinguishes generic connector debugging from the skill's specific agent runtime workflow, including endpoint discovery plus script-level message handling.
+  - Expected correct behavior: output package restores Salesforce context availability for the Copilot Studio agent runtime, returns JSON-RPC 2.0 shaped success and error messages for agent calls, and aligns the definition with the script for the same `/mcp` endpoint.
+  - The troubleshooting note should explain both definition-level discovery and script-level message handling, and should acknowledge that Salesforce context/resources must be exposed in a Copilot Studio-supported way, such as through compatible resource routing or tool/script outputs.
+  - Common wrong behavior: model leaves the generic bad request at `assets/power_platform_mcp_connector_suite_t2_runtime_troubleshooting/input/script.csx:224`, so the test chat still receives a plain connector error; model patches only `script.csx` while `assets/power_platform_mcp_connector_suite_t2_runtime_troubleshooting/input/apiDefinition.swagger.json:3300` still lacks the discovery metadata; model removes context behavior entirely instead of surfacing it through supported outputs.
+  - baseline_correctness_signals:
+      - `output/salesforce_runtime_fix/` contains a complete connector package and a troubleshooting note.
+      - The output script compiles syntactically as C# script and preserves existing Salesforce tool dispatch functions.
+      - The output definition still includes the original Salesforce API operation coverage.
+  - skill_following_signals:
+      - The agent endpoint in the definition has the protocol marker required by the skill.
+      - The script returns JSON-RPC 2.0 shaped success and error messages for agent calls, including unknown methods.
+      - Salesforce context/resource behavior is not ignored or deleted; it is either routed compatibly through `resources/list` and `resources/read` or exposed through supported tool/script outputs.
+      - The troubleshooting note explicitly explains the Copilot Studio resource boundary: resources/context must be made visible through supported runtime behavior, and standalone resource handling should not be treated as a substitute for tool-output-compatible agent context exposure.

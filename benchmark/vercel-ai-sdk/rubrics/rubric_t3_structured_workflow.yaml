@@ -1,0 +1,74 @@
+task_id: vercel_ai_sdk_v6_t3_structured_workflow
+skill_id: vercel-ai-sdk
+rules:
+  - id: r1_v6_structured_output_via_generate_text
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.25
+    spec: |
+      [SKILL] The structured review result must be produced via generateText's output: Output.object({ schema }) and read from the return value's output field; it must not continue using generateObject/streamObject or the object field.
+      skill-exclusive reason: without reading the skill, a strong model will retain the widely circulated old pattern generateObject({ schema }) and { object } from the fixture; the skill explicitly changes v6 structured output to generateText/streamText + Output helpers, and reads the typed result from the output field.
+    signal:
+      file: "assets/vercel_ai_sdk_v6_t3_structured_workflow/input/review-service/app/api/review/route.ts"
+      file_must_contain:
+        - "await\\s+generateText\\s*\\([\\s\\S]{0,1000}?output\\s*:\\s*Output\\.object\\s*\\("
+        - "\\{\\s*output\\s*\\}\\s*=\\s*await\\s+generateText|Response\\.json\\s*\\(\\s*(?:[A-Za-z_][A-Za-z0-9_]*\\.)?output\\s*\\)"
+      file_must_not_contain: "\\bgenerateObject\\s*\\(|\\bstreamObject\\s*\\(|\\{\\s*object\\s*\\}|\\b[A-Za-z_][A-Za-z0-9_]*\\.object\\b|Response\\.json\\s*\\(\\s*object\\s*\\)"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_update_anthropic_model_spec
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Keep the direct Anthropic provider-function model specification, and update to the current model ID, e.g. anthropic('claude-sonnet-4-5'); must not retain claude-3-5-sonnet-latest or claude-3 series old identifiers.
+      skill-exclusive reason: the task only asks to keep the JSON contract and update the SDK pattern, a strong model may think the old model id is still semantically valid and leave it unchanged; the skill explicitly gives current direct provider-function model IDs. The conflict is keeping old model identifiers vs using current model IDs from the v6 guide.
+    signal:
+      file: "assets/vercel_ai_sdk_v6_t3_structured_workflow/input/review-service/app/api/review/route.ts"
+      file_must_contain: "anthropic\\s*\\(\\s*['\"]claude-(?:sonnet|haiku|opus)-4-5['\"]\\s*\\)"
+      file_must_not_contain: "claude-3-5-sonnet-latest|claude-3"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_keep_sequential_text_then_structured_pattern
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] For workflow/structured output, the sequential workflow of first using generateText to produce a draft, then structuring it with Output.object, should be preserved, rather than changing structured output to free text or single-step JSON assembly.
+      skill-exclusive reason: without reading the skill, the model may hand-write JSON to "keep the JSON contract" or compress the process into a single prompt; the skill's workflow patterns explicitly specify sequential chain + Output.object. The conflict is ad-hoc JSON/free-form text vs AI SDK v6 structured workflow.
+    signal:
+      query: |
+        Inspect only the final code in assets/vercel_ai_sdk_v6_t3_structured_workflow/input/review-service/app/api/review/route.ts. Does it keep a two-step AI SDK workflow where the first generateText call creates a draft/summary and a later generateText call uses output: Output.object({ schema: reviewSchema }) to structure that draft?
+        Answer YES only if the final code has two ordered AI SDK generation calls, the second call uses Output.object, and the second prompt/data flow uses the first call's draft text. Answer NO if the structured step is removed, replaced by hand-built JSON, collapsed into unrelated single-step output, or no longer uses the first draft.
+      acceptable: "const draft = await generateText(...); const { output } = await generateText({ ..., output: Output.object({ schema: reviewSchema }), prompt: `...${draft.text}` });"
+      unacceptable: "return Response.json({ risk: 'low', summary: draft.text, followUps: [] }) with no Output.object structured model step."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] The review endpoint has been updated, and the original validation behavior and caller-facing JSON contract are preserved.
+    signal:
+      query: |
+        Inspect only the final contents of assets/vercel_ai_sdk_v6_t3_structured_workflow/input/review-service/app/api/review/route.ts. Does the route still accept a transcript, validate/structure the review with risk, summary, and followUps, and return the same caller-facing JSON shape via Response.json without wrapping it in a new property?
+        Judgment basis: look only at the final file contents, not at the agent's self-report. Answer YES if the endpoint's public JSON contract remains { risk, summary, followUps } and the staged review behavior is preserved. Answer NO if fields are missing/renamed, the response is wrapped differently, or validation/structured review behavior is removed.
+      acceptable: "Response.json(output) where output conforms to reviewSchema with risk, summary, followUps."
+      unacceptable: "Response.json({ review: output }) or Response.json({ text: draft.text })"

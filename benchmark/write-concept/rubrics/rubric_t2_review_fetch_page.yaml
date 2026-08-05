@@ -1,0 +1,188 @@
+# Rubric for skill_78_write_javascript_concept_documentation — t2_review_fetch_page
+# Objective: evaluate whether the model reviews Fetch material per the write-concept skill; task completion is recorded separately with weight=0.
+rules:
+  - id: g1_observable_review_write
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable write or edit attempt to output/fetch-page-review.md.
+      The gate only judges whether there is an attempt, not report quality or skill-following.
+    signal:
+      pattern: '(?s)(Write|Edit).{0,800}(file_path|path).{0,300}output/fetch-page-review\.md|Bash.{0,800}(>|tee|cat\s+>|python).{0,500}output/fetch-page-review\.md'
+
+  - id: r1a_reviews_opening_and_learning_structure
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.4
+    spec: |
+      [SKILL] The review report should explicitly check the opening hook, immediate simple code example, What you'll learn Info and other opening template gaps per the skill, and present them in gap/recommendation form.
+      skill-exclusive reason: without reading the skill, a strong model typically reviews Fetch technical accuracy and clarity; the skill requires gap review using the 33 JavaScript Concepts fixed concept page structure.
+    signal:
+      file: output/fetch-page-review.md
+      file_must_contain: '(?si)(?=.{0,12000}(opening hook|question hook|hook))(?=.{0,12000}(immediate|immediately|right after|simple).{0,120}(code example|example))(?=.{0,12000}(What you[''’]ll learn|learning summary|Info))(?=.{0,12000}(missing|lacks|needs|should add|gap|缺少|需要|建议))'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r1b_reviews_body_and_practice_structure
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.4
+    spec: |
+      [SKILL] The review report should check analogy/ASCII diagram, Common Mistakes, Key Takeaways, Test Your Knowledge and other body and practice structure gaps per the template.
+      skill-exclusive reason: without reading the skill, the model may not necessarily require analogy, ASCII diagram, error contrasts, and knowledge quiz as project template structures.
+    signal:
+      file: output/fetch-page-review.md
+      file_must_contain: '(?si)(?=.{0,12000}(analogy|ASCII|diagram))(?=.{0,12000}(Common Mistakes|mistake))(?=.{0,12000}(Key Takeaways|takeaways))(?=.{0,12000}(Test Your Knowledge|knowledge check|quiz))(?=.{0,12000}(missing|lacks|needs|should add|gap|缺少|需要|建议))'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r1c_reviews_resource_structure
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.4
+    spec: |
+      [SKILL] The review report should check the Related Concepts, Reference, Articles, Videos resource ending structure, and require all three types of external resource sections to appear.
+      skill-exclusive reason: without reading the skill, the review may only suggest adding reference links; the skill requires the project's fixed internal related concepts and Reference/Articles/Videos three-category resource sections.
+    signal:
+      file: output/fetch-page-review.md
+      file_must_contain: '(?si)(?=.{0,12000}Related Concepts?)(?=.{0,12000}Reference)(?=.{0,12000}Articles)(?=.{0,12000}Videos)(?=.{0,12000}(missing|lacks|needs|should add|gap|缺少|需要|建议))'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_reviews_beginner_voice_five_traits
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The review report should evaluate whether the material needs to be changed to the skill-specified voice: conversational but authoritative, encouraging, practical, concise, question-driven, and oriented toward readers just learning JavaScript.
+      skill-exclusive reason: without reading the skill, a strong model may only say "clearer/more beginner-friendly"; the skill gives five specific voice traits and the question-driven requirement.
+    signal:
+      file: output/fetch-page-review.md
+      file_must_contain: '(?si)(?=.{0,12000}(conversational.{0,120}authoritative|authoritative.{0,120}conversational))(?=.{0,12000}encouraging)(?=.{0,12000}practical)(?=.{0,12000}concise)(?=.{0,12000}question[- ]driven)(?=.{0,12000}(beginner|new learner|novice|初学者|刚学))(?=.{0,12000}(review|assess|rewrite|adjust|needs?|改写|调整|审阅))'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_reviews_language_quality_rules
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The review report should check whether the future final draft needs to avoid the AI-sounding phrases, stiff/filler phrases, repeated emphasis patterns listed in the skill, and control em dash usage, preferably naming specific banned phrase examples.
+      skill-exclusive reason: without reading the skill, a strong model reviewing MDN material will not naturally check for project-banned phrases like "Master/To truly understand/This is crucial/In order to" or em-dash thresholds.
+    signal:
+      file: output/fetch-page-review.md
+      file_must_contain: '(?si)(?=.{0,12000}(AI[- ]sounding|banned phrases|avoid phrases|stiff phrases|filler|anti[- ]AI))(?=.{0,12000}(em dash|em-dash|—))(?=.{0,12000}(repetitive emphasis|Key insight|Best practice|Important\b|Important:|重复强调))(?=.{0,12000}(Master|To truly understand|This is crucial|In order to|It[''’]s worth noting|one of the most important))'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_distinguishes_mdn_reference_from_project_concept_page
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The review report should clearly distinguish between "MDN technical material is accurate/authoritative" and "still needs to be rewritten into a project-publishable beginner-oriented concept page", especially pointing out the gap between reference-style prose and the project concept page voice/structure.
+      skill-exclusive reason: without reading the skill, a strong model tends to equate MDN's authority with publishability, primarily reviewing correctness; the skill requires reshaping the material into the project's concept page.
+    signal:
+      file: output/fetch-page-review.md
+      file_must_contain: '(?si)(?=.{0,12000}(MDN|reference))(?=.{0,12000}(accurate|authoritative|technical|权威|准确))(?=.{0,12000}(concept page|project-ready|publishable|beginner-oriented|项目概念页))(?=.{0,12000}(rewrite|reshape|reframe|convert|turn|重写|改写))(?=.{0,12000}(reference[- ]style|参考文档风格|voice|structure|beginner))'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5a_prerequisite_concepts_review
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] The review report should remind that the future Fetch page should explain or link prerequisite concepts like Promise, async/await, Response, and JSON before relying on them.
+      skill-exclusive reason: the task can derive "supplement prerequisite knowledge", but the skill emphasizes not assuming beginners already know these concepts, so this rule is retained as a weaker skill signal.
+    signal:
+      file: output/fetch-page-review.md
+      file_must_contain: '(?si)(?=.{0,12000}(Promise|Promises))(?=.{0,12000}(async/await|async function))(?=.{0,12000}Response)(?=.{0,12000}JSON)(?=.{0,12000}(prerequisite|before assuming|explain first|先解释|前置))'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5b_inline_linking_strategy_review
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The review report should require MDN inline links when first introducing Web APIs/methods/objects, and use /concepts/... internal links for related concepts.
+      skill-exclusive reason: without reading the skill, the model may not necessarily require MDN first-mention links and internal concept links; the skill explicitly makes linking a concept page quality rule.
+    signal:
+      file: output/fetch-page-review.md
+      file_must_contain: '(?si)(?=.{0,12000}(first mention|首次提及|first introduced|inline link))(?=.{0,12000}(MDN|developer\.mozilla\.org))(?=.{0,12000}(/concepts/|internal link|related concept|内部链接))'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r6_reviews_resource_card_requirements
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The review report should remind the future final draft to need Reference, Articles, Videos resource sections, use CardGroup/Card, and write specific two-sentence descriptions for articles/videos, avoiding generic descriptions like "comprehensive guide / learn all about".
+      skill-exclusive reason: without reading the skill, a strong model may suggest adding reference links; the skill has specific specifications for the number of resource sections, Mintlify Cards, and description quality.
+    signal:
+      file: output/fetch-page-review.md
+      file_must_contain: '(?si)(?=.{0,12000}Reference)(?=.{0,12000}Articles)(?=.{0,12000}Videos)(?=.{0,12000}(CardGroup|Card))(?=.{0,12000}(two[- ]sentence|2[- ]sentence|两句|specific description|具体说明))(?=.{0,12000}(avoid|不要|避免).{0,120}(generic|vague|comprehensive guide|learn all about|泛泛))'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: final-state
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/fetch-page-review.md exists and is a Fetch material review report, containing actionable improvement suggestions, and pointing out that HTTP 404/500 will not cause fetch() Promise to reject, and that response.ok needs to be checked.
+    signal:
+      file: output/fetch-page-review.md
+      file_must_contain: '(?si)(?=.{0,12000}(Fetch|fetch\(\)))(?=.{0,12000}(review|审阅|gap|missing|recommend|建议))(?=.{0,12000}response\.ok)(?=.{0,12000}(404|500|HTTP error|HTTP 状态))(?=.{0,12000}(reject|resolve|不会抛错|doesn[''’]t throw|does not throw))'

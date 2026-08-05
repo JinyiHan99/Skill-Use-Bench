@@ -1,0 +1,33 @@
+task_id: vercel_ai_sdk_v6_t1_migrate_chat
+skill_id: vercel-ai-sdk
+description: |
+  The customer support chat in `assets/vercel_ai_sdk_v6_t1_migrate_chat/input/legacy-chat/` was copied from an older internal demo and now needs to work with the current app stack. Please update the chat page and its server endpoint so agents can send messages, see streamed assistant replies, and render the returned conversation correctly. Keep the visible UI roughly the same and do not replace the streaming chat with a one-shot JSON response.
+initial_state:
+  assets:
+    - path: assets/vercel_ai_sdk_v6_t1_migrate_chat/input/legacy-chat/app/page.tsx
+      source: "Adapted from real Vercel AI repository example https://github.com/vercel/ai/blob/main/examples/next-openai-pages/pages/chat/stream-chat-api-route/index.tsx"
+      real_state: "Client chat component using an older message-send and message-rendering shape that is incompatible with the current AI chat API."
+      preparation: |
+        Started from the public Vercel AI chat page example, then transformed the file into a legacy migration fixture by reverting the message input handling and rendering shape to the older chat API style.
+    - path: assets/vercel_ai_sdk_v6_t1_migrate_chat/input/legacy-chat/app/api/chat/route.ts
+      source: "Adapted from real Vercel AI repository example https://github.com/vercel/ai/blob/main/examples/next/app/api/chat/route.ts"
+      real_state: "Streaming chat endpoint that forwards UI messages directly and returns an older stream response format."
+      preparation: |
+        Started from the public Vercel AI Next.js route example, then transformed the route into a legacy migration fixture by removing the current message conversion and changing the response helper to the older form.
+  tools_available: [Read, Write, Edit, Glob, Grep, Bash, WebFetch]
+expected_trigger: true
+skill_constraints_tested:
+  - id: current_chat_send_flow
+    description: "The skill requires the current chat hook send flow with locally managed input state rather than the older append/input helper pattern."
+    exclusive: "Without the skill or a bundled current v6 reference, a model is likely to preserve or recreate the older append/input-helper pattern because it remains common in older AI SDK chat examples."
+  - id: parts_based_message_rendering
+    description: "The skill requires rendering assistant/user text from message parts rather than reading a flat content field."
+    exclusive: "Without the skill or a bundled current v6 reference, a model is likely to keep message.content rendering or add compatibility fallbacks instead of adopting the current parts-based message structure."
+  - id: ui_message_stream_route
+    description: "The skill requires converting UI messages for the model call and returning the current UI message stream response shape."
+    exclusive: "Without the skill or a bundled current v6 reference, a model may continue passing UI messages directly to the model call or keep the older data stream response helper because those patterns still look plausible from legacy examples."
+notes: |
+  - Positive trigger: this is an implementation/migration task for the current AI chat interface.
+  - Observable correct behavior: the edited client no longer depends on append/input helpers or message.content; the route converts incoming UI messages and returns a UI-message streaming response rather than a legacy data stream.
+  - Common failure modes: preserving the older chat hook API, rendering blank messages because parts are ignored, passing UI messages directly to the model call, or changing the endpoint to non-streaming JSON.
+  - Do not expose current v6 reference implementations as input assets for the model; reference files, if used, must remain on the evaluator side only.

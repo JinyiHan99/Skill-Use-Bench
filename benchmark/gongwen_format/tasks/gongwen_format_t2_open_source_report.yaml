@@ -1,0 +1,49 @@
+task_id: gongwen_format_t2_open_source_report
+skill_id: gongwen_format
+description: |
+  The Technology Strategy Office needs to compress a public open-source-ecosystem material into a circulatable annual observation report. Please read `assets/gongwen_format_t2_open_source_report/input/2024_china_open_source_report_excerpt.md`, and on behalf of the Technology Strategy Office produce a formal work report for management circulation and archiving.
+
+  Save the final draft as `output/open_source_report.docx`, and also save the runnable script you used to generate the document as `output/create_report_document.js`.
+initial_state:
+  assets:
+    - path: assets/gongwen_format_t2_open_source_report/input/2024_china_open_source_report_excerpt.md
+      source: "Kaiyuanshe (Open Source Society) '2024 China Open Source Annual Report' data chapter https://kaiyuanshe.github.io/2024-China-Open-Source-Report/data.html"
+      real_state: "A Chinese excerpt of the public report page, including report positioning, nine chapters, indicator descriptions, key findings, and internal-reporting background."
+      preparation: |
+        Visit the Kaiyuanshe public report page, excerpting the report structure, core indicators, and key findings; organize as Markdown input material, without including a reference final draft.
+  tools_available:
+    - filesystem
+    - document_generation
+    - node
+    - python
+expected_trigger: true
+skill_constraints_tested:
+  - id: heading_hierarchy_typography
+    description: "Level-1, level-2, and level-3 headings in a formal report should respectively follow the skill's heading-hierarchy font and numbering conventions."
+    exclusive: "A generic model often uses Markdown-style headings, default bold Songti, or writes level-3 headings as Chinese enumeration-number (顿号) numbering."
+  - id: third_level_numbering
+    description: "Level-3 headings should use the `1.` form, not `1、`."
+    exclusive: "A generic model often mixes `1、`, `1.`, or auto-lists in Chinese formal writing; the skill explicitly requires level-3 headings to use the `1.` form from official-document conventions, which can distinguish whether the skill was read."
+  - id: attachment_typography_and_numbering
+    description: "The attachment list should use official-document style: numbering uses `1.`, `2.`, and attachment items use 方正仿宋 (FangSong), size 三号 (size 3)."
+    exclusive: "A generic model, even if it accidentally uses `1.`, often writes the attachment area as ordinary bullets, default body style, or without separately controlling font/size; only the skill stably treats the attachment area as an official-document format element."
+notes: |
+  - Core test point: the report material contains multi-level structure and attachment requirements, allowing testing of skill-exclusive details such as heading hierarchy, level-3 numbering, and attachment numbering.
+  - Expected correct behavior: generate `output/open_source_report.docx`; the report body should include an overall judgment, key findings, and implications/suggestions for internal R&D work; the end may append public sources and data excerpts.
+  - Common model error behaviors:
+      - Writing a level-1 heading as `font: "方正仿宋", bold: true` in `output/create_report_document.js`, instead of using the skill-specified level-1 heading font.
+      - Writing a level-2 heading as an ordinary body run in `output/create_report_document.js`, or only indicating hierarchy via `bold: true`, without using the skill-specified level-2 heading font.
+      - Having `1、研发平台建设`-style level-3 headings in the generated content, violating the skill's explicit `1.` form.
+      - Writing attachment paragraphs as `附件一：公开报告来源` or `（一）公开报告来源`, without using the skill-specified attachment numbering form.
+  - baseline_correctness_signals:
+      - `output/open_source_report.docx` exists and can be opened.
+      - `output/create_report_document.js` exists and can run to generate the same-named document.
+      - The report body contains a summary of the core facts in the input material, without introducing specific statistical conclusions or sources beyond the material.
+  - skill_following_signals:
+      - The document title uses 方正小标宋简体, size 二号, centered, rather than the default bold heading style.
+      - Level-1 headings use 方正黑体 (FangHei), size 三号, numbering format `一、`.
+      - Level-2 headings use 方正楷体 (FangKai), size 三号, numbering format `（一）`.
+      - Level-3 headings use 方正仿宋, size 三号, numbering format `1.`, with no `1、`.
+      - Body paragraphs use 方正仿宋, size 三号, line spacing 28 points.
+      - The page is A4, with margins per the skill convention.
+      - If an attachment area exists, attachment items use 方正仿宋, size 三号, numbering format `1.`, `2.`.

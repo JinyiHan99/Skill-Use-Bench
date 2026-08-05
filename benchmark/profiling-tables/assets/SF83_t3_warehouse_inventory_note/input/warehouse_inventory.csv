@@ -1,0 +1,3 @@
+table_schema,table_name,row_count,source
+analytics,titanic_passengers,891,Data Science Dojo Titanic passenger manifest CSV
+analytics,seattle_weather,1461,Vega datasets Seattle weather CSV

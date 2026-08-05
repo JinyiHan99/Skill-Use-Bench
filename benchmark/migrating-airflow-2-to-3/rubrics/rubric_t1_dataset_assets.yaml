@@ -1,0 +1,136 @@
+# Rubric for skill_73_airflow_2_to_3_migration — airflow_2_to_3_t1_dataset_assets
+# Scoring boundary: skill is scored; task only records completion rate; gate only judges evaluability.
+
+rules:
+  - id: g1_target_dag_or_note_edit_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain a real write/edit attempt on the target DAG or rollout_note.txt.
+    signal:
+      pattern: '(?is)\b(?:Write|Edit)\b[\s\S]{0,3000}?file_path["''\s:]+["'']?[^"''\n]*(?:assets/airflow_2_to_3_t1_dataset_assets/input/dags/example_datasets\.py|/?rollout_note\.txt)\b'
+
+  - id: r1_use_airflow3_asset_api
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — exclusive] The Dataset object must be migrated to Airflow 3's Asset API, importing Asset from airflow.sdk, and must not continue using airflow.datasets.Dataset.
+      Skill-exclusive rationale: Looking only at the task description, a strong model may only make generic "compatible with new runtime" changes or guess to keep the Dataset terminology; the skill explicitly gives the Airflow 3 table mapping `airflow.datasets.Dataset` -> `airflow.sdk.Asset`. The conflict point is that the old Dataset API should be systematically replaced with Asset in the Airflow 3 migration.
+    signal:
+      file: "assets/airflow_2_to_3_t1_dataset_assets/input/dags/example_datasets.py"
+      file_must_contain: '(?m)^\s*from\s+airflow\.sdk\s+import\s+(?:\([\s\S]*?\bAsset\b[\s\S]*?\)|[^\n#]*\bAsset\b)'
+      file_must_not_contain: '(?m)^\s*from\s+airflow\.datasets\s+import\s+Dataset\b'
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_replace_dataset_constructors
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — exclusive] The data-dependency object construction in the DAG should use Asset(...), and must not leave Dataset(...) constructions.
+      Skill-exclusive rationale: Without reading the skill, the model may only fix obvious imports or local variable names, keeping Dataset(...) constructions; the skill requires scanning the datasets-to-assets surface and migrating consistently. The conflict point is that the old constructor text must disappear from the artifact.
+    signal:
+      file: "assets/airflow_2_to_3_t1_dataset_assets/input/dags/example_datasets.py"
+      file_must_contain: '\bAsset\s*\(\s*(?:uri\s*=\s*)?["'']s3://dag1/output_1\.txt["'']'
+      file_must_not_contain: '(?m)^\s*(?!#).*?\bDataset\s*\('
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_migrate_dataset_timetable_surface
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — exclusive] The timetable that combines "time or data trigger" must also be migrated from Dataset terminology to Asset terminology, including the timetable class name and parameter names.
+      Skill-exclusive rationale: Looking only at the task description, a strong model may fix Dataset(...) constructions but miss the more hidden timetable-level surface like `DatasetOrTimeSchedule(..., datasets=...)`; the skill's checklist specifically requires scanning datasets-to-assets and scheduling/timetable impact. The conflict point is that you must not migrate only ordinary objects while missing timetable parameters.
+    signal:
+      file: "assets/airflow_2_to_3_t1_dataset_assets/input/dags/example_datasets.py"
+      file_must_contain: '(?sm)(?=.*^\s*from\s+airflow\.timetables\.assets\s+import\s+AssetOrTimeSchedule\b)(?=.*\bAssetOrTimeSchedule\s*\()(?=.*\bassets\s*=)'
+      file_must_not_contain: '\bDatasetOrTimeSchedule\b|\bdatasets\s*='
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_standard_provider_bash_import
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — exclusive] BashOperator should be migrated to the Airflow 3 standard provider import path.
+      Skill-exclusive rationale: The task description does not give the specific import path, so a generic migration may keep `airflow.operators.bash` or only change Dataset; the skill's Key Import Changes table explicitly requires `airflow.providers.standard.operators.bash.BashOperator`. The conflict point is that you must not just do a semantic rename while keeping the Airflow 2 import.
+    signal:
+      file: "assets/airflow_2_to_3_t1_dataset_assets/input/dags/example_datasets.py"
+      file_must_contain: '(?m)^\s*from\s+airflow\.providers\.standard\.operators\.bash\s+import\s+(?:\([\s\S]*?\bBashOperator\b[\s\S]*?\)|[^\n#]*\bBashOperator\b)'
+      file_must_not_contain: '(?m)^\s*from\s+airflow\.operators\.bash\s+import\s+BashOperator\b'
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_rollout_note_safe_upgrade_path
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — exclusive] The rollout note must include the safe version-path first step specified by the skill: upgrade to Airflow 2.11 first, and express that this is the safe upgrade step before entering Airflow 3.
+      Skill-exclusive rationale: Looking only at the task description, a strong model usually writes a generic "upgrade to Airflow 3 after testing" note; the skill gives the specific Airflow 2.11 rollback-safety step at the start. The conflict point is that the rollout note must not omit this non-generic intermediate version.
+    signal:
+      file: "rollout_note.txt"
+      file_must_contain: '(?is)(?:first|before|prior|start|step\s*1|先|首先)[\s\S]{0,120}Airflow\s*2\.11|Airflow\s*2\.11[\s\S]{0,120}(?:first|before|prior|先|首先)'
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_rollout_note_airflow3_minimum
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — exclusive] The rollout note's Airflow 3 target version must be specific: "at least 3.0.11" or "ideally 3.1".
+      Skill-exclusive rationale: Without reading the skill, the model may only write Airflow 3 or 3.0; the skill explicitly says early 3.0 had many bugs, at least 3.0.11, ideally 3.1. The conflict point is that a generic Airflow 3 recommendation is insufficient.
+    signal:
+      file: "rollout_note.txt"
+      file_must_contain: '(?i)(3\.0\.11|3\.1\b(?:\.\d+)?)'
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Whether the target DAG and rollout note have produced a usable migration artifact.
+    signal:
+      judge_question: |
+        Based strictly on final file contents, not agent self-claims, answer YES iff:
+        1. assets/airflow_2_to_3_t1_dataset_assets/input/dags/example_datasets.py still contains the original producer/consumer DAG structure and task IDs in a syntactically plausible Python file.
+        2. Dataset/asset producer and consumer relationships are preserved rather than deleted or replaced by simple cron-only schedules.
+        3. rollout_note.txt exists and contains a brief rollout note for the release owner.
+        Acceptable: the DAG remains recognizable and data-aware scheduling is preserved, plus a rollout note exists.
+        Unacceptable: the DAG file is missing, most DAGs are deleted, asset-triggered schedules are removed, or no rollout note exists.
+      judge_expected: "YES"

@@ -1,0 +1,39 @@
+task_id: ios_design_guidelines_t3_custom_navigation
+skill_id: ios-design-guidelines
+description: |
+  We are evaluating whether a third-party SwiftUI navigation component is suitable for direct adoption in an iPhone product. Please review
+  `assets/ios_design_guidelines_t3_custom_navigation/input/NavigationView.swift` together with
+  the behavior described in `assets/ios_design_guidelines_t3_custom_navigation/input/README.md`,
+  and write an adoption risk assessment and minimal remediation recommendations for the product team.
+
+  The conclusion should focus on whether the component is suitable for direct production use, the main user-experience risks, and the few issues that should be prioritized if adoption continues.
+initial_state:
+  assets:
+    - path: assets/ios_design_guidelines_t3_custom_navigation/input/NavigationView.swift
+      source: "https://github.com/Mijick/NavigationView/blob/main/Sources/Internal/Views/NavigationView.swift"
+      real_state: "Core view source code of an open-source SwiftUI navigation library, including a custom full-screen container, safe area padding logic, drag-back gesture, and multiple transition animations."
+      preparation: |
+        Download the zip from the public GitHub repository Mijick/NavigationView main branch, and copy Sources/Internal/Views/NavigationView.swift verbatim.
+    - path: assets/ios_design_guidelines_t3_custom_navigation/input/README.md
+      source: "https://github.com/Mijick/NavigationView/blob/main/README.md"
+      real_state: "README of the same open-source SwiftUI navigation library, describing features such as custom navigation, transition animations, gesture support, and scroll position preservation."
+      preparation: |
+        Download the zip from the public GitHub repository Mijick/NavigationView main branch, and copy README.md verbatim.
+  tools_available:
+    - file_read
+    - code_review
+expected_trigger: true
+skill_constraints_tested:
+  - id: do_not_override_system_gestures
+    description: "Custom gestures must not break iPhone system back-gesture and edge-gesture expectations; complex gestures need visible alternative paths."
+    exclusive: "Without reading the skill, the model may generically note that custom drag has interaction-compatibility risk, but may not classify overriding system back/edge gestures as a high-priority issue per iPhone HIG, nor require narrowing gesture scope and providing visible alternative paths."
+  - id: safe_area_for_essential_content
+    description: "Key content must not be occluded by the status bar, Dynamic Island, or Home indicator; ignoring safe areas is allowed only for decorative backgrounds."
+    exclusive: "Without reading the skill, the model may warn about safe area risk, but may not explicitly distinguish that ignored safe areas apply only to decorative backgrounds and must not let body or interactive content enter the status bar, Dynamic Island, or Home indicator regions."
+  - id: reduce_motion_and_standard_navigation
+    description: "Navigation transitions and animations should respect the Reduce Motion preference and prioritize standard navigation patterns familiar to users."
+    exclusive: "Without reading the skill, the model may treat custom animations as a configurable experience or only generically suggest paying attention to accessibility; after reading the skill it should explicitly require respecting Reduce Motion and prioritizing convergence to standard navigation behavior familiar to iPhone users."
+notes: |
+  - Positive example: a real iPhone HIG risk review before adopting an open-source navigation component.
+  - The expected correct behavior is to produce an assessment and minimal remediation suggestions, not necessarily to rewrite the entire library.
+  - Common errors include: doing only a code-quality review; praising custom animations without flagging system gesture, safe area, and Reduce Motion risks.

@@ -1,0 +1,47 @@
+task_id: mcp_adaptive_cards_t3_work_items_fallback
+skill_id: mcp-create-adaptive-cards
+description: |
+  Release leads use `./assets/mcp_adaptive_cards_t3_work_items_fallback/input/work-items-plugin/` to review GitHub work items inside Copilot. Some rows are issues, some are pull requests, and older imported rows do not always carry the extra display hint that newer rows have. Please make the response easier to review visually without changing the operation or dropping those older rows.
+initial_state:
+  assets:
+    - path: ./assets/mcp_adaptive_cards_t3_work_items_fallback/input/work-items-plugin/ai-plugin.json
+      source: "Schema and manifest structure adapted from Microsoft 365 Copilot plugin manifest documentation: https://github.com/MicrosoftDocs/m365copilot-docs/blob/main/docs/plugin-manifest-2.4.md"
+      real_state: "Plugin manifest for a GitHub issue triage function that exposes citation title, subtitle, and URL only."
+      preparation: |
+        Started from public Microsoft 365 Copilot manifest schema examples and filled a function around GitHub's public issues API.
+    - path: ./assets/mcp_adaptive_cards_t3_work_items_fallback/input/work-items-plugin/openapi.yaml
+      source: "Real API shape from GitHub REST Issues documentation: https://docs.github.com/en/rest/issues/issues#list-repository-issues"
+      real_state: "OpenAPI description for issue-list records that may represent either issues or pull requests and include nullable fields."
+      preparation: |
+        Reduced GitHub's documented issue-list response to a compact OpenAPI fixture while preserving real field names such as `pull_request`, `labels`, `user`, and `html_url`.
+    - path: ./assets/mcp_adaptive_cards_t3_work_items_fallback/input/work-items-plugin/sample-response.json
+      source: "Representative fields adapted from GitHub REST API issue and pull request examples: https://docs.github.com/en/rest/issues/issues#list-repository-issues"
+      real_state: "Sample response with an issue item, a pull request item, and an imported issue-like item without a display selector."
+      preparation: |
+        Selected a small subset of documented GitHub issue fields and populated representative public repository-style values, keeping the mixed issue/pull-request shape and a missing selector case.
+  tools_available: [Read, Write, Edit, Glob, Grep, Bash, WebFetch]
+expected_trigger: true
+skill_constraints_tested:
+  - id: combined_static_and_dynamic_templates
+    description: "The skill says a function can use a template selector for item-specific cards and a static template as the default when the selector is missing or cannot resolve."
+    exclusive: "Without the skill, a model is likely to choose either one static card for all items or only dynamic templates, causing old rows without the selector to lose a usable visual presentation."
+  - id: selector_property_location
+    description: "The skill places template_selector under response_semantics.properties, alongside the existing title, subtitle, and url citation mappings."
+    exclusive: "Without the skill, a model may put the selector at the response_semantics root level, add only a data-side hint, or replace the existing title/subtitle/url mappings with card-only configuration."
+notes: |
+  - Positive trigger: this combines mixed item types with missing selectors, matching the skill's combined static-and-dynamic branch.
+  - Expected correct behavior: the manifest has a selector property and a default static card under response semantics, while the sample/contract supports issue and pull-request templates plus a fallback rendering path for the imported item.
+  - Common failure modes: adding `template_selector` but no `static_template`; deleting title/subtitle/url properties when adding the selector; putting all labels into a table-like ColumnSet with fixed widths; relying on `${body}` without an `if(...)` fallback even though `IssueItem.body` is nullable; omitting the imported item from the sample instead of preserving fallback behavior.
+  - baseline_correctness_signals:
+      - All original plugin files remain parseable and the existing operation id remains `ListRepositoryIssues`.
+      - The response presentation still includes work item title, state, URL, and item type or type-specific context.
+      - Items without a display hint are still represented rather than filtered out.
+  - skill_following_signals:
+      - `ai-plugin.json` adds `response_semantics.properties.template_selector` while preserving `title`, `subtitle`, and `url`.
+      - `ai-plugin.json` defines a `static_template` in the same `response_semantics` block.
+      - `sample-response.json` retains at least one selectorless imported item and includes template references for issue-like and pull-request-like items.
+      - The fallback `static_template` uses fields present on the imported item and guards nullable fields such as `body` with `if(...)`, `$when`, or equivalent Adaptive Card templating safeguards.
+      - Dynamic templates distinguish issue-like and pull-request-like rows without changing the existing operation id.
+  - secondary_style_signals:
+      - Card layouts prefer stacked or flexible structures with wrapping text rather than fixed-width table-like ColumnSet designs.
+      - Small avatars or icons are acceptable, but primary work-item metadata should not depend on narrow fixed-width columns.

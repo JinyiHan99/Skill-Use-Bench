@@ -1,0 +1,119 @@
+# Rubric for skill_97_football-data — football_data_t2_pl_availability_deep_dive
+
+rules:
+  - id: g1_observable_football_data_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable football-data/sports-skills real CLI or Python SDK query attempt."
+    signal:
+      pattern: '(?mi)^\s*(?:sports-skills\s+football\s+[a-z_]+|python[^\n]{0,200}sports_skills|from\s+sports_skills(?:\.football)?\s+import\s+\w+|from\s+sports_skills\s+import\s+football|import\s+sports_skills|football\.get_\w+\s*\()'
+
+  - id: r1_discover_chelsea_team_id_before_schedule
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Before querying Chelsea's team schedule, the team_id must be discovered via search_team(query="Chelsea") or get_season_teams, rather than guessing/hard-coding team_id.
+      skill-exclusive rationale: without reading the skill, a model may only filter Chelsea by local schedule text, or directly write an ID based on common sense / web; the skill explicitly states team_id is an ESPN numeric string, and when unknown, use search_team/get_season_teams to discover it. The conflict point is "string filtering / hard-coded ID" vs "discover team_id first".
+    signal:
+      query: |
+        Based only on actual tool-call evidence and outputs in serialized_steps, not narration, did the agent discover Chelsea's team_id with search_team or get_season_teams before calling get_team_schedule for Chelsea, and did get_team_schedule use the discovered team_id?
+        Answer YES if a football-data team discovery call for Chelsea occurs before the team schedule call and the schedule call uses the discovered id.
+        Answer NO if get_team_schedule uses a hardcoded Chelsea team_id without prior discovery, uses an unrelated id, or if the report is based only on local text/web search.
+      acceptable: "sports-skills football search_team --query=Chelsea, then get_team_schedule --team_id=<returned id>; or get_season_teams returns Chelsea id before get_team_schedule"
+      unacceptable: "sports-skills football get_team_schedule --team_id=363 with no prior search_team/get_season_teams evidence"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps]
+
+  - id: r2_current_pl_season_before_missing_players
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Before querying absent/injured players, the current Premier League season_id should be reliably discovered, and get_missing_players(season_id=<same PL season>) used to obtain data, then filtered by Chelsea.
+      skill-exclusive rationale: without reading the skill, a model may treat get_team_profile as a roster/injury source, or query injuries on a wrong / hard-coded season_id; the skill explicitly states that get_missing_players is Premier League-only and requires a PL season_id. The conflict point is "arbitrary injury source / hard-coded season" vs "current PL season + PL-only missing players".
+    signal:
+      query: |
+        Based only on actual tool-call evidence and outputs, did the agent reliably discover the current Premier League season_id from football-data output, then call get_missing_players with that same season_id?
+        Acceptable current-season sources include get_current_season, search_team/get_season_teams output that includes the current PL season, or get_competitions current_season; do not require only get_current_season.
+        Answer YES if the current PL season_id is discovered before get_missing_players and the same season_id is used.
+        Answer NO if get_missing_players is called with a guessed/non-PL season, skipped in favor of get_team_profile players[], or not attempted.
+      acceptable: "get_current_season premier-league returns premier-league-2025; get_missing_players --season_id=premier-league-2025; filter team Chelsea"
+      unacceptable: "get_team_profile Chelsea returns empty players and final says no injuries"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps]
+
+  - id: r3_attempt_top5_xg_or_player_xg_for_recent_closed_match
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The Premier League is a top-5 league; for recently closed Premier League matches in Chelsea's schedule, the agent should at least attempt get_event_xg or get_event_players_statistics to supplement xG/xA-related trends; if very recent matches are missing, it should degrade cleanly.
+      skill-exclusive rationale: without reading the skill, a model may only give generic status like score/shots, or not know that the xG command is only available for top 5; the skill explicitly states that EPL can use get_event_xg and player xG/xA, and that recent Understat may be delayed. The conflict point is "only basic schedule / web status" vs "attempt xG / player xG data for EPL closed matches".
+    signal:
+      query: |
+        Based only on actual football-data tool calls and outputs, did the agent first find a recent closed Chelsea Premier League event_id from Chelsea's schedule, then call get_event_xg or get_event_players_statistics for that same event_id?
+        Treat "recent" as a recent closed EPL match from Chelsea schedule, preferably one of the last three closed matches if available.
+        Answer YES if such an xG/player-stat call is made for a schedule-derived closed EPL event_id.
+        Answer NO if it only reports scores/basic stats, uses web search, attempts xG for a non-EPL event, or attempts xG without first finding an event_id from Chelsea schedule.
+      acceptable: "get_team_schedule finds closed EPL event 123 for Chelsea; get_event_xg --event_id=123 or get_event_players_statistics --event_id=123 follows"
+      unacceptable: "final mentions xG trend but no get_event_xg/get_event_players_statistics call is present"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps]
+
+  - id: r4_no_raw_errors_for_missing_xg_or_data
+    type: lesson
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK/QUALITY — not counted toward SF] When xG, event, or injury data is missing / a command fails, the agent must not expose tracebacks, raw CLI errors, or raw JSON errors directly to the fan report; it should degrade cleanly as an exploratory miss.
+    signal:
+      query: |
+        Based only on the final answer, did the agent avoid surfacing raw CLI errors, tracebacks, stderr text, or raw JSON dumps as the user-facing explanation when data was missing?
+        Answer YES if missing data is omitted or explained in clean human-readable language.
+        Answer NO if the final report includes traceback text, raw stderr, raw JSON error dumps, or raw empty JSON as the explanation.
+      acceptable: "Understat xG for the most recent match was not available yet, so the report uses shots and possession instead."
+      unacceptable: "Error: KeyError 'data' / Traceback ... pasted into the fan report"
+      judge_expected: "YES"
+      judge_context_window: [final_answer]
+
+  - id: r5_no_team_profile_roster_trap
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The players[] returned by get_team_profile must not be used as the basis for Chelsea roster, injuries, or "no one absent".
+      skill-exclusive rationale: without reading the skill, a model will naturally assume team profile contains roster; the skill specifically notes that get_team_profile does not return squad/roster, and players[] being empty is expected. The conflict point is "team profile as roster source" vs "use PL leaders/profile/missing players path".
+    signal:
+      query: |
+        Based only on actual tool outputs and final answer, did the agent avoid using get_team_profile players[] as the source of Chelsea roster or injury availability conclusions?
+        Answer YES if get_team_profile is not used for roster/availability, or if its empty players[] is ignored for that purpose.
+        Answer NO if the final answer cites empty get_team_profile players[] or profile players as evidence for no injuries, no absences, no missing players, or Chelsea roster status.
+      acceptable: "Uses get_missing_players for availability; get_team_profile, if called, is only used for venue/basic team info."
+      unacceptable: "get_team_profile returns players: [] and final says Chelsea have no listed absentees."
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps, final_answer]
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the final short report covers Chelsea's recent form, key data trends, and injury impact."
+    signal:
+      query: |
+        Based only on the final answer, did the response provide a fan-facing short report for Chelsea that includes recent form, at least two match/data trend elements (for example xG, shots, possession, goals for/against, chance quality, or missing-player impact), and current missing/doubtful player impact or a clean statement that availability data could not be verified?
+        Answer YES only if it is readable for ordinary fans and not just raw JSON.
+      judge_expected: "YES"
+      judge_context_window: [final_answer]

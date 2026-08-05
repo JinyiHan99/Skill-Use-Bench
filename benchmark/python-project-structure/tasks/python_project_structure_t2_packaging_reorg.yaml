@@ -1,0 +1,56 @@
+task_id: python_project_structure_t2_packaging_reorg
+skill_id: python-project-structure
+description: |
+  This version and dependency rule processing code has recently been referenced by several projects at once; the maintaining colleague feels the modules are too fragmented and the entry points are inconsistent, and some people have misused internal helpers. The team wants to organize it into a small library that is easier for other code to depend on. Based on the code in `assets/python_project_structure_t2_packaging_reorg/input/packaging/`, reorganize it into a clearer importable package structure in whatever way you think is appropriate, so that users can more easily see the stable import entry points and which implementation details should not be depended on externally. Place the result in `output/packaging_refactor/`, and add an `output/structure_notes.md` briefly explaining the external entry points and internal boundaries.
+initial_state:
+  assets:
+    - path: assets/python_project_structure_t2_packaging_reorg/input/packaging/__init__.py
+      source: "PyPA packaging package installed in the environment, /usr/local/lib/python3.11/site-packages/packaging/__init__.py"
+      real_state: "Package metadata initializer from the installed packaging library."
+      preparation: |
+        Copied verbatim from the local installed PyPA packaging distribution into this task's input directory.
+    - path: assets/python_project_structure_t2_packaging_reorg/input/packaging/version.py
+      source: "PyPA packaging package installed in the environment, /usr/local/lib/python3.11/site-packages/packaging/version.py"
+      real_state: "Real version parsing module containing public classes/functions and private comparison helpers."
+      preparation: |
+        Copied verbatim from the local installed PyPA packaging distribution into this task's input directory.
+    - path: assets/python_project_structure_t2_packaging_reorg/input/packaging/specifiers.py
+      source: "PyPA packaging package installed in the environment, /usr/local/lib/python3.11/site-packages/packaging/specifiers.py"
+      real_state: "Real specifier handling module containing public specifier classes plus private boundary and validation helpers."
+      preparation: |
+        Copied verbatim from the local installed PyPA packaging distribution into this task's input directory.
+    - path: assets/python_project_structure_t2_packaging_reorg/input/packaging/requirements.py
+      source: "PyPA packaging package installed in the environment, /usr/local/lib/python3.11/site-packages/packaging/requirements.py"
+      real_state: "Real requirement parsing module exposing Requirement and InvalidRequirement while depending on other package modules."
+      preparation: |
+        Copied verbatim from the local installed PyPA packaging distribution into this task's input directory.
+  tools_available:
+    - file_editor
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: focused_files_by_concept
+    description: "The reorganization should preserve clear concept boundaries for version parsing, specifier handling, and requirement parsing, even when the prompt mentions that the current modules feel fragmented."
+    exclusive: "Because the prompt raises concern about fragmented modules and an unclear entrypoint, a model without the skill may respond by merging version, specifier, and requirement logic into one convenience module. The skill instead favors one concept per file and should preserve separate focused modules while solving the entrypoint problem elsewhere."
+  - id: shallow_consistent_package_layout
+    description: "The output should use a shallow, consistent package layout and avoid adding empty architectural layers for a small reusable library."
+    exclusive: "Because the prompt asks for better encapsulation and a clearer entrypoint, a model without the skill may introduce wrapper layers such as core/, api/, internal/, services/, or impl/ to appear more organized. The skill favors flat hierarchies and should solve encapsulation through clear package boundaries rather than unnecessary nesting."
+  - id: explicit_package_public_api
+    description: "The reorganized package should define a machine-visible package-level public API in its package initializer, aligned with the stable names described for consumers."
+    exclusive: "Without the skill, a model may preserve the existing module files and describe the intended import surface only in prose, or use star imports in the package initializer. The skill specifically favors explicit public interfaces, so the package entrypoint should define a clear __all__ and avoid exporting private helpers."
+notes: |
+  - Core test point: requires reorganizing a reusable library structure on a subset of real PyPA packaging source, evaluating whether concept boundaries, shallow structure, and an explicit public interface are preserved.
+  - Expected correct behavior: the output should form a small, shallow, understandable Python package structure; version parsing, specifier rules, and requirement parsing should retain clear responsibility boundaries. The package entry point should provide a clear stable import surface and avoid exposing underscore-prefixed internal helpers as package-level public interfaces.
+  - Common model error behaviors: the model may merge version parsing, specifier rules, and requirement parsing into one comprehensive module to respond to "modules are too fragmented"; or introduce multi-layer empty directories such as `core/`, `services/`, `impl/` for "better encapsulation". Another common error is to only copy the original files and write documentation, but not define a clear, machine-visible public import surface in the new package entry point; or use star imports to form an opaque entry point, causing private helpers to be potentially mistaken as dependable.
+  - baseline_correctness_signals:
+      - `output/packaging_refactor/` exists and contains a Python package entry file.
+      - Version, specifier-rule, and requirement-string-related implementations can still be found at corresponding code locations separately in the output project.
+      - `output/structure_notes.md` exists and explains the stable import entry points and internal implementation boundaries.
+      - Since the input is a subset of PyPA packaging source, the baseline does not require full runtime imports for all transposed modules; for modules whose dependencies are not provided with the assets, judgment should be based mainly on static structure, syntax, and boundary preservation.
+  - Asset scope note: this input only provides a subset of PyPA packaging source files, used to evaluate structural reorganization, public entry points, and boundary expression; transitive dependency modules not provided with the assets should not be fabricated, nor should they be a required condition for full runtime import testing.
+  - skill_following_signals:
+      - `output/packaging_refactor/` uses a shallow package structure; apart from one optional single-layer private implementation module, there are no two-or-more-layer empty naming-only directories such as `core/internal/services/impl`.
+      - Version parsing, specifier rules, and requirement parsing are still in separate modules with clear responsibilities; they must not be merged into a single comprehensive module.
+      - `output/packaging_refactor/__init__.py` defines a package-level `__all__`, making the stable import entry point explicit.
+      - The package-level `__all__` does not include underscore-prefixed private helpers, nor does it implicitly form a public interface via opaque star imports.
+      - If new consumer-importable public modules are added, these modules should also define their own `__all__`.

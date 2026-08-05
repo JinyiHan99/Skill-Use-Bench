@@ -1,0 +1,88 @@
+task_id: SF03_t4_form_fill_no_flatten
+level: L2
+skill_id: skill_03_pdf
+description: |
+  A new employee onboarding needs to fill out the IRS W-4 form. The form template is at forms/fw4.pdf (5-page official IRS form).
+
+  I have already prepared the employee information FDF data file employee_w4.fdf. Please use this data
+  to fill the W-4 form.
+
+  Note: after filling, the employee still needs to sign and confirm themselves, so do not lock the form; keep it editable.
+
+  Also, please save the filled file as fw4_filled.pdf (based on the original form filename with an _filled suffix).
+
+initial_state:
+  files:
+    - path: employee_w4.fdf
+      content: |
+        %FDF-1.2
+        1 0 obj
+        <<
+        /FDF <<
+          /Fields [
+            << /T (topmostSubform[0].Page1[0].Step1a[0].f1_01[0]) /V (Zhang) >>
+            << /T (topmostSubform[0].Page1[0].Step1a[0].f1_02[0]) /V (Wei) >>
+            << /T (topmostSubform[0].Page1[0].Step1a[0].f1_03[0]) /V (123-45-6789) >>
+            << /T (topmostSubform[0].Page1[0].Step1a[0].f1_04[0]) /V (742 Evergreen Terrace, Springfield, IL 62704) >>
+            << /T (topmostSubform[0].Page1[0].f1_05[0]) /V (Springfield, IL 62704) >>
+            << /T (topmostSubform[0].Page1[0].Step3_ReadOrder[0].f1_06[0]) /V (2) >>
+            << /T (topmostSubform[0].Page1[0].Step3_ReadOrder[0].f1_07[0]) /V (4000) >>
+            << /T (topmostSubform[0].Page1[0].f1_08[0]) /V (6000) >>
+            << /T (topmostSubform[0].Page1[0].f1_09[0]) /V (1500) >>
+            << /T (topmostSubform[0].Page1[0].f1_10[0]) /V (3200) >>
+            << /T (topmostSubform[0].Page1[0].f1_11[0]) /V (150) >>
+            << /T (topmostSubform[0].Page1[0].f1_13[0]) /V (2025-03-01) >>
+          ]
+        >>
+        >>
+        endobj
+        trailer
+        << /Root 1 0 R >>
+        %%EOF
+    - path: forms/README.txt
+      content: |
+        IRS Form W-4 (2026) - Employee's Withholding Certificate
+        Downloaded from: https://www.irs.gov/pub/irs-pdf/fw4.pdf
+        Pages: 5
+        This is the official IRS fillable PDF form.
+  tools_available: [bash, read, edit, grep]
+  binary_assets:
+    - path: forms/fw4.pdf
+      source_url: "https://www.irs.gov/pub/irs-pdf/fw4.pdf"
+      pages: 5
+      size_mb: 0.2
+      description: "Official IRS Form W-4 (2026) — real fillable PDF form with multiple fields"
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: tool_restriction
+    description: "Must use pdftk fill_form, not Python libraries"
+    exclusive: "Model defaults to pypdf.update_page_form_field_values(), PyPDF2, pdfrw, or fillpdf scripts; rarely reaches for pdftk fill_form unless skill enforces it; may also bypass FDF entirely by rewriting fields into a Python dict and calling pypdf directly"
+  - id: no_flatten_without_explicit_request
+    description: "User's context implies form will be further edited → must NOT add flatten"
+    exclusive: "Model often adds flatten by default for 'professional' output"
+  - id: inspect_fields_first
+    description: "Must run dump_data_fields as pre-flight inspection before fill_form, even when the FDF data file already contains field names — skill mandates field verification regardless."
+    exclusive: "Model skips field inspection and fills directly"
+  - id: output_naming
+    description: "Output filename must follow skill's naming rule for non-flattened fills (stem from input PDF + standard suffix), not arbitrary names."
+    exclusive: "Model uses arbitrary name like filled_form.pdf or w4_completed.pdf"
+  - id: stem_source
+    description: "Output stem must derive from the input PDF template, not from the FDF data file."
+    exclusive: "Model often names output after the data file"
+
+notes: |
+  Core test points (real IRS W-4 form, 5 pages, multi-field):
+  1. The flatten decision is the most critical test:
+     - The user says "the employee still needs to supplement signature and other info" → implies the form should remain editable
+     - Skill-defined flatten trigger words: final, finalize, lock, non-editable, print-ready, flatten
+     - The user did not use any trigger word → should not flatten
+  2. Must run dump_data_fields to inspect fields first: real IRS forms have complex field hierarchy naming
+  3. Real form complexity: field names are XFA-style hierarchical paths, not simple "name"/"address"
+  
+  Expected correct behavior (high-level judgment, commands not written):
+  - Use the skill-specified CLI tool (not a Python PDF library) to complete the fill
+  - Complete field-level pre-inspection before filling
+  - The output file remains editable (not locked/flattened)
+  - Output naming follows the skill's stem rule (derived from the input PDF, not the data file)

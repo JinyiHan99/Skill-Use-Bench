@@ -1,0 +1,29 @@
+{
+  "quarter": "Q4 2024",
+  "regions": [
+    {
+      "name": "North America",
+      "revenue": 2100000,
+      "units": 8400,
+      "growth": 12
+    },
+    {
+      "name": "Europe",
+      "revenue": 1500000,
+      "units": 6200,
+      "growth": 8
+    },
+    {
+      "name": "Asia Pacific",
+      "revenue": 980000,
+      "units": 4100,
+      "growth": 22
+    },
+    {
+      "name": "Latin America",
+      "revenue": 420000,
+      "units": 1800,
+      "growth": 15
+    }
+  ]
+}

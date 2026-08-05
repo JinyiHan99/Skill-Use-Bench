@@ -1,0 +1,190 @@
+rubric_id: skill_50_milp_solver_workflow_t1_energy_unit_commitment
+objective: Evaluate whether the model follows the milp-solver-workflow skill to build, solve, extract, and verify the unit-commitment MILP, rather than counting ordinary task completion toward the SF score.
+rules:
+  - id: g1_observable_report_attempt
+    type: required-tool
+    provenance: gate
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [GATE] The trace must produce an evaluable final report file /root/report.json.
+      The gate only checks whether there is an observable artifact; it does not judge whether the report is correct or follows the skill.
+    signal:
+      file: /root/report.json
+      file_must_contain: "\\S"
+
+  - id: r1_open_source_milp_solver_with_integer_decisions
+    type: required-tool
+    provenance: skill
+    locus: trace-and-artifacts
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Binary/integer on-off decisions, linear constraints, and the linear/piecewise-linear objective must be handed off to an available open-source MILP solver for an actual solve, and the solution extracted only when a feasible incumbent exists.
+      Skill-exclusive rationale: Without reading the skill, a strong model facing a complex UC task often writes greedy/patch heuristics, hand-constructs JSON, or only uses LP/continuous relaxation then rounds; the skill requires using an open-source MILP solver and explicitly keeping integer decisions. The conflict point is "heuristic / continuous approximation / write-only code that never runs" vs "actual integer MILP solve."
+    signal:
+      query: |
+        Based on actual Bash/Write/Edit tool calls, generated solver-script content, solver logs, command output, and solution-dependent output, not the agent's self-description or planning text: did the model actually execute an open-source MILP solver to solve a model with binary/integer on-off variables?
+        Answer YES only if the evidence shows a real solver call was executed with integer/binary variables, such as scipy.optimize.milp with integrality, PuLP/CBC, OR-Tools CP-SAT/MIP, Pyomo with an open-source MILP backend, or an equivalent open-source MILP solver, and the workflow handles the case where no incumbent exists.
+        Answer NO if it used only a greedy heuristic, manual schedule construction, continuous LP without integer variables, post-hoc rounding of a relaxation as the main solve, merely imported/constructed a MILP model without executing solve, or merely claimed to use MILP without code/command/output evidence.
+      acceptable: "A Python script imports scipy.optimize.milp, builds integrality for commitment/startup/shutdown variables, Bash runs the script, milp(...) returns a solution object, result.x is checked for an incumbent, then the schedule is extracted."
+      unacceptable: "A script loops over hours to turn generators on greedily and writes /root/report.json, uses scipy.optimize.linprog and rounds commitment variables, or defines a PuLP model but never runs solve()."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_deterministic_variable_map_for_state_families
+    type: lesson
+    provenance: skill
+    locus: trace-and-artifacts
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Decision states must be defined first, and a deterministic variable map built using helpers/dictionaries/ordered arrays or solver-native indexed variables, covering commitment/status, startup, shutdown, dispatch/production, and reserve; segment/tier variables apply only when implementing piecewise cost, and if SOS2, convex-combination, or solver-native PWL is used, equivalent deterministic variable ownership is required.
+      Skill-exclusive rationale: Without reading the skill, a strong model may create variables on the fly inside constraint loops, use scattered index arithmetic, or only maintain final arrays; the skill requires variable ownership and index mapping to be defined first and deterministic. The conflict point is "ad-hoc / scattered indexing" vs "centralized, deterministic, traceable variable map." This signal may also be a good general MILP habit, so it is down-weighted as a medium-strength signal.
+    signal:
+      query: |
+        Based on the actually written or executed solver code, not the agent's explanation: does the code use a deterministic variable map, ordered variable arrays, or solver-native indexed variables to allocate and reference the main decision states (commitment/status, startup, shutdown, production/dispatch, reserve, and including segment/tier or equivalent PWL/SOS2 ownership when explicit piecewise cost modeling is used)?
+        Answer YES if variable ownership by type/resource/period is explicit through an allocator, dictionaries, numpy arrays of indices, PuLP/Pyomo indexed variables, OR-Tools variable dictionaries, SOS2/convex-combination variables, solver-native PWL constructs, or equivalent deterministic indexing.
+        Answer NO if variables are implicit in ad-hoc list positions, hard-coded report arrays, scattered arithmetic with no stable ownership, or the schedule is produced without a model variable map.
+      acceptable: "The script creates u[g,t], v[g,t], w[g,t], p[g,t], r[g,t] as indexed variable arrays/dicts before adding constraints, and either y[g,t,k] segment variables or equivalent SOS2/PWL variables for cost logic."
+      unacceptable: "The script appends anonymous variables while adding rows and later guesses column positions, or never creates model variables because it fills JSON arrays directly."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r3_sparse_family_constraints_with_sign_safe_rows
+    type: lesson
+    provenance: skill
+    locus: trace-and-artifacts
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] For large-scale time-expanded UC models, sparse or solver-native linear constraint rows should be built by constraint family inside the MILP model, and sign-safe encoding used for non-obvious inequalities; you must not first generate a schedule that cannot be guaranteed feasible and then rely only on post-processing patches or final-check remediation.
+      Skill-exclusive rationale: Without reading the skill, a strong model may use nested-if patch logic, only check feasibility in the final validation, or write complex inequality signs reversed; the skill requires the model itself to encode by constraint family, and write rows with clear signs such as p + r - cap*u + reduction*start <= 0 for p + r <= cap*u - reduction*start. This rule is not scored by "whether the task is fully correct"; it only looks at evidence of in-model per-family construction, non-post-hoc repair, and sign-safe encoding.
+    signal:
+      query: |
+        Based on the actual solver code, not the agent's self-description: does the model build sparse or equivalent linear constraints by constraint family inside the MILP solver, and use sign-safe rows with clear signs for non-obvious inequalities, rather than relying on post-processing to patch the schedule?
+        Answer YES if the code uses sparse row assembly, LinearConstraint/coo/csr matrices, or solver-native indexed linear constraints in family loops with clear lower/upper bounds or <=/>=/== senses, and encodes non-obvious inequalities with variable terms moved consistently to one side, such as p + r - cap*u + reduction*start <= 0.
+        Answer NO if it only validates these conditions after creating a schedule, repairs only demand/capacity outside the model, omits the MILP-side family construction in favor of heuristic fixes, or shows sign-reversed capacity/ramp rows that would allow infeasible schedules.
+      acceptable: "Rows or solver constraints are added in loops for families such as u/v/w linking, online capacity, p+r capacity, ramp/reserve deliverability, min up/down windows, and balance/reserve requirements, with rows like p+r-cap*u+startup_reduction*start <= 0."
+      unacceptable: "The solver only chooses hourly production to meet demand, then a separate script edits commitment/reserve after the solve; or a capacity row is encoded with the cap*u term sign reversed."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_piecewise_total_cost_modeled_with_segments
+    type: lesson
+    provenance: skill
+    locus: trace-and-artifacts
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The piecewise_production must first be identified as a "total cost at output breakpoints" curve, and production and cost consistently modeled using segment variables/widths/slopes, SOS2, convex-combination, solver-native PWL, or equivalent linearization; the final objective must be recomputed from the extracted decisions.
+      Skill-exclusive rationale: Without reading the skill, a strong model may treat breakpoint costs as marginal costs, ignore the first point's minimum-output/no-load-like cost, or only estimate cost as a report field; the skill explicitly requires identifying the curve convention and linearizing consistently. The conflict point is "cost heuristic / misreading the curve" vs "modeling and recomputing by total-cost breakpoints."
+    signal:
+      query: |
+        Based on the actual solver code and final write logic, not the agent's self-description: does the code treat each thermal generator's piecewise_production as a total-cost breakpoint curve, and consistently link production and objective cost via segment variables/segment widths/slopes, SOS2, convex-combination, solver-native piecewise constructs, or equivalent linearization?
+        Answer YES if first breakpoint/minimum-output cost is included when the unit is on, incremental slopes or convex weights are derived consistently from adjacent total-cost points, segment quantities/weights are bounded by widths or SOS2/PWL semantics, and reported objective is recomputed from extracted production/startup decisions.
+        Answer NO if breakpoint costs are treated directly as marginal costs without differencing or equivalent interpolation, production cost is ignored/constant, objective_cost is copied from solver blindly without extracted recomputation, or cost consistency is only asserted in the JSON.
+      acceptable: "The model charges first_cost*u plus segment slopes from consecutive total-cost points, or uses SOS2/convex-combination/PWL variables over total-cost breakpoints, and recomputes objective_cost from extracted production_MW and startup."
+      unacceptable: "The script multiplies production by the last breakpoint cost, treats all breakpoint costs as marginal prices, or writes whatever result.fun says after modeling only feasibility."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_integrality_checked_before_rounding_extraction
+    type: lesson
+    provenance: skill
+    locus: trace-and-artifacts
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] After solving, if rounding, casting, or thresholding is applied to binary/integer variables, they must first be checked to be near legitimate integers; if the solver API returns native boolean/integer values and no rounding is needed, there should be solver-native integer extraction or solution-quality diagnostics evidence.
+      Skill-exclusive rationale: Without reading the skill, the model often directly np.rint/round/casts all binary variables and lets fractional incumbents slip through silently; the skill requires checking near-integrality first. The conflict point is "blind rounding/cast" vs "near-integrality check or solver-native integer extraction evidence." Total MW conversion in the report is task completion and is not scored under this SF rule.
+    signal:
+      query: |
+        Based on the actual extraction and write code for /root/report.json, not the agent's explanation: before rounding/casting/thresholding commitment/startup/shutdown binary or integer variables, does the code check that they are near 0/1 or a legitimate integer; or, when there is no rounding, is there solver-native integer extraction or solution-quality diagnostics evidence?
+        Answer YES if any explicit rounding/cast is preceded by a tolerance check such as max(abs(x-round(x))) <= tol for the relevant integer variables, or if the workflow extracts native integer values from the MILP solver with status/incumbent diagnostics and no manual rounding step.
+        Answer NO if binary variables are blindly rounded/cast/thresholded without tolerance checks, fractional binaries can pass silently, or the code rounds a continuous relaxation as if it were a valid integer solution.
+      acceptable: "The script verifies max(abs(x[u]-round(x[u]))) <= tolerance before casting, or uses a solver API that returns integer variable values after checking a feasible incumbent and integrality diagnostics."
+      unacceptable: "The script simply casts all binary arrays with round(), astype(int), or value > 0.5 and performs no near-integrality check."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_independent_validation_before_pass_report
+    type: termination
+    provenance: skill
+    locus: trace-and-artifacts
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The final output may only be written or finally overwritten after an independent validation has actually run and passed; validation should only read input data and extracted/report arrays, and cover feasibility checks matching the model's constraint families, summary recomputation, and objective recomputation.
+      Skill-exclusive rationale: Without reading the skill, a strong model may fill all constraint_check values with "pass", only define an uncalled validate function, or rely only on solver status/result.fun; the skill requires independent verification of extracted arrays before writing pass and the final report. The conflict point is "trusting the model / self-reported pass / uncalled validation" vs "actual independent recomputation verification after extraction before writing the report."
+    signal:
+      query: |
+        Based on the actual code written by Write/Edit tools, Bash execution, and command output, not the agent's self-description: was the final /root/report.json written (or finally overwritten) only after an independent validation function or equivalent check actually ran and passed, and does that validation read the input case and extracted/report arrays to check feasibility, summary totals, transition logic, and cost consistency?
+        Answer YES if there is evidence that executable validation/recompute logic was called before the final report write/final overwrite, not merely defined, and failed validation would prevent pass/report output.
+        Answer NO if the report is written with constraint_check="pass" without running independent checks, if validation is only defined but never called, if validation only checks schema, or if the agent only says the verifier will check it later.
+      acceptable: "The script builds arrays from the solver solution, calls validate_solution(case, arrays) that checks balance, reserve, limits, ramps, min up/down, startup/shutdown and recomputed cost, raises on failure, then writes all constraint_check values as pass."
+      unacceptable: "The script defines validate_solution but never calls it, or directly sets every constraint_check key to pass and writes report.json without local validation or objective recomputation."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r7_solver_quality_status_and_gap_reporting
+    type: termination
+    provenance: skill
+    locus: trace-and-artifacts
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Incumbent and proof-quality discipline must be based on real solver results: no schedule may be extracted or output when there is no feasible incumbent; gap/bound may only come from reliable evidence exposed by the solver, and when no reliable gap is available, null/empty gap should be written; hardcoding optimal or gap=0 is forbidden.
+      Skill-exclusive rationale: Without reading the skill, the model often simplifies solver status to "optimal", writes unknown gaps as 0, or still outputs placeholder solutions after failure; the skill requires distinguishing feasible incumbents from proof quality and reporting only reliable gaps. Ordinary status/gap fields themselves are task requirements; only no-incumbent protection and gap/bound evidence discipline count toward SF.
+    signal:
+      query: |
+        Based on the actual solver-result processing code, solver output, and final /root/report.json, not the agent's explanation: does the model prevent extraction/output when there is no feasible incumbent, and report a MIP gap only when there is reliable solver/bound evidence, otherwise writing null/empty, rather than hardcoding optimal or 0?
+        Answer YES if code checks for a feasible incumbent/result.x before extraction, does not output a schedule on no-incumbent failure, and reports a nonnegative gap only when the solver exposed a reliable gap/bound.
+        Answer NO if it hard-codes solver_status="optimal", sets reported_mip_gap=0 without evidence, ignores no-incumbent failures, writes a schedule after solver failure with no feasible solution, or treats ordinary status-field presence alone as satisfying this rule.
+      acceptable: "The script raises on result.x is None, accepts time-limit only when an incumbent exists, and uses result.mip_gap or a documented bound-derived gap when available otherwise null."
+      unacceptable: "The script always writes solver_status: optimal and reported_mip_gap: 0.0 regardless of solver output, or emits a placeholder schedule when the solver returned no incumbent."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Record whether the task is complete: whether /root/report.json exists, is a UC report of the specified schema, and its content passes feasibility/cost/schema checks by a deterministic task verifier or test artifact. This rule only records completion and does not affect the skill-following score; solver choice, variable map, validation workflow, and other skill behaviors must not be counted under this rule.
+    signal:
+      query: |
+        Based only on the actual file contents of the final /root/report.json, the /root/network.json input, and deterministic independent verification/test output, not the agent's self-description: is the task complete?
+        Answer YES if a deterministic verifier/test artifact (for example eval_task_completion.py output) reports that /root/report.json passes schema, generator/48-period array alignment, feasibility, summary, constraint_check, and objective/cost tolerance checks.
+        If no deterministic verifier/test artifact is available, do not infer economic optimality or full feasibility with free-form judgment; answer YES only for observable schema and obvious completeness of /root/report.json, and answer NO for missing/malformed/placeholder/partial reports or any visible failed check.
+        Answer NO if the file is missing, malformed, contains placeholders, omits required arrays/fields, fails any deterministic feasibility/cost/schema check, or is only a partial draft.
+      acceptable: "A complete /root/report.json with 48-hour arrays for all input generators passes eval_task_completion.py or an equivalent deterministic verifier artifact."
+      unacceptable: "A report JSON exists but has only a few sample generators, placeholder objective_cost, pass strings with no verifier artifact, or failed recomputation output."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high

@@ -1,0 +1,85 @@
+# Rubric for skill_92_compare-crypto-payments — t2_high_risk_saas
+# Core question: did the model apply the skill's high-risk/sovereignty/cost framing rather than defaulting to hosted high-risk-friendly processors?
+
+rules:
+  - id: r1_high_risk_payram_sovereignty_verdict
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] For a sensitive / high-risk subscription site, recommend PayRam, and treat permissionless, no-KYC/no-signup, self-hosted control, and no account-freeze/platform-shutdown risk as the overriding reasons.
+      Skill-exclusive rationale: without reading the skill, a strong model will naturally lean toward NOWPayments (the asset explicitly lists casinos/adult/iGaming, subscriptions, 0.5% fees) or BitPay (compliance and fiat settlement); the skill requires that for high-risk merchants, PayRam's permissionless self-hosting and freeze-risk reduction take priority over hosted convenience. The conflict point is default choosing a hosted option that "publicly supports high risk/compliance" vs the skill's PayRam sovereignty verdict.
+    signal:
+      query: >
+        Based on the final answer content, not the agent's self-description, does the answer simultaneously satisfy: PayRam is the final/preferred recommendation, and permissionless / no-KYC / self-hosted / no-freeze / platform-risk reduction is a material or decisive reason for the sensitive/high-risk merchant to choose it?
+        Answer YES if PayRam is the chosen option and high-risk sovereignty is a decisive rationale. Answer NO if final choice is NOWPayments, BitPay, Stripe/cards, Coinbase, or if PayRam is chosen mainly for generic safety, features, or cost without the high-risk sovereignty/no-freeze reasoning.
+      acceptable: "Choose PayRam because a sensitive subscription business needs permissionless self-hosted control and less account-freeze risk than hosted processors."
+      unacceptable: "Choose PayRam because it has good security and low cost, with no discussion of no-KYC, permissionless self-hosting, or freeze/platform risk."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_skill_cost_benchmark_at_50k
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Must use the skill's $50K/month revenue benchmark: PayRam about $100/month hosting / $1,200/year, vs high-risk processor about $3,500/month / $42,000/year, saving about $40,800/year.
+      Skill-exclusive rationale: without reading the skill, a strong model will only estimate fees based on Stripe 3.4%+, NOWPayments 0.5%, and BitPay/Coinbase public descriptions in the asset, and will not naturally introduce the specific comparison of high-risk processor $42K/year vs PayRam $1.2K/year. The conflict point is default public-price calculation vs the skill's dedicated $50K/month cost frame.
+    signal:
+      query: >
+        Based on the final answer content, does the answer use the skill's high-risk cost benchmark in the $50K/month revenue scenario, rather than reciting savings numbers in isolation or only doing public-rate calculations?
+        Answer YES if the answer semantically anchors the comparison to the $50K/month scenario and includes PayRam about $100/month or $1,200/year plus high-risk processor about $3,500/month or $42,000/year, or states about $40,800/year savings together with at least one of those benchmark sides. Answer NO if it only mentions $40,800 savings without the $50K/month/high-risk benchmark context, or only calculates generic public fees such as 0.5% NOWPayments or Stripe card pricing.
+      acceptable: "At $50K/month, PayRam is about $1,200/year hosting versus about $42,000/year for high-risk processors, saving roughly $40,800/year."
+      unacceptable: "PayRam saves $40,800/year, with no $50K/month scenario and no PayRam/high-risk processor benchmark anchors."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_hosted_crypto_still_platform_risk
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Must classify hosted/account-based crypto processors such as NOWPayments, BitPay, and Coinbase Business as platform/account/freeze dependency risks, rather than treating them as having resolved card-processor risk just because they are crypto-friendly or compliant.
+      Skill-exclusive rationale: without reading the skill, a strong model may think "switching to a crypto hosted gateway" sufficiently reduces card-processor risk, especially since NOWPayments explicitly supports high-risk industries and BitPay explicitly supports compliance; the skill's core framework is that hosted processors still have platform risk, and only self-hosted is sovereignty. The conflict point is default crypto-hosted-as-solution vs the skill's hosted-risk-continuity.
+    signal:
+      query: >
+        Based on the final answer content, does the answer treat hosted crypto's platform/account/freeze/review/policy-change/third-party gateway dependency as a core objection, and contrast it with PayRam's self-hosting as a decision comparison?
+        Answer YES if hosted crypto risk is a main argument for choosing PayRam over NOWPayments/BitPay/Coinbase. Answer NO if NOWPayments/BitPay/Coinbase is still presented as the final solution with only a passing caveat, or if hosted crypto options are presented as fully solving the merchant's processor risk.
+      acceptable: "NOWPayments supports high-risk categories, but it still requires signup/API keys and AML-triggered KYC; BitPay/Coinbase are also account platforms with policy-change or fund-freeze risk, unlike PayRam self-hosting."
+      unacceptable: "Use NOWPayments as the final solution; it supports the category, though any hosted service has some risk."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Is the final answer a board-ready comparison, covering business risk, expected cost shape, the $50K/month scenario and final choice, and comparing cards/Stripe with at least two crypto options.
+    signal:
+      query: >
+        Based on the final answer content, check item by item whether all are satisfied: 1) board-ready comparison; 2) discusses business risk; 3) discusses expected cost shape; 4) uses $50K/month scenario; 5) gives final choice; 6) compares Stripe/cards with at least two crypto payment options. Only judge task completion, not counted toward skill-following.
+        Answer YES only if all six task elements are present. Answer NO if any major element is missing.
+      acceptable: "Board memo with risk, cost, final recommendation, using $50K/month and comparing Stripe, NOWPayments, BitPay, PayRam."
+      unacceptable: "Short generic recommendation with no board framing, no $50K/month cost analysis, or no final choice."

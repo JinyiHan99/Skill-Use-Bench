@@ -1,0 +1,63 @@
+task_id: SF28_t1_employee_onboarding_form
+level: L2
+skill_id: skill_28_json_render
+description: |
+  I have a JSON-driven form project under assets/SF28_t1_form_spec/, with schema and catalog already defined.
+  Please help me write a JSON spec file for an employee onboarding form, and save it to assets/SF28_t1_form_spec/src/spec.json. It needs to include the following features:
+
+  1. Personal info section: name (firstName field), email, confirm email, department selection (Engineering/Product/Design/Operations), hire date
+  2. Office info section: office location selection, whether a parking spot is needed (checkbox); if the parking checkbox is checked, a parking floor selection should appear
+  3. Emergency contact section: contact name, contact phone
+  4. Confirmation section: an "agree to terms" checkbox
+
+  Validation requirements:
+  - Email must be in valid format
+  - Hire date must be earlier than the cutoff date (/form/endDate is already defined in state)
+  - Emergency contact phone must be in numeric format
+  - "Agree to terms" must be checked before submission
+  - Confirm email value must match the email (used to confirm input consistency)
+
+  Also fill in the initial state needed by the form.
+
+initial_state:
+  assets:
+    - path: assets/SF28_t1_form_spec/
+      source: "Hand-crafted project scaffold based on real @json-render/core starter template"
+  files:
+    - path: assets/SF28_t1_form_spec/package.json
+      content: |
+        { "dependencies": { "@json-render/core": "^3.2.0", "@json-render/react": "^3.2.0", "react": "^18.3.1", "react-dom": "^18.3.1", "zod": "^3.23.8" }, "devDependencies": { "typescript": "^5.5.4", "@types/react": "^18.3.3", "vite": "^5.4.0" } }
+    - path: assets/SF28_t1_form_spec/src/schema.ts
+      content: "Schema definition using defineSchema with form spec structure"
+    - path: assets/SF28_t1_form_spec/src/catalog.ts
+      content: "Catalog with form components: TextInput, Select, Checkbox, DatePicker, etc."
+    - path: assets/SF28_t1_form_spec/src/state.ts
+      content: "Initial state store with form field paths under /form/"
+  tools_available: [bash, read, edit, grep]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: bindState_not_statePath
+    description: "Two-way binding must use { \"$bindState\": \"/path\" } on the value prop, not a statePath prop"
+    exclusive: "Model uses a statePath top-level prop or statePath inside props for two-way binding, which is the more intuitive pattern used in many form frameworks"
+  - id: check_api_validation
+    description: "Validation must reference check.* helpers from @json-render/core (check.required, check.email, check.matches, check.lessThan, etc.), expressed as structured objects in JSON (e.g., { \"check\": \"required\", \"message\": \"...\" }), not raw Zod schemas or manual comparisons"
+    exclusive: "Model writes inline Zod validation schemas or manual comparison logic instead of using the check.* namespace"
+  - id: visibility_condition_object
+    description: "Conditional visibility must use the renderer's $state-based condition object (e.g., { \"$state\": \"/form/needsParking\" }), not ad-hoc condition fields or boolean values"
+    exclusive: "Model invents generic condition fields such as visibleWhen, showIf, condition, hidden, or sets visible to a static boolean, instead of using the renderer's { \"$state\": \"/path\" } condition object syntax"
+  - id: content_not_children
+    description: "Container components must use the top-level 'content' array for nested elements, not props.children"
+    exclusive: "Model nests child elements inside props.children, which is the standard React pattern"
+notes: |
+  Evaluation goal: test whether the model, given a description that does not mention @json-render/core by name,
+  can infer the project's JSON spec authoring conventions via the skill, including:
+  - Using $bindState instead of statePath for two-way binding
+  - Using the check.* API for form validation (especially check.matches, check.lessThan)
+  - Using visibility condition objects rather than booleans to control visibility
+  - Using content rather than children to organize nested elements
+  The description does not mention the json-render library name, only "JSON-driven form project."
+  Note: this task's schema defines content as s.array(s.string()) (flat-map form, storing child element IDs),
+  whereas the skill example shows a nested-object form. The rubric only checks "content vs children" usage,
+  without distinguishing flat-map from tree-nested structure.

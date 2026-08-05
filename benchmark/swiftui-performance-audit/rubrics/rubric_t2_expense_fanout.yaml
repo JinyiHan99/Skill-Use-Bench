@@ -1,0 +1,137 @@
+rules:
+  - id: g1_read_contentview_file
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable attempt to read ContentView.swift."
+    signal:
+      pattern: '(?:"file_path"|"path"|"command")\s*:\s*"[^"]*assets/swiftui_performance_audit_t2_expense_fanout/input/ContentView\.swift[^"]*"'
+
+  - id: g2_read_addview_file
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable attempt to read AddView.swift."
+    signal:
+      pattern: '(?:"file_path"|"path"|"command")\s*:\s*"[^"]*assets/swiftui_performance_audit_t2_expense_fanout/input/AddView\.swift[^"]*"'
+
+  - id: r1_standard_excessive_view_updates_classification
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] First classify the symptom of "adding/deleting a record causing broad list refresh" as excessive or unexpectedly broad view updates.
+      skill-exclusive reason: without reading the skill, a strong model may directly proceed to code fixes or generally call it "list refresh"; the skill requires classifying by standard symptoms. The conflict is whether to use the excessive view updates performance audit classification framework.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer explicitly classify the symptom as a diagnostic category under excessive view updates, unexpectedly broad view updates, or equivalent standard classification? Answer YES if this is an explicit classification or diagnostic category, even if not formatted as a heading. Answer NO if it only describes "jank" "list redraw" "too much refresh" or "performance issue" without using the standard category as a classification.
+      acceptable: "Symptom classification: Excessive or unexpectedly broad view updates."
+      unacceptable: "This is a list performance issue; it gets slow when adding and deleting."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_prioritize_observation_invalidation_fanout_chain
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] Treat broad observation / invalidation fan-out as the highest priority issue, and connect the ContentView reading expenses.items, AddView append, ContentView remove trigger chain.
+      skill-exclusive reason: without reading the skill, a strong model may only point out ForEach, currency formatting, or UserDefaults didSet; the skill's code-smells explicitly places broad observation causing invalidation storms as the audit focus. The conflict is whether to prioritize locating the overly broad observation trigger chain.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer list broad observation, observation fan-out, invalidation storm, unnecessary broad invalidation, or equivalent concepts as the highest priority/P0/primary root cause, and explain that ContentView reads expenses.items, AddView appends new records, ContentView removes deleted records, together triggering broad invalidation/fan-out or list-wide refresh? Answer YES only if both the top-priority framing and this add/remove state-mutation chain are present. Answer NO if observable state is secondary, if the chain omits ContentView or AddView, or if it incorrectly places remove in AddView.
+      acceptable: "P0: @Observable Expenses.items is read by ContentView's ForEach; AddView appends on save, ContentView removes on delete, both cause the parent list's observation scope to invalidate entirely."
+      unacceptable: "The main issue is Text currency format possibly recalculating; consider optimizing Observable."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r3_targeted_state_scope_or_stable_row_inputs
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] Fix suggestions should specifically narrow state scope, split view boundaries, or stabilize row-level inputs, and explain how this narrows the observation/invalidation scope, rather than using generic caching or stuffing arbitrary computations into @State.
+      skill-exclusive reason: without reading the skill, the model may propose "add caching" "use @State to save computed results" and other generic optimizations; the skill explicitly requires narrow state scope / stable row inputs and warns that @State is only for view-owned state. The conflict is whether the fix direction targets the invalidation scope.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer propose narrowing observable state read scope, extracting row views/sub-view boundaries, letting ExpenseRow receive stable value inputs, or equivalent row-level stabilization, and explain how this narrows the observation/invalidation scope or reduces fan-out? Answer YES only if both a targeted state-scope/stable-row-input remediation and its invalidation-scope rationale are present. Answer NO if it merely says "extract sub-views for clarity" or proposes only caching, debouncing, lazy loading, or generic "optimize List".
+      acceptable: "Extract ExpenseRow(item: item), letting the row receive only stable ExpenseItem values, avoiding the parent view's observation of the entire expenses.items from widening the invalidation scope on every append/remove."
+      unacceptable: "Extract sub-views for code clarity, and cache formatting results in @State."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: low
+
+  - id: r4_effort_estimation_for_fixes
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] The proposed fixes in the output should include explicit effort estimates.
+      skill-exclusive reason: the task only asks for specific code modification suggestions, not effort estimates; the skill's output format requires fixes with estimated effort. The conflict is whether to proactively attach effort information such as Low/Medium/High, hours/person-days to each fix.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does each/all major proposed fix in the answer carry an explicit effort estimate (e.g., Low/Medium/High, S/M/L, hours, person-days, or "low/medium/high")? Answer YES if all major proposed fixes include explicit effort estimates. Answer NO if fixes are listed but some major fixes have no effort estimate, or if there is only a single global vague effort note.
+      acceptable: "Fix: Extract ExpenseRow and narrow observation scope. Effort: Low/Medium. Fix: Adjust model read boundary. Effort: Medium."
+      unacceptable: "Suggest extracting views, optimizing state, reducing recomputation."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_baseline_metric_validation_same_interaction
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] Validation should request re-running the same interaction and comparing baseline metrics, such as CPU, frame drops, view update/invalidation counts.
+      skill-exclusive reason: without reading the skill, a strong model may vaguely suggest "verify with Instruments"; the skill requires before/after metric comparison with the same capture. The conflict is whether validation is quantifiable and reproducible.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the validation suggestion request pre-fix vs post-fix baseline comparison for the same interaction of adding/deleting the same type of record, and explicitly include at least two metric categories (CPU, frame drops/frame time, SwiftUI view updates/invalidation count, memory peak, etc.)? Answer YES only if same interaction, pre/post comparison, and at least two metric categories are present. Answer NO if it only lists metrics without before/after comparison or only says "re-test" / "use Instruments".
+      acceptable: "Use the same batch of data to repeatedly add/delete, comparing CPU, dropped frames, and SwiftUI view update count before and after the fix."
+      unacceptable: "After the changes, use Instruments to see if performance improved."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: "[TASK — not counted toward SF] Whether the answer completed a performance review of the expense page add/delete jank."
+    signal:
+      query: >
+        Looking only at the final answer content: does the answer analyze the list refresh or recalculation issue when adding/deleting records around ContentView.swift and AddView.swift, provide prioritized issues and specific code modification suggestions, and both files have specific code location evidence (can be line numbers, function names, code snippets, or clear location descriptions)? Answer YES if all task-completion elements are present. Answer NO otherwise.
+      acceptable: "References ContentView.swift's ForEach/delete entry and AddView.swift's save append logic, analyzes by priority and provides code changes."
+      unacceptable: "Only analyzes ContentView or only gives generic SwiftUI List optimization, without AddView location evidence."

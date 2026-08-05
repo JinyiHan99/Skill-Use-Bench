@@ -1,0 +1,51 @@
+task_id: SF28_t2_analytics_dashboard
+level: L2
+skill_id: skill_28_json_render
+description: |
+  The project assets/SF28_t2_dashboard_spec/ is a JSON-driven data dashboard. Please help me write the JSON config file for this dashboard, and save it to assets/SF28_t2_dashboard_spec/src/spec.json, with the following requirements:
+
+  1. A row of filters at the top: time range selection (7 days/30 days/90 days) and region filter (All/North America/Europe/Asia-Pacific)
+  2. Overview panel: four metric cards (total users, active users, revenue, conversion rate), with data read from state
+  3. Tab switching: switch between "Overview" and "Orders"; selecting different tabs shows different panel content
+  4. Place a line chart and a bar chart inside the overview panel
+  5. Place an orders table inside the orders panel, with data read from state
+  6. The conversion rate card's value must be dynamically formatted as a percentage (e.g., 3.2%)
+  7. When the region filter changes, automatically trigger a data refresh
+
+  When different tabs are selected, the corresponding panels should show/hide.
+
+initial_state:
+  assets:
+    - path: assets/SF28_t2_dashboard_spec/
+      source: "Hand-crafted project scaffold based on real @json-render/core dashboard template"
+  tools_available: [bash, read, edit, grep]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: bindState_not_statePath
+    description: "Filter and tab controls must use { \"$bindState\": \"/path\" } on value prop for two-way binding"
+    exclusive: "Model uses read-only { \"$state\" } on value with separate action wiring, onChange/onSelect callback props, or legacy statePath — instead of { \"$bindState\": \"/path\" } on the natural value prop"
+  - id: visibility_condition_objects
+    description: "Tab panel's top-level \"visible\" field must be a state-based condition object (e.g. { \"$state\": \"/activeTab\", \"eq\": \"overview\" }), not a boolean value"
+    exclusive: "Model uses visible: true/false or ternary logic for tab switching"
+  - id: content_not_children
+    description: "Container components (Dashboard, Panel) must use 'content' array, not props.children"
+    exclusive: "Model puts nested elements in children prop following React conventions"
+  - id: watch_for_side_effects
+    description: "Region filter change should trigger data refresh via the watch field with action binding"
+    exclusive: "Model uses onChange/onSelect callback props on the filter component, imperative action dispatch, or omits data-refresh coordination — instead of the top-level declarative watch field"
+  - id: computed_expressions
+    description: "Dynamic value formatting should use { \"$computed\": \"fnName\", \"args\": {...} } expression"
+    exclusive: "Model uses inline template strings or JavaScript expressions for computed values"
+  - id: state_read_expression
+    description: "Reading state values for display (metrics, table data) must use { \"$state\": \"/path\" } expressions"
+    exclusive: "Model hardcodes literal values, copies numbers from state.ts, uses template interpolation like {{ path }}, or invents non-framework variable reference syntax instead of { \"$state\": \"/path\" } expressions"
+
+notes: |
+  Evaluation goal: test whether the model correctly applies json-render spec conventions in a dashboard scenario.
+  This task covers more skill constraints: $bindState two-way binding, visibility condition objects,
+  content arrays, the watch field, $computed expressions, and $state reads.
+  The description does not mention the json-render name, only "JSON-driven data dashboard."
+  The schema has already declared builtInActions; the model should understand these actions can be used directly in the spec.
+  Note: this project's schema uses a normalized structure (root + elements flat map); the content array stores string IDs of child elements, not the inline element objects shown in the skill example. Evaluation should follow the actual definition in schema.ts.

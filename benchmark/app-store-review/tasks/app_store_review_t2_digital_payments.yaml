@@ -1,0 +1,53 @@
+task_id: app_store_review_t2_digital_payments
+skill_id: app-store-review
+description: |
+  This payment example is about to be reused in a paid-content purchase flow of an iPhone app. Please read the code under `./assets/app_store_review_t2_digital_payments/input/` and, from a pre-submission review perspective, determine whether there are risks that would affect listing, and provide a report. Do not modify the code.
+initial_state:
+  assets:
+    - path: ./assets/app_store_review_t2_digital_payments/input/example/src/screens/PaymentsUICompleteScreen.tsx
+      source: "https://github.com/stripe/stripe-react-native/blob/8a7909e0858d844de4aeed3e982163724ece311e/example/src/screens/PaymentsUICompleteScreen.tsx"
+      real_state: "Real open-source Stripe React Native example payment page; uses PaymentSheet and includes Apple Pay, Google Pay, test-environment, and custom payment-method configuration."
+      preparation: |
+        Shallow-cloned https://github.com/stripe/stripe-react-native.git at commit 8a7909e0858d844de4aeed3e982163724ece311e, then copied example/src/screens/PaymentsUICompleteScreen.tsx unchanged.
+    - path: ./assets/app_store_review_t2_digital_payments/input/example/src/screens/HomeScreen.tsx
+      source: "https://github.com/stripe/stripe-react-native/blob/8a7909e0858d844de4aeed3e982163724ece311e/example/src/screens/HomeScreen.tsx"
+      real_state: "Real open-source Stripe React Native example home page; contains StripeProvider, test publishable key, Crypto Onramp entry, and payment example navigation."
+      preparation: |
+        Copied example/src/screens/HomeScreen.tsx unchanged from the same shallow clone and commit.
+    - path: ./assets/app_store_review_t2_digital_payments/input/example/src/components/PaymentScreen.tsx
+      source: "https://github.com/stripe/stripe-react-native/blob/8a7909e0858d844de4aeed3e982163724ece311e/example/src/components/PaymentScreen.tsx"
+      real_state: "Real open-source Stripe React Native example payment container component."
+      preparation: |
+        Copied example/src/components/PaymentScreen.tsx unchanged from the same shallow clone and commit.
+    - path: ./assets/app_store_review_t2_digital_payments/input/example/src/Config.ts
+      source: "https://github.com/stripe/stripe-react-native/blob/8a7909e0858d844de4aeed3e982163724ece311e/example/src/Config.ts"
+      real_state: "Real open-source Stripe React Native example configuration file, providing constants such as the example backend address."
+      preparation: |
+        Copied example/src/Config.ts unchanged from the same shallow clone and commit.
+  tools_available:
+    - read_file
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: crypto-onramp-business-risk
+    description: "If the report covers the Crypto Onramp in `HomeScreen.tsx`, the skill-following output should explicitly classify it under the cryptocurrencies / financial-compliance high-risk branch of App Store review, and require separate pre-submission verification of regional availability, licenses/qualifications, Apple rule boundaries, and whether an applicable entitlement or business exception exists."
+    exclusive: "Medium discriminating power: a model without the skill may also mention crypto/financial-compliance risk based on general common sense; skill-following expects mapping the Crypto Onramp in `HomeScreen.tsx` explicitly to the App Store Business/Legal review risk branch and proposing separate pre-submission verification requirements. A vague mention of 'financial risk,' 'regulatory risk,' or 'compliance issue' does not count as a hit."
+  - id: production-logs-app-store-risk
+    description: "The skill's Medium-Risk pattern requires: production code preparing for App Store submission should not retain debugging output such as `console.log`; it should be removed or wrapped in a development-environment condition."
+    exclusive: "Strong discriminating power: a model without the skill typically treats `console.log` only as a generic code-quality or debugging-cleanup issue; the skill-following output should explicitly classify debug-log residue in real assets (e.g., `console.log` in `PaymentsUICompleteScreen.tsx` and `HomeScreen.tsx`) as a Medium-Risk App Store pre-submission review risk and require removal or guarding before production submission."
+notes: |
+  - Core test point: the description does not list a checklist, but "paid-content purchase flow of an iPhone app" should trigger the skill's special judgment for App Store Business/Payments.
+  - Expected correct behavior: the report should point out that `example/src/screens/PaymentsUICompleteScreen.tsx:156-224` initializes Stripe PaymentSheet and, if used for digital-content purchases, cannot replace StoreKit/IAP; the Checkout button at `example/src/screens/PaymentsUICompleteScreen.tsx:347-357` should be treated as a potential external/non-IAP digital-goods payment path; `example/src/screens/HomeScreen.tsx:582-626` exposes Crypto Onramp and Payment Method Messaging related entries that require separate pre-submission verification of cryptocurrency/financial-compliance boundaries; the test publishable key at `example/src/screens/HomeScreen.tsx:583` and the Google Pay testEnv at `example/src/screens/PaymentsUICompleteScreen.tsx:163-166` should also not appear in a production submission configuration.
+  - Common model mistakes: only saying the publishable key is public so there is no problem; only suggesting hiding API_URL or improving loading state; misjudging Apple Pay configuration as compliant with Apple's digital-goods purchase rules; missing the core divergence that digital-content purchases must go through IAP/StoreKit.
+  - Scoring should prioritize whether the model attributes risks to App Store review-blocking or high-risk review branches, rather than general payment implementation, code-quality, or configuration-cleanup issues; merely pointing out test configuration, sample-code nature, backend URL, or generic financial-compliance risk should not be considered a main skill-following hit.
+  - baseline_correctness_signals:
+      - The output covers a pre-submission review risk report for the given multiple files.
+      - The report can distinguish between sample-code status and risks of reuse in a real iPhone app.
+      - It can point out that Stripe PaymentSheet at `example/src/screens/PaymentsUICompleteScreen.tsx:156-224` and the Checkout button at `:347-357` cannot replace StoreKit/IAP for iOS digital-content purchases, unless there is an explicit Apple entitlement or rule exception.
+      - It can point out that the test publishable key at `example/src/screens/HomeScreen.tsx:583` and the Google Pay testEnv at `example/src/screens/PaymentsUICompleteScreen.tsx:163-166` should not appear in a production submission configuration.
+      - The input assets are not modified.
+  - skill_following_signals:
+      - Identify the Crypto Onramp at `example/src/screens/HomeScreen.tsx:586-613` as a cryptocurrencies / financial-compliance high-risk branch in App Store review, rather than a normal Stripe example navigation entry.
+      - Explicitly require separate pre-submission verification of the Crypto Onramp's regional availability, licenses/qualifications, Apple rule boundaries, and whether an applicable entitlement or business exception exists.
+      - Only vaguely mentioning "financial risk," "regulatory risk," or "compliance issue" without mapping to the App Store Business/Legal review context or proposing separate verification requirements should not be judged as a hit on this skill-following signal.
+      - Identify debug `console.log` residue in real assets and treat it as a Medium-Risk App Store pre-submission review risk; merely calling it a generic code-quality cleanup suggestion should not be judged as a hit on this skill-following signal.

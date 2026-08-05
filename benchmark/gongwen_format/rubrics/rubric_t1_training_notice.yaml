@@ -1,0 +1,109 @@
+rubric_id: rubric_t1_training_notice
+skill_id: gongwen_format
+task_id: gongwen_format_t1_training_notice
+objective: "Evaluate whether the model, when generating an internal training-learning notice, follows the GB/T 9704 official-document format requirements specific to the gongwen_format skill."
+rules:
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    severity: soft
+    exclusive: false
+    locus: trace
+    spec: "[GATE] The trace must contain an actual write attempt to the target JS script or DOCX final draft; this is only an evaluability gate and does not judge content correctness."
+    signal:
+      pattern: '(?s)(?:\b(?:Write|Edit)\b.{0,500}\bfile_path\b\s*:\s*["''][^"'']*output/(?:create_notice_document\.js|training_notice\.docx)["'']|\bBash\b.{0,1200}(?:node\s+output/create_notice_document\.js|(?:writeFileSync|Packer\.toBuffer|>|tee).{0,600}output/(?:create_notice_document\.js|training_notice\.docx)))'
+
+  - id: r1_exact_gongwen_page_setup
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    weight: 1.0
+    severity: hard
+    exclusive: true
+    locus: output-file
+    spec: |
+      [SKILL] The generation script must explicitly set the official-document page to A4, and use the skill-specified margins: top 37mm, bottom 35mm, left 28mm, right 26mm (in docx-js typically corresponding to 11906×16838 and top 1570, bottom 1484, left 1134, right 1106).
+      skill-exclusive rationale: without reading the skill, a strong model may use default docx margins or ordinary A4 settings; the skill requires precise official-document type-area margins. The conflict point is that "default page setup / approximate A4" cannot replace the precise margins of GB/T 9704.
+    signal:
+      file: "output/create_notice_document.js"
+      file_must_contain: '(?s)\A(?=.{0,20000}?(?:page|sections|properties))(?=.{0,20000}?width\s*:\s*11906)(?=.{0,20000}?height\s*:\s*16838)(?=.{0,20000}?top\s*:\s*(?:1570|(?:mmTo(?:Twip|Dxa)s?|convertMillimetersToTwips)\(\s*37\s*\)))(?=.{0,20000}?bottom\s*:\s*(?:1484|(?:mmTo(?:Twip|Dxa)s?|convertMillimetersToTwips)\(\s*35\s*\)))(?=.{0,20000}?left\s*:\s*(?:1134|(?:mmTo(?:Twip|Dxa)s?|convertMillimetersToTwips)\(\s*28\s*\)))(?=.{0,20000}?right\s*:\s*(?:1106|(?:mmTo(?:Twip|Dxa)s?|convertMillimetersToTwips)\(\s*26\s*\)))'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_multiline_title_uses_xiaobiaosong_erhao
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    weight: 0.75
+    severity: hard
+    exclusive: true
+    locus: output-file
+    spec: |
+      [SKILL] Long titles should be treated as multi-line official-document titles; the title run/style should use 方正小标宋简体 (FangSong XiaoBiaoSong Simplified), size 二号 (size 2, 22pt/44 half-points), and centered.
+      skill-exclusive rationale: without reading the skill, a strong model will usually use Songti/Heiti, Markdown-style headings, or bold default headings; the skill requires 方正小标宋简体 size 二号 centered. The conflict point is that ordinary title styles do not meet the official-document title font/size.
+    signal:
+      file: "output/create_notice_document.js"
+      file_must_contain: '(?s)\A(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?(?:关于.{0,120}(?:PyCon China 2024|研发培训|视频回放).{0,120}通知|研发培训学习通知))(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?(?:AlignmentType\.CENTER|alignment\s*:\s*(?:AlignmentType\.)?CENTER|alignment\s*:\s*["'']?center))(?:(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?font\s*:\s*["'']?方正小标宋简体)(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?size\s*:\s*44)|(?=.{0,20000}?xiaobiaosong\s*:\s*["'']方正小标宋简体["''])(?=.{0,20000}?erhao\s*:\s*44)(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?font\s*:\s*FONTS\.xiaobiaosong)(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?size\s*:\s*SIZES\.erhao))'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_multiline_title_not_bold_and_38pt_spacing
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    weight: 0.75
+    severity: hard
+    exclusive: true
+    locus: trace
+    spec: |
+      [SKILL] Because this task's title is long and requires multi-line layout, the title paragraph should use 38-point line spacing and must not be bold.
+      skill-exclusive rationale: without reading the skill, a strong model often makes formal titles bold or uses default line spacing; the skill explicitly requires multi-line titles to be not bold with 38-point line spacing. The conflict point is that "bold title / default line spacing" is the opposite of the official-document multi-line title convention.
+    signal:
+      query: >
+        Based only on the content actually written to output/create_notice_document.js or actual generated docx structural evidence, not the agent's self-description: does the title Paragraph containing the title text such as "PyCon China 2024 / 研发培训 / 视频回放 / 通知" simultaneously satisfy the following two conditions: spacing.line is 760 or 38 * 20, and the title TextRun/title style does not set bold: true? Answer YES only if both conditions are satisfied; otherwise answer NO. Answer only YES or NO.
+      acceptable: "The title Paragraph contains the specified notice title text, spacing: { line: 38 * 20 } or line: 760, and the title TextRun does not have bold: true."
+      unacceptable: "The title TextRun sets bold: true, or the title paragraph does not set line: 760 / 38 * 20."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_body_uses_fangsong_sanhao_28pt_spacing
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    weight: 1.0
+    severity: hard
+    exclusive: true
+    locus: output-file
+    spec: |
+      [SKILL] Body paragraphs should use 方正仿宋 (FangSong), size 三号 (size 3, 16pt/32 half-points), and set 28-point body line spacing (in docx-js commonly line: 560 or 28*20).
+      skill-exclusive rationale: without reading the skill, a strong model may use default Calibri/Songti, size 4, or default line spacing; the skill requires the precise combination of "方正仿宋 + size 3 + 28-point line spacing". The conflict point is that ordinary body styles cannot reflect the official-document body convention.
+    signal:
+      file: "output/create_notice_document.js"
+      file_must_contain: '(?s)\A(?=.{0,20000}?(?:bodyStyle|bodyParagraph|createBody|正文|new\s+Paragraph).{0,3500}?(?:line\s*:\s*(?:560|28\s*\*\s*20|20\s*\*\s*28)))(?:(?=.{0,20000}?(?:bodyStyle|bodyParagraph|createBody|正文|new\s+Paragraph).{0,3500}?font\s*:\s*["'']?方正仿宋)(?=.{0,20000}?(?:bodyStyle|bodyParagraph|createBody|正文|new\s+Paragraph).{0,3500}?size\s*:\s*32)|(?=.{0,20000}?fangsong\s*:\s*["'']方正仿宋["''])(?=.{0,20000}?sanhao\s*:\s*32)(?=.{0,20000}?(?:bodyStyle|bodyParagraph|createBody|正文|new\s+Paragraph).{0,3500}?font\s*:\s*FONTS\.fangsong)(?=.{0,20000}?(?:bodyStyle|bodyParagraph|createBody|正文|new\s+Paragraph).{0,3500}?size\s*:\s*SIZES\.sanhao))'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    severity: soft
+    exclusive: false
+    locus: trace
+    spec: "[TASK — not counted toward SF] Both the final draft output/training_notice.docx and the runnable script output/create_notice_document.js are generated, with content centered on the PyCon China 2024 internal learning notice, including requirements to attend the learning and submit review summaries."
+    signal:
+      query: >
+        Based on actual file writes, command outputs, or final file content evidence, not the agent's self-description: answer YES only if both output/training_notice.docx and output/create_notice_document.js exist; given both files exist, does the script/document content contain the task-specified title or core task content such as "PyCon China 2024" or "复盘纪要" (review summary)? Answer only YES or NO.
+      acceptable: "Both the target docx and create_notice_document.js exist; the script writes the specified notice title and includes content such as attending learning, review summaries, and R&D Management Department."
+      unacceptable: "Missing docx or missing create_notice_document.js, or content unrelated to the PyCon China 2024 internal learning notice."

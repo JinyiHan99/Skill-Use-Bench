@@ -1,0 +1,54 @@
+task_id: SF27_t1_order_model_tests
+level: L2
+skill_id: SF27
+description: |
+  Our e-commerce project has an Order model that contains status transition logic for confirm, ship, deliver, and cancel. This part of the business has always lacked automated test coverage. We are about to refactor order-related code and want to protect these core behaviors first.
+
+  Please review the Order model in apps/orders/models.py and add a complete test suite for its status transition logic. The tests need to cover normal business flow paths and the cases where illegal state transitions are intercepted (e.g., a shipped order cannot be cancelled).
+
+  The project already has basic test configuration; you can write tests under the tests/ directory. If the tests need common setup code or test-data construction tools, please add them as well.
+
+initial_state:
+  assets_dir: assets/SF27_t1_model_tests
+  key_files:
+    - path: apps/orders/models.py
+      description: "Order model with status transition methods (confirm, ship, deliver, cancel)"
+    - path: config/settings/test.py
+      description: "Test settings (SQLite in-memory, fast password hashers)"
+    - path: pytest.ini
+      description: "Test runner configuration"
+    - path: tests/__init__.py
+      description: "Tests package marker"
+  tools_available: [bash, read, edit, write]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: factory_boy_required
+    description: "All test data must be created through factory_boy factories, not Model.objects.create()"
+    exclusive: "Model's default is to use Model.objects.create() or direct instantiation for simple models"
+  - id: pytest_fixtures_in_conftest
+    description: "conftest.py must use @pytest.fixture decorators, not setUp/tearDown methods"
+    exclusive: "Model may use unittest.TestCase with setUp/tearDown or define helpers inline"
+  - id: pytest_django_runner
+    description: "Must use pytest-django (pytest runner), not Django's unittest-based TestCase or manage.py test"
+    exclusive: "Model may use django.test.TestCase, self.assertEqual, or manage.py test"
+
+notes: |
+  Positive task. Core test points:
+  - Whether the model uses factory_boy to create Order instances (rather than Order.objects.create())
+  - Whether conftest.py uses @pytest.fixture (rather than setUp/tearDown)
+  - Whether pytest-style assertions (assert x == y) are used rather than self.assertEqual
+  - Whether the pytest-django runner is used rather than django.test.TestCase
+
+  Expected correct behavior: create OrderFactory, UserFactory (inheriting DjangoModelFactory),
+  expose them in conftest.py via @pytest.fixture, tests use pytest functional style,
+  create data via factory, and declare database access with @pytest.mark.django_db.
+
+  Expected incorrect behavior: direct Order.objects.create(), using TestCase classes,
+  setUp methods, self.assert* methods, manage.py test.
+
+  Material source: constructed referencing industry-standard e-commerce order state machine patterns (the core order flow skeleton of Saleor/django-oscar and similar projects).
+
+  Illegal transitions expected to be covered: pending->ship, pending->deliver, confirmed->deliver,
+  shipped->cancel, delivered->cancel, cancelled->confirm/ship/deliver.

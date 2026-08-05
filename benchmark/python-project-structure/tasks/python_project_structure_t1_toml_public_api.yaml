@@ -1,0 +1,49 @@
+task_id: python_project_structure_t1_toml_public_api
+skill_id: python-project-structure
+description: |
+  We are preparing to hand over this small config-parsing library as an internal team dependency for use by other projects. Based on the current code in `assets/python_project_structure_t1_toml_public_api/input/tomllib/`, organize the entry points it exposes to consumers, so that callers can reliably obtain the intended capabilities from the package entry point, while preserving the internal-implementation boundary. Place the reorganized files in `output/tomllib/`, and briefly explain your trade-offs in `output/structure_notes.md`.
+initial_state:
+  assets:
+    - path: assets/python_project_structure_t1_toml_public_api/input/tomllib/__init__.py
+      source: "Based on CPython 3.11 standard library tomllib package, /usr/lib64/python3.11/tomllib/__init__.py; package initializer deliberately modified for this task."
+      real_state: "Modified package initializer that uses wildcard imports to import all contents from _parser, _re, and _types, creating namespace pollution."
+      preparation: |
+        Copied from CPython 3.11 standard library and deliberately modified to use wildcard imports to pollute the namespace, requiring reorganization.
+    - path: assets/python_project_structure_t1_toml_public_api/input/tomllib/_parser.py
+      source: "CPython 3.11 standard library tomllib package, /usr/lib64/python3.11/tomllib/_parser.py"
+      real_state: "Private parser implementation module containing public-looking functions plus internal helpers and types used by the package initializer."
+      preparation: |
+        Copied verbatim from the local CPython 3.11 standard library installation into this task's input directory.
+    - path: assets/python_project_structure_t1_toml_public_api/input/tomllib/_re.py
+      source: "CPython 3.11 standard library tomllib package, /usr/lib64/python3.11/tomllib/_re.py"
+      real_state: "Private regular-expression and conversion helper module for the parser implementation."
+      preparation: |
+        Copied verbatim from the local CPython 3.11 standard library installation into this task's input directory.
+    - path: assets/python_project_structure_t1_toml_public_api/input/tomllib/_types.py
+      source: "CPython 3.11 standard library tomllib package, /usr/lib64/python3.11/tomllib/_types.py"
+      real_state: "Private type-alias helper module for parser internals."
+      preparation: |
+        Copied verbatim from the local CPython 3.11 standard library installation into this task's input directory.
+  tools_available:
+    - file_editor
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: explicit_public_api
+    description: "The skill requires defining module public APIs explicitly with __all__, treating unlisted members as internal implementation details."
+    exclusive: "Without the skill, a model may simply make imports work or re-export many convenient names from _parser.py/_re.py, failing to preserve a deliberately small public surface."
+  - id: package_initializer_as_consumer_interface
+    description: "The skill says __init__.py should provide a clean public interface for package consumers."
+    exclusive: "A general solution may edit implementation modules only or tell consumers to import from private modules instead of stabilizing the package entry point."
+notes: |
+  - Core test point: this is an organization task for an existing real package entry point, not a functional fix; the package entry point's consumer-facing public API should be kept clear, narrow, and explicit.
+  - Expected correct behavior: `output/tomllib/__init__.py` should be changed to explicitly import the consumer-facing `load`, `loads`, `TOMLDecodeError` from private implementations, and establish an `__all__` containing only these names; do not add implementation details such as `Output`, `Flags`, `NestedDict`, `key_value_rule` from `_parser.py` or `RE_NUMBER` from `_re.py` to the package-level public interface.
+  - Common model error behaviors: the model may expand `__all__` at `output/tomllib/__init__.py:5` to include `_parser`, `RE_DATETIME`, `ParseFloat`, or `match_to_number`, turning private module details into public API; or change around `output/tomllib/_parser.py:12` to have users import parser functions directly from `tomllib._parser`, bypassing the package entry point.
+  - baseline_correctness_signals:
+      - `output/tomllib/` exists and contains the four Python files from the input.
+      - `load`, `loads`, `TOMLDecodeError` can be imported from `output/tomllib/__init__.py`, and the original parser implementation files are not deleted.
+      - `output/structure_notes.md` exists and explains the distinction between the external entry point and internal implementation.
+  - skill_following_signals:
+      - `output/tomllib/__init__.py` defines an explicit `__all__`, and the public names cover only the package-level capabilities needed by callers.
+      - Private implementation modules still exist with private naming boundaries, without batch re-exporting internal helpers from `_parser.py`, `_re.py`, `_types.py`.
+      - The package entry point serves as the consumer interface, rather than requiring consumers to depend on private module paths.

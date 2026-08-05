@@ -1,0 +1,135 @@
+rules:
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable write/edit attempt on the corporate checkout task input directory or notes file."
+    signal:
+      pattern: >-
+        (?s)(?:^|\n)(?:(?:Write|Edit):\{[\s\S]{0,4000}?"file_path"\s*:\s*"[^"]*(?:assets/clean-ddd-hexagonal_t1_refactor_checkout/input|output/checkout-refactor-notes\.md)[^"]*"|\{[\s\S]{0,1000}?"(?:tool|toolName|tool_name|name)"\s*:\s*"(?:Write|Edit)"[\s\S]{0,4000}?"file_path"\s*:\s*"[^"]*(?:assets/clean-ddd-hexagonal_t1_refactor_checkout/input|output/checkout-refactor-notes\.md)[^"]*")
+
+  - id: r1_api_routes_through_application_use_case
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    locus: trace
+    judge_context_window: [serialized_steps, final_answer]
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The corporate checkout PublicApi Endpoint/Controller may only do protocol parsing, request mapping, and calling the application service/use case in ApplicationCore; it must not directly complete order assembly, credit-limit validation, PO validation, and persistence in the entry layer.
+      Skill-exclusive rationale: looking only at the task description, a strong model may follow the existing PublicApi endpoint style and directly inject repositories in CorporateCheckoutEndpoint.HandleAsync to complete validation, assembly, and saving; the skill requires controllers route through use cases, and the conflict point is that the entry layer must not bypass the application use-case boundary.
+    signal:
+      query: >
+        Based on the corporate-checkout-related Endpoint/Controller file content and final file diffs written by actual Write/Edit tool calls, not the agent's self-description or plan, does the new corporate checkout API delegate the main business processing to an application service/use case, mediator command handler, or equivalent ApplicationCore collaborator located in src/ApplicationCore/**, rather than directly orchestrating credit-limit validation, order aggregate assembly, and persistence inside the PublicApi Handler/Controller? Answer YES if the endpoint mostly maps request/response and calls an ApplicationCore service/use case or IMediator.Send(CorporateCheckoutCommand) whose handler is in ApplicationCore. Answer NO if no relevant PublicApi endpoint/controller was actually implemented, if it is only a placeholder, if the called collaborator is implemented in PublicApi/Infrastructure, or if the endpoint itself contains the core checkout workflow or direct transaction script.
+      acceptable: "CorporateCheckoutEndpoint injects ICorporateCheckoutService/CorporateCheckoutUseCase from ApplicationCore, or sends CorporateCheckoutCommand to an ApplicationCore handler, and only maps request/response."
+      unacceptable: "CorporateCheckoutEndpoint injects IRepository<Order> and implements CorporateId/PO validation, credit-limit comparison, Order construction, and AddAsync in HandleAsync."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_no_publicapi_direct_repository_checkout_write
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    locus: trace
+    judge_context_window: [serialized_steps, final_answer]
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Corporate-checkout-related PublicApi Endpoints/Controllers must not directly inject or call IRepository<Order>, IRepository<Basket>, IReadRepository<Basket>, DbContext, or any custom persistence port/adapter/repository used directly for the checkout write transaction.
+      Skill-exclusive rationale: without reading the skill, a model easily imitates the project's existing CRUD endpoints and uses repositories directly for writes; the skill requires the outer entry to go through application use cases, and the conflict point is that persistence calls must live within the application-service/use-case orchestration, not in the API layer.
+    signal:
+      query: >
+        Looking only at the actually written or modified corporate-checkout-related PublicApi Endpoint/Controller content, not the agent's self-description: do these entry files avoid directly injecting/calling order or basket repositories, read repositories, DbContext, EF context, persistence adapters, or any custom persistence abstraction used directly for the checkout write transaction? Answer YES if persistence is reached only through an ApplicationCore application service/use case. Answer NO if no relevant PublicApi Endpoint/Controller was written or modified. Answer NO if the PublicApi endpoint directly uses IRepository/IReadRepository/DbContext/EF context or a custom checkout persistence abstraction for checkout persistence.
+      acceptable: "Endpoint constructor accepts ICorporateCheckoutService and no IRepository<Order>, IRepository<Basket>, IReadRepository<Basket>, DbContext, or custom checkout persistence port."
+      unacceptable: "Endpoint constructor accepts IRepository<Order> orderRepository, OrderStore, CheckoutWriter, or DbContext and calls it to persist the corporate checkout."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_core_business_rules_not_anemic
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: trace
+    judge_context_window: [serialized_steps, final_answer]
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] CorporateId, PurchaseOrderNumber, and credit-limit/order-amount invariants should be carried by domain entities, value objects, domain services, or policies in ApplicationCore; the application service only coordinates domain objects and ports, and must not flatten enterprise rules into an if-else script in the entry layer, infrastructure layer, or a single procedural ApplicationCore service.
+      Skill-exclusive rationale: looking only at the task description, a strong model can write credit-limit comparison and required-field validation as if-else in a Handler or service and still complete the interface; the skill opposes anemic domain models and requires business rules to be close to the domain core, and the conflict point is the location of business rules and how model behavior is carried.
+    signal:
+      query: >
+        Based on the corporate-checkout-related file content written by actual Write/Edit tool calls, not the agent's self-description: are CorporateId/PurchaseOrderNumber invariants and credit-limit validation primarily carried by ApplicationCore's domain entities, value objects, domain services, or policies, and does the application service only coordinate these domain objects/ports? Answer YES if the core rules live in behavioral domain/value objects/domain services/policies inside ApplicationCore. Answer NO if no corporate checkout implementation exists. Answer NO if rules are mostly in PublicApi/Infrastructure. Answer NO if the implementation merely moves a flat procedural if-else transaction script from Endpoint into an ApplicationCore service while entities/value objects remain DTO/data bags.
+      acceptable: "ApplicationCore contains CorporateAccount/CreditLimit/PurchaseOrderNumber value behavior or a domain service/policy; CorporateCheckoutService coordinates those objects and PublicApi only maps the request."
+      unacceptable: "HandleAsync or a flat CorporateCheckoutService compares total > 5000m and checks string.IsNullOrWhiteSpace(PurchaseOrderNumber) while ApplicationCore only defines request DTOs/data bags."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_applicationcore_keeps_inward_dependency_rule
+    type: boundary
+    provenance: skill
+    verifier: state-diff
+    exclusive: false
+    weight: 0.5
+    spec: |
+      [SKILL] New or modified src/ApplicationCore code must not depend on ASP.NET/HTTP, EF Core/ORM, DbContext, HttpContext, PublicApi, Infrastructure, or database implementation details; the outer layer may depend on the core, but the core must not depend on the outer layer.
+      Skill-exclusive rationale: this is the baseline dependency rule of Clean Architecture, but a strong model may naturally follow it even with the skill masked, so it is a low-weight non-exclusive guard item.
+    signal:
+      file: "assets/clean-ddd-hexagonal_t1_refactor_checkout/input/src/ApplicationCore"
+      file_must_not_contain: "(?i)Microsoft\\.AspNetCore|Microsoft\\.EntityFrameworkCore|\\bDbContext\\b|\\bHttpContext\\b|\\bPublicApi\\b|\\bInfrastructure\\b"
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_preserve_existing_checkout_as_separate_flow
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: trace
+    judge_context_window: [serialized_steps, final_answer]
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Corporate checkout should extend the existing flow as an independent use case/application service; the ordinary checkout main method must not be refactored into a mixed flow carrying both ordinary and corporate branches.
+      Skill-exclusive rationale: the task mentions "not affecting the existing normal checkout flow", and a strong model often directly stuffs a corporate if branch into the existing OrderService/BasketService; the skill requires organizing application services by use-case boundary, and the conflict point is that the new capability should not expand the existing service into a mixed procedural mega-service.
+    signal:
+      query: >
+        Based on actual file modifications, not the agent's self-description: is a new standalone corporate checkout use case/service/ApplicationCore handler added, and is the ordinary checkout main method not changed into conditional branches that handle both ordinary checkout and corporate checkout at the same time? Answer YES if corporate checkout has a distinct use case boundary and the ordinary checkout flow remains separate. Answer NO if no corporate checkout implementation exists. Answer NO if the existing checkout method now contains CorporateId/PurchaseOrderNumber/credit-limit branches for the corporate flow.
+      acceptable: "New ICorporateCheckoutService/CorporateCheckoutService or CorporateCheckoutCommandHandler coordinates corporate checkout without rewriting normal checkout behavior."
+      unacceptable: "Existing CheckoutAsync now has if (request.CorporateId != null) branches for all corporate validation and persistence."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_implementation_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    locus: trace
+    judge_context_window: [serialized_steps, final_answer]
+    weight: 0
+    spec: "[TASK — not counted toward SF] The corporate checkout API and core logic are implemented, supporting CorporateId, PurchaseOrderNumber, and credit-limit rejection logic."
+    signal:
+      query: >
+        Based on the file content and final diffs written by actual Write/Edit tool calls, not the agent's self-description: is there non-placeholder corporate checkout API/core code in the input project, handling CorporateId, PurchaseOrderNumber, enterprise CORP_001 limit 5000.00/default 0 overage rejection? Answer YES only if implementation code exists and enforces the required business parameters. Answer NO if only notes/DTO/placeholder exists or credit-limit enforcement is missing.
+      acceptable: "Corporate checkout endpoint/service exists, validates PO and credit limit, and rejects orders above the corporate credit limit."
+      unacceptable: "Only a DTO with CorporateId exists, or the endpoint accepts PurchaseOrderNumber but never enforces credit limits."
+
+  - id: tc2_notes_written
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] output/checkout-refactor-notes.md exists and explains the main changes and verification method."
+    signal:
+      file: "output/checkout-refactor-notes.md"
+      file_must_contain: "(?i)(change|modified|改动|变更|验证|verify|test)"

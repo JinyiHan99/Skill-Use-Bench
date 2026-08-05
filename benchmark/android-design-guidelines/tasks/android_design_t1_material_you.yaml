@@ -1,0 +1,31 @@
+task_id: android_design_t1_material_you
+skill_id: android-design-guidelines
+description: |
+  We plan to hand off the theme implementation in `assets/android_design_t1_material_you/input/Theme.kt` for reuse in a new project. Please review and modify this file so the default theme behavior is better suited as a baseline for the new project, and provides a consistent experience across device capabilities, light/dark environments, and the brand theme toggle; preserve the semantics of the existing brand theme toggle.
+
+  Place the modified file at `output/Theme.kt`, and include a brief note in `output/review.md` describing which user-perceivable theme issues you changed.
+initial_state:
+  assets:
+    - path: assets/android_design_t1_material_you/input/Theme.kt
+      source: "https://raw.githubusercontent.com/android/nowinandroid/main/core/designsystem/src/main/kotlin/com/google/samples/apps/nowinandroid/core/designsystem/theme/Theme.kt"
+      real_state: "The real Compose theme file from the Now in Android open-source project; contains the NiaTheme entry point, light/dark default color palettes, Android brand color palettes, and theme extension definitions such as GradientColors / BackgroundTheme."
+      preparation: |
+        Downloaded Theme.kt directly from the android/nowinandroid repository main branch, content unmodified.
+  tools_available:
+    - filesystem
+    - text_editor
+expected_trigger: true
+skill_constraints_tested:
+  - id: dynamic_color_default_with_fallback
+    description: "In non-brand mode, devices supporting system personalization themes should default to system theme capabilities; devices that do not support or explicitly disable them should still use the existing static light/dark palettes; when androidTheme=true, preserve the explicit override semantics of the brand palette."
+    exclusive: "Flipping the default parameter alone is common Android/Material knowledge with weak discriminating power; the effective discriminating point for this constraint is preserving both the low-version static fallback and the brand theme toggle override semantics, avoiding turning system theme capabilities into the sole global default."
+  - id: no_pure_black_dark_surfaces
+    description: "GradientColors / BackgroundTheme in the brand dark path should also no longer use Color.Black as a large-area surface or container color; they should stay consistent with the current theme's surface role or tonal mapping."
+    exclusive: "Without reading the skill, a model may only handle the default theme path, or replace brand dark constants with another static dark gray; following the skill, it should realize that the rule against large-area pure-black surfaces also applies to brand themes and theme extensions."
+  - id: theme_extensions_follow_scheme
+    description: "Theme extensions such as GradientColors / BackgroundTheme should derive from semantic color roles of the current colorScheme, avoiding detachment from dynamic themes, dark themes, and brand theme toggle semantics."
+    exclusive: "Without reading the skill, a model may only modify MaterialTheme.colorScheme or do local constant substitution; after reading the skill, it should include custom theme extensions in the color-role consistency check, avoiding adding or retaining hardcoded colors detached from theme roles."
+notes: |
+  - Core test points: default theme strategy, brand theme toggle override semantics, static fallback for low-version or explicitly disabled scenarios, dark large-area surface handling, and consistency between theme extension objects and the main color scheme.
+  - Expected correct behavior: the modified theme should stay consistent across system capabilities, brand mode, light/dark mode, and static fallback; it should not break existing brand theme toggle semantics, nor work around issues by adding fixed color values.
+  - Common mistakes: writing notes without changing code; deleting or mistakenly modifying the brand theme toggle; only handling the default palette while ignoring theme extensions; replacing theme roles with new hardcoded colors; only handling the light or dark single path.

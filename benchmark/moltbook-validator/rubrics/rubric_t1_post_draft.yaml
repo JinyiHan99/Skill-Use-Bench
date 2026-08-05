@@ -1,0 +1,108 @@
+# Rubric for moltbook-validator — t1_post_draft
+# Goal: score skill-following only; task completion is recorded with weight 0.
+rules:
+  - id: g1_final_post_written
+    type: gate
+    provenance: gate
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] A final post JSON file must be produced so the attempt is observable.
+      This gate only checks that an output file exists with some content; correctness is checked separately.
+    signal:
+      file: "output/final_post.json"
+      file_must_contain: '.+'
+
+  - id: r1_post_body_uses_content_key
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Moltbook post payloads must use the required non-empty `content` field for the body.
+      skill-exclusive reason: without the skill, a strong model doing ordinary JSON cleanup is likely to preserve
+      the draft's existing `text` body key; the skill says `text` stores as null and must be converted to `content`.
+      The conflict is preserving the source schema (`text`) versus producing Moltbook's required send schema (`content`).
+    signal:
+      file: "output/final_post.json"
+      file_must_contain: '"content"\s*:\s*"(?:[^"\\]|\\.){1,}"'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_post_body_does_not_rely_on_text_key
+    type: forbidden-arg
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The final Moltbook post payload must not rely on `text` as the body field.
+      skill-exclusive reason: the task input uses `text`, so an unskilled default transformation may pass that key through;
+      the skill explicitly warns that `text` causes a null Moltbook body. The conflict is draft-key preservation versus
+      the platform-specific prohibition on `text` for sends.
+    signal:
+      file: "output/final_post.json"
+      file_must_not_contain: '"text"\s*:'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_dev_post_uses_specific_submolt
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] For coding/software-development posts, use a specific dev/coding submolt instead of `general`.
+      skill-exclusive reason: the draft already says `submolt: general`, and without the skill a model would likely preserve
+      that safe-looking catch-all value. The skill warns that `general` has high spam exposure and recommends `m/coding` or
+      `m/dev` for coding/dev topics. The conflict is preserving the given destination versus applying Moltbook submolt guidance.
+    signal:
+      file: "output/final_post.json"
+      file_must_contain: '"submolt"\s*:\s*"m/(coding|dev)"'
+      file_must_not_contain: '"submolt"\s*:\s*"general"'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_title_preserved
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [TASK — not included in SF] `output/final_post.json` should preserve the README-derived title.
+      This records task completion only and must not affect skill-following score.
+    signal:
+      file: "output/final_post.json"
+      file_must_contain: '"title"\s*:\s*"Notes from CPython README"'
+
+  - id: tc2_body_preserved
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [TASK — not included in SF] `output/final_post.json` should preserve the README-derived body text.
+      This records task completion only and must not affect skill-following score.
+    signal:
+      file: "output/final_post.json"
+      file_must_contain: '"content"\s*:\s*"(?:[^"\\]|\\.)*Python version 3\.16\.0 alpha 0(?:[^"\\]|\\.)*"'

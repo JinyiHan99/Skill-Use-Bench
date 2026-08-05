@@ -1,0 +1,118 @@
+# Rubric for SF43_t5_stock_data_visualization
+# Skill: D3.js Visualization — deterministic, offline, vendored D3
+# Note: This task tests c1 (no CDN), c3 (no transitions), c4 (force layout determinism)
+# c2 (version pinning to 7.9.0) is NOT tested for this task
+
+# ── GATE ──
+- id: g1_observable_attempt
+  type: required-tool
+  provenance: gate
+  verifier: regex
+  weight: 0
+  signal:
+    pattern: "Write|Edit"
+  spec: "[GATE] The trace contains an observable file write operation (Write or Edit tool call)"
+
+# ── Skill-Following rules (scored) ──
+
+- id: r1_no_cdn_local_vendor
+  type: forbidden-arg
+  provenance: skill
+  verifier: state-diff
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] Loading D3 from CDN is prohibited; must be imported via a local vendor file.
+    skill-exclusive reason: without reading the skill, a strong model defaults to importing D3 from CDN (e.g., https://d3js.org/d3.v7.min.js or unpkg/cdnjs),
+    only by following the skill will it create a local vendor file and reference it with a relative path.
+  signal:
+    file: "output/index.html"
+    file_must_not_contain: "https?://"
+
+- id: r2_no_d3_transition
+  type: forbidden-arg
+  provenance: skill
+  verifier: state-diff
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] Using D3's transition/animation API (.transition()) is prohibited.
+    skill-exclusive reason: D3 is known for animations; a strong model habitually adds .transition().duration() for effects when implementing bubble chart linked interactions.
+    Only by following the skill will it completely avoid the D3 transition API. CSS transitions (e.g., tooltip opacity) are not in the prohibited scope.
+  signal:
+    file: "output/js/visualization.js"
+    file_must_not_contain: "\\.transition\\s*\\("
+
+- id: r3_force_layout_fixed_ticks
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] Force-directed layout (force simulation) must fix N iterations and fix initial positions; convergence-based stopping (on('tick') running until alpha converges) is prohibited.
+    skill-exclusive reason: the D3 force simulation standard paradigm is sim.on('tick', ticked) letting the layout run until alphaMin automatically stops,
+    only by following the skill will it switch to simulation.tick(N) for precomputing a fixed number of steps and then manually rendering.
+  signal:
+    query: >
+      In the JavaScript files actually written by the agent via Write/Edit tools, examine the force-directed layout (d3.forceSimulation) implementation.
+      Does it satisfy the following conditions: (1) uses simulation.tick(N) or equivalent to precompute a fixed number of steps, rather than relying on the on('tick') event for continuous rendering until convergence;
+      (2) node initial positions are deterministically set (e.g., grid positions based on sorting, index-based positions), rather than random.
+      Look only at the JS file contents actually written by Write/Edit tool calls, not at the agent's self-report.
+      Answer YES if the force layout uses a fixed number of tick iterations (e.g., simulation.tick(300)) AND sets deterministic initial positions.
+      Answer NO if it uses on('tick', ...) for real-time rendering until convergence, OR initial positions are random/undefined.
+    acceptable: "simulation.tick(300); then bind coordinates and render at once — initial positions based on sector grouping or sort index"
+    unacceptable: "simulation.on('tick', function() { ... }) continuous rendering; or initial node.x/node.y not set"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+- id: r4_tooltip_pattern_skill
+  type: lesson
+  provenance: skill
+  verifier: state-diff
+  exclusive: true
+  weight: 0.5
+  spec: |
+    [SKILL] Tooltip must use the .visible class toggle pattern specified by the skill (opacity 0/1 + .classed('visible', true/false)).
+    skill-exclusive reason: without reading the skill, the model will use display:none/block or directly .style('opacity', 1) to control tooltip visibility,
+    only by following the skill will it use the combined pattern of .visible CSS class + .classed() method.
+  signal:
+    file: "output/css/style.css"
+    file_must_contain: "\\.visible"
+
+- id: r5_vendor_directory_structure
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.75
+  spec: |
+    [SKILL] D3 must be vendored under the vendor/ directory (e.g., vendor/d3.v7.9.0.min.js), not placed in output/js/ or other locations.
+    skill-exclusive reason: the skill explicitly specifies "Prefer vendoring a minified D3 bundle (e.g., vendor/d3.v7.9.0.min.js)",
+    a model not reading the skill will place D3 in js/lib/ or inline it directly.
+  signal:
+    query: >
+      In the files actually written by the agent via Write/Edit tools, is the D3 library file placed in a directory named "vendor"?
+      Judgment basis: check whether the file path created by the Write tool includes a vendor/ directory, or whether the script src in HTML references a D3 file under the vendor/ path.
+      Look only at the actual file paths and contents from Write/Edit tool calls, not at the agent's self-report.
+      Answer YES if D3 is placed in a vendor/ directory (e.g., vendor/d3.v7.9.0.min.js or output/vendor/d3.v7.9.0.min.js).
+      Answer NO if D3 is placed elsewhere (js/, lib/, inline, node_modules/) or loaded from CDN.
+    acceptable: "Write tool path is output/vendor/d3.v7.9.0.min.js or vendor/d3.v7.9.0.min.js"
+    unacceptable: "D3 file placed at output/js/d3.min.js or inlined in HTML"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: medium
+
+# ── Task completion record (not scored) ──
+- id: tc1_task_done
+  type: task-completion
+  provenance: task
+  verifier: state-diff
+  weight: 0
+  spec: "[TASK — not counted toward SF] Whether the task core product output/index.html exists and contains D3 visualization content"
+  signal:
+    file: "output/index.html"
+    file_must_contain: "<svg"

@@ -1,0 +1,50 @@
+task_id: SF21_t1_jakarta_migration
+level: L3
+skill_id: skill_21_jakarta
+description: |
+  Under the ./assets/SF21_t1_jakarta_migration/workspace/ folder, there is a legacy user management microservice that you need to migrate from Java 8/Spring Boot 2.7 to Java 21/Spring Boot 3.2. This microservice is based on REST API and manages user information. Key functions are: CRUD operations for user management, JWT-based authentication, Role-based access control, Database persistence with JPA/Hibernate, Input validation, and External API calls using RestTemplate.
+
+  Your migration should upgrade Java from 8 to 21 and Spring Boot from 2.7.x to a compatible 3.x version, and upgrade all related dependencies accordingly. Resolve all compilation and test failures caused by the framework migration while preserving the existing REST API, persistence, validation, authentication, authorization, and external HTTP client behavior.
+
+  Make sure to run the following commands to check the quality:
+  1. `mvn clean compile` (your code should not return errors)
+  2. `mvn test` (your code need to pass all unit tests)
+initial_state:
+  assets:
+    - path: workspace/
+      source: "skillsbench/tasks/spring-boot-jakarta-migration/environment/workspace/"
+      description: "Legacy Spring Boot 2.7 user management microservice with javax.* imports"
+  tools_available: [bash, read, edit, grep]
+  environment:
+    apt_packages: "maven"
+    java_version: "21"
+expected_trigger: true
+skill_constraints_tested:
+  - id: must_migrate_javax_to_jakarta
+    description: "Must replace Java EE namespace imports with their jakarta.* equivalents across the project"
+    exclusive: "Model leaves javax.* imports unchanged or only partially migrates some files"
+  - id: must_not_change_javax_sql
+    description: "Must NOT replace JDK-shipped javax subpackages used for database connectivity"
+    exclusive: "Model blindly replaces all javax.* including JDK packages"
+  - id: must_not_change_javax_crypto
+    description: "Must NOT replace JDK-shipped javax subpackages used for cryptography"
+    exclusive: "Model replaces javax.crypto with jakarta.crypto which does not exist"
+  - id: must_check_test_files
+    description: "Must migrate Java EE imports in all source roots, not only production sources"
+    exclusive: "Model only migrates src/main/ and ignores src/test/"
+  - id: must_verify_completeness
+    description: "Must verify after migration that no un-migrated Java EE imports remain in the project"
+    exclusive: "Model makes replacements without verification, leaving missed files"
+  - id: must_preserve_non_jakarta_javax_annotations
+    description: "Must NOT replace javax annotations that are not part of Java EE / Jakarta EE (e.g. JSR-305 nullability annotations)"
+    exclusive: "Model blindly converts every javax.* annotation to jakarta.*"
+  - id: must_distinguish_spring_vs_jakarta_transactional
+    description: "Must keep Spring's own transaction annotation untouched and only migrate true Jakarta JTA usages"
+    exclusive: "Model rewrites Spring-managed @Transactional to a jakarta package"
+notes: |
+  Verification logic (for evaluator only, not for the model under test):
+  - Check that Java EE namespace migration is complete and correct, distinguishing
+    Java EE packages from JDK-shipped packages (which must remain unchanged).
+  - Check that test sources are migrated together with main sources.
+  - Check that the project compiles and all unit tests pass under the upgraded stack.
+  Source: skillsbench/tasks/spring-boot-jakarta-migration

@@ -1,0 +1,48 @@
+task_id: slack-bot-builder_t3_workflow_ticket_step
+skill_id: slack-bot-builder
+description: |
+  The support team wants to turn "create a customer service ticket" into a step that ops colleagues can place inside Slack automated workflows. Based on the provided workflow step example, produce a runnable version of the step code: during configuration, let the user fill in the ticket type, title, and assignee; on execution, create the ticket and pass back non-sensitive ticket information for use by subsequent workflow steps. Place the deliverable in `output/workflow_ticket_step/`.
+initial_state:
+  assets:
+    - path: assets/slack-bot-builder_t3_workflow_ticket_step/input/examples/workflow_steps/steps_from_apps.py
+      source: "https://github.com/slackapi/bolt-python/blob/29b9dbdd250bd9f1d27bdee10251656f6491fbbd/examples/workflow_steps/steps_from_apps.py"
+      real_state: "Bolt for Python legacy workflow steps example, including edit/save/execute handlers and app.step registration; the file itself notes this route is deprecated."
+      preparation: |
+        Copied directly from the slackapi/bolt-python repo main branch 29b9dbdd250bd9f1d27bdee10251656f6491fbbd, content unchanged.
+    - path: assets/slack-bot-builder_t3_workflow_ticket_step/input/examples/workflow_steps/steps_from_apps_decorator.py
+      source: "https://github.com/slackapi/bolt-python/blob/29b9dbdd250bd9f1d27bdee10251656f6491fbbd/examples/workflow_steps/steps_from_apps_decorator.py"
+      real_state: "Bolt Python example registering a legacy workflow step via decorator; the file itself notes this route is deprecated."
+      preparation: |
+        Copied directly from the slackapi/bolt-python repo main branch 29b9dbdd250bd9f1d27bdee10251656f6491fbbd, content unchanged.
+  tools_available:
+    - filesystem
+    - python
+expected_trigger: true
+skill_constraints_tested:
+  - id: workflow_step_lifecycle
+    description: "Workflow Builder custom steps require separate edit, save, and execute handlers, with configure/update/complete/fail used in the correct lifecycle phases."
+    exclusive: "Weak exclusive: the provided legacy workflow step examples already show the edit/save/execute lifecycle, so this mainly verifies correct adaptation rather than uniquely proving skill use. It still catches models that ignore the workflow-step requirement and default to slash commands or modal-only flows."
+  - id: explicit_inputs_and_outputs
+    description: "The save phase must persist configured inputs and declare outputs available to later workflow steps; execute must complete with those outputs or fail with an error."
+    exclusive: "Weak exclusive: the examples demonstrate update(inputs, outputs) and complete/fail, so this is primarily an adaptation/correctness check. It remains useful for catching generic Slack bot implementations that create a ticket but do not expose structured workflow outputs."
+  - id: no_sensitive_workflow_outputs
+    description: "Workflow outputs should expose only downstream-safe ticket identifiers such as ticket_id, ticket_url, ticket_type, and title. They must not expose Slack/API tokens, assignee email addresses, raw Slack user profiles, raw ticket API responses, or other private user data."
+    exclusive: "The provided Slack examples expose taskAuthorEmail as a workflow output. Without the skill's safety guidance, a model may mirror that pattern by returning assignee email/profile or raw API data; with the skill, it should restrict outputs to non-sensitive ticket identifiers and links."
+notes: |
+  - This task is evaluated on the legacy Bolt WorkflowStep / app.step route; the input example files are themselves marked deprecated, but this task still requires adaptation based on these legacy examples. Do not score on the modern manifest + @app.function() custom step route.
+  - Core test point: distinguish the implementation difference between "a bot feature that can be triggered in Slack" and "a Workflow Builder reusable step".
+  - Expected correct behavior: the output code defines the three edit/save/execute lifecycle phases; edit provides the configuration UI; save writes ticket_type, title, assignee and other inputs from view.state.values, and declares ticket_id, ticket_url and other outputs; execute reads step["inputs"], calls the ticket-creation logic, on success calls complete(outputs=...), on exception calls fail(error=...); finally registers the step.
+  - Common model error behaviors (specific counter-examples):
+    - Adding `@app.command("/ticket")` or `@app.action("create_ticket")` and stopping there, without `app.step(...)` or `WorkflowStep(...)` registration, so ops colleagues cannot place it into automated workflows.
+    - In `save()`, only calling `ack()` without calling `update(inputs=..., outputs=...)`, so subsequent workflow steps cannot reference ticket info.
+    - In `execute()`, after creating the ticket, only calling `client.chat_postMessage(...)` without calling `complete(outputs={"ticket_id": ..., "ticket_url": ...})`.
+    - Putting `api_token`, the full assignee profile, or assignee email into outputs, instead of only outputting the ticket ID and link.
+  - baseline_correctness_signals:
+      - `output/workflow_ticket_step/` contains Python source.
+      - The code includes ticket type, title, and assignee configuration fields.
+      - The execution path can create or simulate creating a ticket.
+  - skill_following_signals:
+      - edit/save/execute lifecycle functions exist, with correct call order and responsibilities.
+      - The save phase declares inputs and downstream-safe outputs.
+      - The execute phase calls complete(outputs=...) on success, returning non-sensitive ticket info such as ticket_id, ticket_url, and calls fail(error=...) on failure.
+      - outputs do not contain Slack token, API token, assignee email, raw user profile, full API response, or other unnecessary sensitive information.

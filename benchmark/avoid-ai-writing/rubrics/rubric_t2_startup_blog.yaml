@@ -1,0 +1,149 @@
+rules:
+  - id: g1_observable_clean_file_attempt
+    type: required-tool
+    provenance: gate
+    locus: trace
+    verifier: regex
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The trace must show an observable attempt to write or edit output/startup_ecosystem_clean.md. This gates evaluability only.
+    signal:
+      pattern: '(?is)(?:^|\n)\s*(?:Write|Edit|write_file|edit_file)\s*:\s*.{0,1200}["'']?(?:file_path|path|file)["'']?\s*:\s*["''][^"'']*output/startup_ecosystem_clean\.md'
+
+  - id: r1_final_response_uses_four_skill_sections
+    type: order
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    severity: hard
+    weight: 1.0
+    spec: |
+      [SKILL] The response should include the skill's four output sections: issues found, rewritten version, what changed, and second-pass audit.
+      skill-exclusive rationale: without reading the skill, a strong model will usually only save the cleaned Markdown and give a short completion note; the skill requires a four-part audit/rewrite/change/second-pass structure. The conflict point is whether the avoid-ai-writing workflow audit evidence is presented.
+    signal:
+      query: >
+        In the final answer only, does the response contain the avoid-ai-writing four-part workflow in this order: an issues/audit section, a rewritten-version section or equivalent, a what-changed/change-summary section, and a second-pass audit section? Judge only final_answer, not serialized tool steps or the agent's descriptions of intent. Answer YES if all four workflow sections are present in order even with slightly different headings; answer NO if the response only says the file was saved, omits one section, or presents them out of order.
+      acceptable: "Final answer has sections equivalent to Issues found, Rewritten version, What changed, and Second-pass audit, in that order."
+      unacceptable: "Final answer only says the cleaned file was saved or gives a short summary without a second-pass audit."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_audit_covers_three_ai_ism_categories
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    severity: hard
+    weight: 1.0
+    spec: |
+      [SKILL] Before or alongside the rewrite, the audit should quote and categorize concrete AI-isms from at least three pattern types present here, such as formatting, vocabulary/promotional language, title-case headings, formulaic/meta narration, or transitions.
+      skill-exclusive rationale: without reading the skill, a strong model may simply improve prose or mention generic marketing tone; the skill requires identifying every AI-ism with cited text across the relevant categories. The conflict point is whether AI-writing patterns are systematically audited rather than doing ordinary copyediting.
+    signal:
+      query: >
+        Based only on final_answer visible content, does the audit quote or clearly cite source text from at least three distinct AI-writing pattern categories present in the excerpt, such as (1) formatting/bold overuse, (2) title-case or formulaic headings, (3) Tier vocabulary/promotional language like "remarkable", "robust", "revolutionizing", or "seamless", and (4) formulaic meta narration/transitions like "This article explores" or "One notable trend"? The cited text must be source-like offending text, not generic claims about tone. Answer YES if at least three distinct categories are evidenced. Acceptable example: flags '# The **Global Startup Ecosystem**' for bold/title formatting, 'Thriving Startup Scenes in Major Cities' for title-case heading, and 'robust'/'seamless' for vocabulary. Answer NO if the audit is generic, cites fewer than three categories, or only says 'removed AI-like language and improved flow' without quoted examples.
+      acceptable: "Flags '# The **Global Startup Ecosystem**' for bold/title formatting, 'Thriving Startup Scenes in Major Cities' for title-case heading, and 'robust'/'seamless' for vocabulary."
+      unacceptable: "Says 'removed AI-like language and improved flow' without quoted examples."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_formatting_and_heading_cleanup_applied
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    exclusive: true
+    severity: hard
+    weight: 0.75
+    spec: |
+      [SKILL] In this short blog output, cleanup should not retain Markdown bold, and retained subheadings should be normalized away from AI-like title-case/formulaic scaffolding.
+      skill-exclusive rationale: without reading the skill, a strong model may treat Markdown bold and Title Case headings as normal blog style; the skill requires bold overuse and title-case subheadings to be treated as AI-writing patterns to clean. The conflict point is whether formatting/heading style is modified, not just sentence wording.
+    signal:
+      file: "output/startup_ecosystem_clean.md"
+      file_must_not_contain:
+        - '\*\*'
+        - '(?m)^#{1,6}\s+(?-i:Thriving Startup Scenes in Major Cities)\s*$'
+        - '(?m)^#{1,6}\s+(?-i:Cross-Border Collaborations Driving Innovation)\s*$'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_blog_context_removes_tier_and_promotional_phrases
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    exclusive: true
+    severity: hard
+    weight: 1.0
+    spec: |
+      [SKILL] With no stronger cue, this ordinary long-form excerpt should be treated as blog context, so the full rule set applies: remove Tier vocabulary clusters, inflated praise, formulaic meta narration, and promotional transitions rather than lightly smoothing them.
+      skill-exclusive rationale: without reading the skill, a strong model might only tone down the most obvious promotional wording and keep familiar business/article phrases; the skill requires the blog profile to apply the full avoid-AI-writing list, including clustered Tier 2/Tier 3 language and meta narration. The conflict point is whether the specific AI-ism vocabulary is systematically removed, not merely improving grammar.
+    signal:
+      file: "output/startup_ecosystem_clean.md"
+      file_must_not_contain:
+        - '(?i)\bremarkable growth\b'
+        - '(?i)\binnovative ideas\b'
+        - '(?i)\bhotspots\b'
+        - '(?i)\brobust\b'
+        - '(?i)\brevolutioniz(e|ing|es|ed)\b'
+        - '(?i)\bseamless\b'
+        - '(?i)\beffortlessly\b'
+        - '(?i)\bOne notable trend\b'
+        - '(?i)\bThis article explores\b'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_second_pass_checks_rewritten_excerpt
+    type: termination
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    severity: hard
+    weight: 0.75
+    spec: |
+      [SKILL] The second-pass audit must re-read the rewritten startup excerpt and either identify/fix remaining AI tells or state that it is clean.
+      skill-exclusive rationale: without reading the skill, a strong model usually ends after producing the cleaned file; the skill requires a second-pass audit after the rewrite. The conflict point is whether a dedicated closing review is performed.
+    signal:
+      query: >
+        In the final answer only, does the second-pass audit specifically review the rewritten startup excerpt and either state that no AI-writing tells remain or identify a remaining issue and its fix? Judge only final_answer, not serialized steps or earlier intent. Answer YES if the second-pass section is substantive and tied to the rewrite; answer NO if it is missing, only says "done", or repeats the first audit without reviewing the rewritten excerpt.
+      acceptable: "Second-pass audit: Clean. No bold overuse, title-case scaffolding, inflated vocabulary, promotional phrasing, or meta narration remain."
+      unacceptable: "No second-pass section, or 'I reviewed it' with no reference to remaining or clean AI tells."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The requested cleaned startup excerpt was saved and still preserves the source facts and entities.
+    signal:
+      file: "output/startup_ecosystem_clean.md"
+      file_must_contain:
+        - '(?s)\S.{50,}'
+        - '(?i)\bNew York\b'
+        - '(?i)\bLondon\b'
+        - '(?i)\bParis\b'
+        - '(?i)\bfintech\b'
+        - '(?i)\bfashion\b'
+        - '(?i)\bcross-border\b'
+        - '(?i)\bcollaboration\b'

@@ -1,0 +1,91 @@
+task_id: SF36_t1_exam_block_sequencing
+level: L2
+skill_id: skill_36_mip_solver_and_solution_audit
+description: |
+  You are helping a university registrar schedule final exams. The exams are already grouped into blocks. Your job is to assign the blocks to available slots so that students have as few tightly packed exams as possible.
+
+  The task uses a prepared exam scheduling instance with 24 exam blocks and 24 time slots. Read data from assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/ and produce the best feasible solution you can. Detailed descriptions of each data file are in assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/README.md.
+
+  Feasibility rules:
+    - Each block must be assigned to exactly one slot.
+    - Each slot can hold at most one block.
+    - Large blocks listed in assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/instance.json must be placed in one of the early slots listed in the same file.
+
+  Time limit: 120 seconds.
+
+  To compute the final optimization objective, use the following weights:
+
+    - evening-to-morning back-to-back count: 1
+
+    - other back-to-back count: 1
+
+    - same-day triple count: 10
+
+    - cross-day / 24-hour triple count: 10
+
+    - overlapping four-slot pressure count: 5
+
+  After finishing the job, create output/ and save the following results:
+
+    - output/formulation.md: describe how you approached the problem and arrived at your final schedule, including the objective and constraints considered.
+
+    - output/schedule.csv: your final schedule as a CSV with two columns: slot and block. One row per slot; every block appears exactly once.
+
+    - output/metrics.json: metrics of your final schedule. Report objective, eve_morn_b2b_count, other_b2b_count, same_day_triple_count, cross_day_triple_count, and z_three_in_four_count.
+
+    - output/report.md: final objective, score breakdown, feasibility check, and solution method.
+
+    - output/audit.json: a solution audit report detailing consistency checks performed on your final schedule outputs.
+initial_state:
+  assets:
+  - path: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/instance.json
+    source: skillsbench/tasks/exam-block-sequencing/environment/data/instance.json
+    description: 'Data file: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/instance.json'
+  - path: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/triplet_counts.csv
+    source: skillsbench/tasks/exam-block-sequencing/environment/data/triplet_counts.csv
+    description: 'Data file: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/triplet_counts.csv'
+  - path: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/blockmap.csv
+    source: skillsbench/tasks/exam-block-sequencing/environment/data/blockmap.csv
+    description: 'Data file: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/blockmap.csv'
+  - path: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/pair_counts.csv
+    source: skillsbench/tasks/exam-block-sequencing/environment/data/pair_counts.csv
+    description: 'Data file: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/pair_counts.csv'
+  - path: assets/SF36_t1_exam_block_sequencing/data/provenance.md
+    source: skillsbench/tasks/exam-block-sequencing/environment/data/provenance.md
+    description: 'Data file: assets/SF36_t1_exam_block_sequencing/data/provenance.md'
+  - path: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/README.md
+    source: skillsbench/tasks/exam-block-sequencing/environment/data/README.md
+    description: 'Data file: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/README.md'
+  - path: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/block_summary.csv
+    source: skillsbench/tasks/exam-block-sequencing/environment/data/block_summary.csv
+    description: 'Data file: assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/block_summary.csv'
+  tools_available:
+  - bash
+  - read
+  - edit
+  - grep
+expected_trigger: true
+skill_constraints_tested:
+- id: c2
+  description: After writing the output files, they must be reloaded from disk and the pure evaluator rerun for roundtrip verification
+  exclusive: When generating schedule/metrics/report only per the prompt, the model usually reports in-memory computed results and does not proactively re-parse the final submitted schedule.csv from disk as the single source of truth and recompute consistency.
+- id: c3
+  description: Build an independent pure-function evaluator (depends only on input + final output, not on solver variables), and cross-validate against the solver objective within 1e-6
+  exclusive: Without auditing per this skill, the model may directly trust the solver objective or derive metrics from solver variables, rather than using an independent evaluation function that depends only on input data and the final schedule artifact for cross-validation.
+- id: c4
+  description: Before abandoning the exact MIP solver route, you must check whether PySCIPOpt is importable; if available, prefer it for modeling and solving, and record solver status/objective/bound/gap
+  exclusive: Directly choosing the most familiar solver package, and if that package is unavailable, abandoning MIP and switching to pure heuristic, without additionally checking PySCIPOpt
+notes: |
+  Source: skillsbench/exam-block-sequencing
+
+  Domain: Optimization/Operations research
+
+  Phase1 score: 0.48
+
+  Confidence: 0.82
+
+  Asset note: active task input uses the 24x24 dataset under assets/SF36_t1_exam_block_sequencing/data/_orig_24x24/; the description and initial_state paths must remain aligned to that dataset. If switching back to 12x12, verify large_blocks <= early_slots and update provenance accordingly.
+
+  Do not expose _orig_24x24 as an alternate input unless the task description and initial_state remain switched to the 24x24 instance.
+
+  Environment note: c4 assumes PySCIPOpt may be available in the evaluation environment; if that dependency cannot be guaranteed, c4 should not be treated as the sole core exclusive constraint.

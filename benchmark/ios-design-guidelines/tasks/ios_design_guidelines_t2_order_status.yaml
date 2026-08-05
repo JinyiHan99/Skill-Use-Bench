@@ -1,0 +1,32 @@
+task_id: ios_design_guidelines_t2_order_status
+skill_id: ios-design-guidelines
+description: |
+  Our order completion page performs inconsistently on real iPhones: on small-screen devices the page looks cramped, under Dark appearance the body and background layers are not clearly separated, and after some system accessibility features are enabled the state transitions look unnatural. Please review and modify
+  `assets/ios_design_guidelines_t2_order_status/input/OrderPlacedView.swift` to make the order status page better suited for real iPhone use.
+
+  The page must still convey the "order received / ready for pickup" status and keep the bottom registration prompt. Please deliver the modified Swift file and a brief explanation.
+initial_state:
+  assets:
+    - path: assets/ios_design_guidelines_t2_order_status/input/OrderPlacedView.swift
+      source: "https://github.com/xiaofu666/FrutaApp/blob/master/Shared/Orders/OrderPlacedView.swift"
+      real_state: "Source code of the Apple Fruta SwiftUI sample's order completion page, including order status display, background visual elements, and a bottom registration prompt."
+      preparation: |
+        Download the zip from the public GitHub repository xiaofu666/FrutaApp master branch, and copy Shared/Orders/OrderPlacedView.swift verbatim.
+  tools_available:
+    - file_edit
+    - swift_source_review
+expected_trigger: true
+skill_constraints_tested:
+  - id: dynamic_type_reflow
+    description: "Text should use scalable semantic styles, and key content must not be clipped by fixed-size containers at accessibility font sizes."
+    exclusive: "Under blinded testing, given only the symptoms of 'cramped small screen / unstable system settings,' the model is more likely to do generic padding, ScrollView, font-size reduction, or fixed-width removal; only after reading the skill does it more reliably ground the problem in semantic fonts under Dynamic Type, reflowable layouts, and avoiding fixed-size containers that clip key content."
+  - id: reduce_motion_support
+    description: "Decorative or state-transition animations should respect the Reduce Motion preference."
+    exclusive: "Under blinded testing, the model may only delete animations, lower spring strength, or keep ordinary visual effects; only after reading the skill does it more reliably respect the system Reduce Motion preference, conditionally disabling or replacing decorative flip and spring animations."
+  - id: safe_area_and_semantic_background
+    description: "Decorative full-screen backgrounds may extend to screen edges; status cards, body text, and interactive areas need semantic background layers suited to light/dark appearance to keep key content stably readable over image backgrounds."
+    exclusive: "Under blinded testing, the model may only add hardcoded black/white overlays, adjust opacity, or weaken the background; only after reading the skill does it more reliably preserve decorative background extension while using iOS semantic background/material layers for foreground content to adapt to Light/Dark mode."
+notes: |
+  - Positive example: a real iPhone order status page refactor scenario.
+  - During evaluation, confirm the page still retains order status expression and the bottom registration prompt.
+  - The task should not be completed by deleting core status content, removing the bottom registration prompt, or replacing it with an unrelated toy UI.

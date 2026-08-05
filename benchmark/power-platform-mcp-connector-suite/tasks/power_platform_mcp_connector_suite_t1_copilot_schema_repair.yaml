@@ -1,0 +1,48 @@
+task_id: power_platform_mcp_connector_suite_t1_copilot_schema_repair
+skill_id: power-platform-mcp-connector-suite
+description: |
+  The Salesforce connector draft in `./assets/power_platform_mcp_connector_suite_t1_copilot_schema_repair/input/` imports, but when I attach it to a Copilot Studio agent the agent only sees part of what the connector can do. Please repair the draft and place a clean, ready-to-import connector package in `output/salesforce_agent_connector/`. Keep the original business coverage intact and include a short handoff note explaining what changed.
+initial_state:
+  assets:
+    - path: ./assets/power_platform_mcp_connector_suite_t1_copilot_schema_repair/input/apiDefinition.swagger.json
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/apiDefinition.swagger.json"
+      real_state: "Real Salesforce Power Platform connector definition, deliberately altered from the public source so the agent integration endpoint has schema patterns that Copilot Studio commonly filters or rejects."
+      preparation: |
+        Downloaded the public Salesforce connector definition. Removed the agent protocol extension from the agent endpoint, added body/response references under that endpoint, and changed its request id field to a union type to simulate a real failed import after manual edits.
+    - path: ./assets/power_platform_mcp_connector_suite_t1_copilot_schema_repair/input/apiProperties.json
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/apiProperties.json"
+      real_state: "Unmodified public connector properties file for the Salesforce connector."
+      preparation: "Downloaded without content changes."
+    - path: ./assets/power_platform_mcp_connector_suite_t1_copilot_schema_repair/input/script.csx
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/script.csx"
+      real_state: "Unmodified public connector script file for the Salesforce connector."
+      preparation: "Downloaded without content changes."
+    - path: ./assets/power_platform_mcp_connector_suite_t1_copilot_schema_repair/input/readme.md
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/readme.md"
+      real_state: "Unmodified public connector documentation for the Salesforce connector."
+      preparation: "Downloaded without content changes."
+  tools_available:
+    - filesystem
+    - json_editor
+    - text_editor
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: copilot_schema_compliance
+    description: "The skill requires connector schemas intended for Copilot Studio to inline all request/response schemas used by the agent endpoint, recursively resolving nested reference types (`$ref`) under that endpoint."
+    exclusive: "Without the skill, a model may leave conventional Swagger `$ref` schemas in place because they are valid Swagger 2.0, while Copilot Studio can still filter the agent endpoint if agent-facing request/response schemas remain reference-based."
+  - id: agentic_protocol_marker
+    description: "The skill requires the agent communication endpoint to carry the Power Platform agentic protocol marker."
+    exclusive: "A general connector repair may make the Swagger valid but miss the Power Platform-specific marker needed for agent discovery."
+notes: |
+  - Core test: repairs a real connector package whose business API surface is already substantial, so success depends on applying the skill's Copilot Studio connector rules rather than rewriting the domain API.
+  - Expected correct behavior: output contains apiDefinition.swagger.json, apiProperties.json, script.csx, and documentation in `output/salesforce_agent_connector/`; the Salesforce operations remain present; the agent endpoint is made discoverable and its request/response schemas are inlined with single type values.
+  - Common wrong behavior: model leaves `./assets/power_platform_mcp_connector_suite_t1_copilot_schema_repair/input/apiDefinition.swagger.json:3309` as a `$ref` response, only shallow-inlines that response while leaving nested `$ref` references such as `McpResponse.result` to `McpParams`, leaves the request `id` field at `./assets/power_platform_mcp_connector_suite_t1_copilot_schema_repair/input/apiDefinition.swagger.json:3324` as a type array, or only validates generic Swagger 2.0 while the missing endpoint marker near `./assets/power_platform_mcp_connector_suite_t1_copilot_schema_repair/input/apiDefinition.swagger.json:3300` remains unresolved.
+  - baseline_correctness_signals:
+      - `output/salesforce_agent_connector/` exists and contains the four expected connector files plus a handoff note.
+      - The output connector retains the Salesforce paths from the input rather than replacing the package with a toy example.
+      - The JSON files parse successfully.
+      - No schema `type` value under the agent-facing request/response definitions is an array.
+  - skill_following_signals:
+      - The agent endpoint has the required Power Platform protocol marker.
+      - No `$ref` remains anywhere in request or response schemas used by the agent endpoint, including nested references such as `McpResponse.result` referencing `McpParams`.

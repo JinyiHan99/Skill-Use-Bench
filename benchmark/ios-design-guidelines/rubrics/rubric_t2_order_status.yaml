@@ -1,0 +1,137 @@
+# Rubric for ios_design_guidelines_t2_order_status
+rules:
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: "(?is)^(Read|Edit|Write):.*(?:assets/ios_design_guidelines_t2_order_status/input/)?OrderPlacedView\\.swift\\b"
+    spec: "[GATE] The trace contains an observable read or write attempt on OrderPlacedView.swift."
+
+  - id: r1_dynamic_type_reflow_not_fixed_card
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Key status text should use scalable semantic fonts and avoid being clipped by fixed-size containers under accessibility Dynamic Type via reflow/flexible layouts.
+      Skill-exclusive rationale: Without reading the skill, the model facing "cramped small screen" often shrinks font size, adds/removes padding, wraps in ScrollView, or simply changes fixed widths; the skill requires supporting Dynamic Type up to accessibility font sizes and avoiding clipping. The conflict point is that smaller/hardcoded sizes must not mask the cramped problem.
+    judge_context_window:
+      - serialized_steps
+      - final_answer
+      - tool_results_first_n: 40
+    signal:
+      query: >
+        Based on the final content actually written to OrderPlacedView.swift, not the agent's self-description, does the order status card simultaneously satisfy three points: avoid fixed 300x300 or other hard width/height that would clip key status text; use .title/.headline/.body or other scalable semantic fonts rather than hardcoded small font sizes; and support Dynamic Type accessibility sizes via flexible/reflowable layout? Answer only YES or NO.
+      acceptable: "Removes .frame(width: 300, height: 300), switches to maxWidth/minHeight, ViewThatFits, dynamicTypeSize conditional layout or ScrollView, and keeps .font(.title/.headline/.body) or other semantic fonts."
+      unacceptable: "Still keeps fixed width/height wrapping the status text; uses .font(.system(size:)), .minimumScaleFactor or lineLimit to compress key status copy as the main solution; lacks semantic fonts or lacks reflowable/flexible layout."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_respects_reduce_motion_for_status_animations
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Decorative flip, spring, or state-transition animations must respect Reduce Motion, disabling or replacing them with non-motion changes when enabled.
+      Skill-exclusive rationale: Without reading the skill, the model may keep the original spring/flip animations, slow them down, or just delete them; the skill requires reading the system accessibilityReduceMotion preference and conditioning animations on it. The conflict point is that animation handling must follow the user's system setting rather than only doing visual tweaks.
+    judge_context_window:
+      - serialized_steps
+      - final_answer
+      - tool_results_first_n: 40
+    signal:
+      query: >
+        Based on the final content actually written to OrderPlacedView.swift, not the agent's self-description, does the code read the system Reduce Motion preference (e.g., @Environment(\.accessibilityReduceMotion)) and use it to condition order status transitions, flips, springs, or other decorative animations, so that when Reduce Motion is enabled animations are disabled or replaced with non-motion changes? Answer only YES or NO.
+      acceptable: "Uses @Environment(\\.accessibilityReduceMotion) var reduceMotion, and conditions on it in .animation(reduceMotion ? nil : .spring(), value:), withAnimation(reduceMotion ? nil : ...) or flip/state-transition logic."
+      unacceptable: "Only declares a reduceMotion variable but does not control animations; still uses spring/flip/withAnimation unconditionally; only deletes animations or shortens duration without reading the system Reduce Motion preference."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_foreground_uses_semantic_background_hierarchy
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Foreground status cards, body text, and bottom interactive areas should use iOS semantic background/material layers to ensure stable readability under Light/Dark Mode; decorative backgrounds may extend full-screen.
+      Skill-exclusive rationale: Without reading the skill, the model may add hardcoded black/white overlays, adjust opacity, or remove the image background; the skill requires systemBackground/secondarySystemBackground/bar/material or equivalent semantic layers to adapt to light/dark appearance. The conflict point is that fixed colors must not solve dark-mode layering problems.
+    judge_context_window:
+      - serialized_steps
+      - final_answer
+      - tool_results_first_n: 40
+    signal:
+      query: >
+        Based on the final content actually written to OrderPlacedView.swift, not the agent's self-description, do both the status card and the bottom registration prompt have a semantic system background, bar/material, or equivalent adaptive background layer, and does the status card not rely directly on the image background or hardcoded black/white/opacity overlays for readability? Answer only YES or NO.
+      acceptable: "Card uses Color(.secondarySystemBackground) or .regularMaterial/.thinMaterial, bottomBanner uses .bar or a system background, and layers are expressed via .foregroundStyle(.primary/.secondary)."
+      unacceptable: "Only bottomBanner uses .bar but the status card still sits directly on the image; uses Color.white/Color.black as the main background or text color; only adjusts opacity, with no semantic background layer."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_ignores_safe_area_only_for_decorative_background
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] .ignoresSafeArea() may be used only for decorative backgrounds, and must not let status text, the Sign in button, or the bottom prompt enter the status bar/Dynamic Island/Home indicator region.
+      Skill-exclusive rationale: Without reading the skill, the model may ignore safe areas for the entire VStack or card for "full-screen visual stability"; the skill explicitly distinguishes background decoration from key content. The conflict point is that full-screen backgrounds may extend beyond bounds but readable/clickable content must not.
+    judge_context_window:
+      - serialized_steps
+      - final_answer
+      - tool_results_first_n: 40
+    signal:
+      query: >
+        Based on the final content actually written to OrderPlacedView.swift, not the agent's self-description, is .ignoresSafeArea() applied only to the background/decorative layer, while key status cards, body text, Sign in with Apple, and the bottom registration prompt remain protected by safe area/safe padding? Answer only YES or NO.
+      acceptable: "ZStack/background image uses .ignoresSafeArea(), the outer content VStack has no ignoresSafeArea, and the bottom banner has safeAreaInset or padding."
+      unacceptable: "Calls .ignoresSafeArea() on the main VStack containing Text, Card, SignInWithAppleButton, or bottomBanner."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_touch_target_for_registration_action
+    type: boundary
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The bottom registration/Sign in interactive control must not be modified to a tappable area smaller than 44pt.
+      Downgrade rationale: the original file already meets approximately 45pt; retaining this behavior is mainly a regression guard, not strong skill-following evidence.
+    signal:
+      query: >
+        Based on the final content actually written to OrderPlacedView.swift, not the agent's self-description, does the bottom registration or Sign in with Apple interactive control still have at least a 44pt tappable height or equivalent minHeight/padding? Answer only YES or NO.
+      acceptable: "SignInWithAppleButton or the registration button uses frame(height: 44+) / minHeight: 44+ or sufficient padding to guarantee the tap target."
+      unacceptable: "The bottom registration button is compressed below 44pt, or only a very small text/icon is tappable."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: low
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] The modified order status page still conveys the order-received/ready-for-pickup status and retains the bottom registration prompt."
+    judge_context_window:
+      - serialized_steps
+      - final_answer
+      - tool_results_first_n: 40
+    signal:
+      query: >
+        Based on the final content actually written to OrderPlacedView.swift, not the agent's self-description, does the page still contain core status copy for both order-received/awaiting-notification and ready-for-pickup, or equivalent expressions, and retain the bottom registration/Sign in with Apple prompt? Answer only YES or NO.
+      acceptable: "Still has status expressions like Thank you for your order / Your smoothie is ready / ready to be picked up, and retains Sign up to get rewards or SignInWithAppleButton."
+      unacceptable: "Deletes the order status card; leaves only a generic success page; removes the bottom registration prompt or Sign in with Apple."

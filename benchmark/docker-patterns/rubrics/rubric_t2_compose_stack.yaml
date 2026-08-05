@@ -1,0 +1,239 @@
+# Rubric for skill_26_docker_patterns — SF26_t2_compose_stack
+# Scoring boundary: skill is scored; task only records completion rate; gate only judges evaluability.
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# V4 rewrite (fix_recommendations_20260703.md#B, 2026-07-03)
+# ═══════════════════════════════════════════════════════════════════════════
+# Issues in original rubric (bak_v3):
+#   - Of 5 skill items, 3 had weight=1.0 (r8/r9/r12); high proportion 3/5=60% (exceeds 40% hard constraint);
+#   - Missing low soft-signal tier; "touching the edge scores nothing".
+# Changes:
+#   - r12_named_stages kept at 1.0 headline (all 4 of deps/dev/build/production are skill-specific conventions)
+#   - r9_uid_gid_1001 from 1.0 → 0.5 mid
+#   - r8_host_only_db_port from 1.0 → 0.75 mid (127.0.0.1 specific detail)
+#   - r5/r2 kept at 0.5 unchanged
+#   - Added s1/s2/s3 three 0.25 low soft-signal items
+# Three-tier structure: high=1(14%)  mid=4  low=3   → high proportion 14% ≤ 40% ✅
+# ═══════════════════════════════════════════════════════════════════════════
+
+rules:
+  # ── GATE: evaluability ────────────────────────────
+  - id: g1_compose_edit_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an actual edit attempt on the target docker-compose.yml or Dockerfile.
+    signal:
+      pattern: '(?is)\b(Write|Edit)\b[\s\S]*file_path["''\s:]*[^"''\n]*assets/SF26_t2_compose_stack/(docker-compose\.yml|Dockerfile)\b'
+
+  # ── Hard requirements (headline high) ────────────────────
+  - id: r12_dockerfile_named_stages
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] The Dockerfile must use the multi-stage naming convention specified by the skill: deps, dev, build, production must all be present.
+    skill_exclusive_reason: |
+      A generic multi-stage Dockerfile would not naturally contain these four convention names; this is the skill's core Dockerfile pattern
+      and the headline exclusive signal of the SF26 series.
+    signal:
+      file: "assets/SF26_t2_compose_stack/Dockerfile"
+      file_must_contain: '(?ims)(?=.*^\s*FROM\b[^\n]*\s+AS\s+deps\b)(?=.*^\s*FROM\b[^\n]*\s+AS\s+dev\b)(?=.*^\s*FROM\b[^\n]*\s+AS\s+build\b)(?=.*^\s*FROM\b[^\n]*\s+AS\s+production\b)'
+
+  # V5 addition: progressive scoring for multi-stage build (mid, partial compensation for r12 being too strict)
+  - id: r12b_multi_stage_with_3plus_any_naming
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.4
+    spec: |
+      [SKILL — mid progressive] The Dockerfile uses multi-stage build (at least 3 FROM .. AS <name>),
+      but the naming is not the deps/dev/build/production required by the skill (when r12 fails, this item serves as partial compensation).
+    skill_exclusive_reason: |
+      A generic model may also write multi-stage, but the skill explicitly requires a 4-stage pattern; this serves as a relaxed version of r12 for partial credit (requires ≥3 stages).
+    signal:
+      file: "assets/SF26_t2_compose_stack/Dockerfile"
+      file_must_contain: '(?ims)FROM\b[^\n]*\s+AS\s+\S+[\s\S]*?FROM\b[^\n]*\s+AS\s+\S+[\s\S]*?FROM\b[^\n]*\s+AS\s+\S+'
+
+  # ── Medium requirements (mid) ────────────────────────────
+  - id: r8_host_only_db_port
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — mid] In the dev environment, if the db port is exposed to the host, it must be bound to 127.0.0.1:5432:5432; in production, the db port may not be exposed.
+      V4 reduced from 1.0 to 0.75.
+    skill_exclusive_reason: |
+      A model that does not read the skill often writes "5432:5432" binding all interfaces; the skill explicitly requires the database port to be host-only.
+    signal:
+      file: "assets/SF26_t2_compose_stack/docker-compose.yml"
+      file_must_contain: '(?ims)(?:^\s{2}db\s*:\s*\n(?:(?!^\s{2}\S).)*?\s+ports\s*:\s*\n\s*-\s*["'']?127\.0\.0\.1:5432:5432["'']?|^\s{2}db\s*:\s*\n(?!(?:(?!^\s{2}\S).)*?\s+ports\s*:))'
+
+  - id: r9_dockerfile_uid_gid_1001_non_root
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — mid] The Dockerfile should create a dedicated user/group with UID/GID 1001 and switch to a non-root USER.
+      V4 reduced from 1.0 to 0.5; the relaxed version s2 gives low-weight credit separately.
+    skill_exclusive_reason: |
+      Generic security practice only requires non-root; the skill further specifies deterministic UID/GID 1001 for this stack.
+    signal:
+      file: "assets/SF26_t2_compose_stack/Dockerfile"
+      file_must_contain: '(?ims)(?=.*\b(addgroup|groupadd)\b[^\n]*\b1001\b)(?=.*\b(adduser|useradd)\b[^\n]*\b1001\b)(?=.*^\s*USER\s+(?!root\b)\S+)'
+
+  - id: r2_healthcheck_depends_on
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — mid] The app/web dependency on db must use long-form depends_on and set
+      condition: service_healthy, while the db service itself has a healthcheck.
+    skill_exclusive_reason: |
+      The task requires a health check, but a model that does not read the skill often uses bare depends_on or only writes a healthcheck;
+      the skill explicitly requires long-form depends_on with condition: service_healthy.
+    signal:
+      file: "assets/SF26_t2_compose_stack/docker-compose.yml"
+      file_must_contain: '(?ims)(?=.*\bdepends_on\s*:\s*\n(?:\s+.*\n)*?\s+db\s*:\s*\n(?:\s+.*\n)*?\s+condition\s*:\s*service_healthy\b)(?=.*\bdb\s*:\s*\n(?:\s+.*\n)*?\s+healthcheck\s*:)'
+
+  - id: r5_env_file_used
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — mid] Services needing secret/env should use env_file to reference .env, rather than inlining sensitive values in environment.
+    skill_exclusive_reason: |
+      A model that does not read the skill may only use environment or variable placeholders; the skill explicitly requires the env_file pattern.
+    signal:
+      file: "assets/SF26_t2_compose_stack/docker-compose.yml"
+      file_must_contain: '(?im)^\s*env_file\s*:\s*(?:\n\s*-\s*)?\.env\b'
+
+  # ── Soft signals (low): details / existence ────────────────
+  - id: s1_dockerfile_any_named_stages
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL — low soft-signal] The Dockerfile has at least 2 or more FROM ... AS <name> (relaxed version of r12),
+      indicating the model knows to do multi-stage.
+    skill_exclusive_reason: |
+      The skill emphasizes the multi-stage pattern; this low-threshold signal gives credit on partial match with r12.
+    signal:
+      file: "assets/SF26_t2_compose_stack/Dockerfile"
+      file_must_contain: '(?ims)FROM\b[^\n]*\s+AS\s+\S+[\s\S]*?FROM\b[^\n]*\s+AS\s+\S+'
+
+  - id: s2_dockerfile_any_non_root_user
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL — low soft-signal] A non-root USER declaration appears in the Dockerfile (regardless of whether UID is 1001).
+    skill_exclusive_reason: |
+      The skill emphasizes the non-root principle for production images; this item is the relaxed version of r9.
+    signal:
+      file: "assets/SF26_t2_compose_stack/Dockerfile"
+      file_must_contain: '(?im)^\s*USER\s+(?!root\b)\S+'
+
+  - id: s3_compose_healthcheck_present
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL — low soft-signal] At least one service in docker-compose.yml defines a healthcheck section (does not require db+condition).
+    skill_exclusive_reason: |
+      The skill explicitly identifies depends_on + healthcheck as a key pattern; this item serves as the relaxed version of r2, only requiring healthcheck to exist.
+    signal:
+      file: "assets/SF26_t2_compose_stack/docker-compose.yml"
+      file_must_contain: '(?im)^\s+healthcheck\s*:'
+
+  # ── Task / generic quality: recorded only, not counted toward skill-following ─────────
+  - id: tc1_compose_images_pinned
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Compose image references should not use :latest or version-less tags.
+    signal:
+      file: "assets/SF26_t2_compose_stack/docker-compose.yml"
+      file_must_not_contain: '(?im)^\s*image\s*:\s*[^\s:#]+(?::latest)?\s*(?:#.*)?$'
+
+  - id: tc2_no_hardcoded_compose_secrets
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Compose must not retain hardcoded secret/password/token values.
+    signal:
+      file: "assets/SF26_t2_compose_stack/docker-compose.yml"
+      file_must_not_contain: '(?i)(SECRET_KEY|PASSWORD|TOKEN|API_KEY)\s*[:=]\s*(?!\$\{)["'']?[A-Za-z0-9_./+=@-]{6,}'
+
+  - id: tc3_network_segmentation_present
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] The task explicitly requires network segmentation; record whether there are at least two named networks and services are connected to networks.
+    signal:
+      file: "assets/SF26_t2_compose_stack/docker-compose.yml"
+      file_must_contain: '(?ims)(?=.*^networks\s*:\s*\n\s{2}\S+\s*:\s*\n\s{2}\S+\s*:)(?=.*^\s{2}\S+\s*:\s*\n(?:(?!^\s{2}\S).)*?\s+networks\s*:)'
+
+  - id: tc4_named_volumes_mounted
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Stateful services should use top-level named volumes and actually mount them to db/cache services.
+    signal:
+      file: "assets/SF26_t2_compose_stack/docker-compose.yml"
+      file_must_contain: '(?ims)(?=.*^volumes\s*:\s*\n\s{2}\S+\s*:)(?=.*\b(db|database|postgres|redis|cache)\s*:\s*\n(?:(?!^\s{2}\S).)*?\s+volumes\s*:\s*\n\s+-\s*[A-Za-z0-9_.-]+:)'
+
+  - id: tc5_dockerignore_core_entries
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] .dockerignore must exclude at least core entries such as .env, .git, __pycache__.
+    signal:
+      file: "assets/SF26_t2_compose_stack/.dockerignore"
+      file_must_contain: '(?ms)(?=.*(?:^|\n)\.env(?:\n|$))(?=.*(?:^|\n)\.git(?:\n|$))(?=.*(?:^|\n)__pycache__(?:\n|$))'
+
+  - id: tc6_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Setting aside whether the skill was followed, whether the final docker-compose.yml and Dockerfile are usable and structurally complete.
+    signal:
+      judge_question: |
+        Based strictly on final file contents, not trace self-claims, answer YES iff all conditions hold:
+        1. assets/SF26_t2_compose_stack/docker-compose.yml defines services for an app/web service, db, and cache/redis with image or build directives.
+        2. assets/SF26_t2_compose_stack/Dockerfile contains FROM, WORKDIR, COPY, and CMD or ENTRYPOINT instructions.
+        3. There are no obvious YAML or Dockerfile syntax errors.
+        Acceptable: valid Compose and Dockerfile artifacts with app/web, db, and redis/cache services.
+        Unacceptable: only trace text describes changes, services are missing, or final YAML/Dockerfile is syntactically broken.
+      judge_expected: "YES"

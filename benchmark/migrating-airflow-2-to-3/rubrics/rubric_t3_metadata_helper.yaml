@@ -1,0 +1,135 @@
+# Rubric for skill_73_airflow_2_to_3_migration — airflow_2_to_3_t3_metadata_helper
+# Scoring boundary: skill is scored; task only records completion rate; gate only judges evaluability.
+
+rules:
+  - id: g1_target_helper_edit_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain a real write/edit attempt on the target plugin helper.
+    signal:
+      pattern: '(?is)\b(?:Write|Edit)\b[\s\S]*?file_path["''\s:]+["'']?(?:\./)?assets/airflow_2_to_3_t3_metadata_helper/input/plugins/dagrun_failure_guard\.py\b'
+
+  - id: r1_remove_worker_side_session_helpers
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — exclusive] worker/plugin-side helper path must not keep Airflow ORM session helpers such as provide_session / NEW_SESSION for metadata access.
+      Skill-exclusive rationale: Looking only at the task description, a strong model may keep the official Airflow 2 model source as-is or only do SQLAlchemy 2 syntax modernization; the skill explicitly says Airflow 3 task code using ORM metadata DB access will fail and lists `provide_session`, `create_session`, settings Session/engine as search patterns to remove/replace. The conflict point is that the session helper boundary must not be retained as the implementation mechanism.
+    signal:
+      judge_question: |
+        Based only on the final contents actually written to assets/airflow_2_to_3_t3_metadata_helper/input/plugins/dagrun_failure_guard.py, not agent explanations, answer YES if the worker/plugin-side recent-failure guard path does not rely on `provide_session`, `NEW_SESSION`, `create_session`, `airflow.settings.Session`, or `airflow.settings.engine` for metadata access. Ignore unrelated copied Airflow model internals only if the final file clearly separates them from the helper being used for the plugin spike.
+        Answer NO if the consecutive-failure guard itself is decorated with `@provide_session`, accepts a metadata DB session as its implementation boundary, or imports session helpers for that guard.
+      acceptable: "A helper class whose check method accepts an API client or base URL/token, with no provide_session on the guard method."
+      unacceptable: "`@provide_session def _check_last_n_dagruns_failed(..., session=NEW_SESSION)` or importing `from airflow.utils.session import NEW_SESSION, provide_session` for the guard."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_remove_direct_dagrun_db_query_for_recent_failures
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — exclusive] recent failed DagRun lookup must not be implemented as direct metadata DB ORM queries such as session.query/select/scalars against DagRun.
+      Skill-exclusive rationale: Without reading the skill, the model may replace `session.query(DagRun)` with `select(DagRun)` and consider it modernized; the skill states direct metadata DB access via ORM fails in Airflow 3 workers, so the conflict is ORM modernization vs replacing the access boundary entirely.
+    signal:
+      judge_question: |
+        Based only on the final contents actually written to assets/airflow_2_to_3_t3_metadata_helper/input/plugins/dagrun_failure_guard.py, not agent explanations, answer YES if the recent failed-run inspection path is not implemented with local ORM metadata DB calls such as `session.query(DagRun)`, `session.scalars(select(DagRun))`, `session.execute/select` against DagRun, raw SQL against `dag_run`, or wrapper helpers that still hit the local metadata DB for DagRun history. Ignore unrelated historical model internals if the submitted helper clearly isolates them away from the worker-side recent-failure guard.
+        Answer NO if the method/helper that checks consecutive failed DAG runs still performs direct ORM queries, raw SQL, or local metadata wrapper calls against DagRun history, even if rewritten from query() to select().
+      acceptable: "The recent failure guard calls an API client or REST helper to list DAG runs and inspects returned states."
+      unacceptable: "`dag_runs = session.scalars(select(DagRun).where(...).order_by(...)).all()` or `session.execute(text(\"select ... from dag_run ...\"))` inside the failure guard."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_route_metadata_access_through_api_boundary
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — exclusive] The helper must preserve necessary DAG-run inspection / pause-decision reporting through an Airflow API-server boundary, using the Airflow Python client, REST requests, or a clearly named API-boundary abstraction.
+      Skill-exclusive rationale: Looking only at the task description, a strong model may keep local ORM code because the input looks like official Airflow internals; the skill provides the replacement path: Airflow Python client or direct REST API calls against the API server. The conflict point is that metadata access must move out of direct DB and into an API/server-client boundary.
+    signal:
+      judge_question: |
+        Based only on the final contents actually written to assets/airflow_2_to_3_t3_metadata_helper/input/plugins/dagrun_failure_guard.py, not agent explanations, answer YES if the remaining implementation routes DAG run history lookup and pause/reporting behavior through one of these Airflow-3-compatible boundaries: airflow_client/client API usage, requests/http calls to Airflow API endpoints, or an injected helper/client abstraction whose body or call site actually invokes a configured API client, HTTP client, REST endpoint, token/base-URL backed client, or injected API client method.
+        Answer NO if the file only deletes the behavior, only modernizes SQLAlchemy ORM queries, still relies on session/query/select/update against Airflow metadata models, or defines a placeholder abstraction that returns fixed empty data, raises NotImplementedError, or is API-named only in comments/docstrings without a real client call/delegation.
+      acceptable: "A DagRunFailureGuard class using airflow_client.client ApiClient/DAGRun APIs, requests.get/patch against /api/v2 endpoints, or an injected AirflowApiClient whose methods are called by the failure-checking and pause-reporting paths."
+      unacceptable: "session.scalars(select(DagRun)...).all(); session.execute(update(DagModel)...); `class AirflowApiClient: def list_dag_runs(...): return []`; no real client/API call."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_review_execution_date_recent_run_logic
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — exclusive] recent-run ordering/filtering logic must review Airflow 2 execution_date semantics and either migrate to logical-date/API fields or leave an inline migration note at the exact remaining use site explaining why it is safe.
+      Skill-exclusive rationale: A generic DB refactor may preserve `DagRun.execution_date` comparisons because they look like normal ordering; the skill specifically calls out logical_date/context changes and asset-triggered runs where logical_date may be None. The conflict point is that old execution_date ordering cannot remain blindly in recent-run semantics.
+    signal:
+      judge_question: |
+        Based only on the final contents actually written to assets/airflow_2_to_3_t3_metadata_helper/input/plugins/dagrun_failure_guard.py, not agent self-claims, answer YES if the code that determines recent DAG runs no longer blindly sorts/filters on DagRun.execution_date or API response `execution_date`, and instead either uses API/logical-date/run-after/data-interval fields or includes an inline migration note immediately next to any remaining execution_date ordering/filtering explaining why it is safe for Airflow 3 and asset-triggered runs.
+        Answer NO if recent-run logic still contains unqualified `order_by(DagRun.execution_date...)`, `DagRun.execution_date <`, `execution_date` range filters, or API payload sorting/filtering by `execution_date` without a nearby migration justification.
+      acceptable: "Recent runs are fetched from API ordered by logical_date/run_after, or remaining execution_date comparison has an adjacent comment explaining Airflow 3 logical-date None handling and why this specific field is safe."
+      unacceptable: "`.order_by(DagRun.execution_date.desc())`, `DagRun.execution_date < dag_run.execution_date`, or `sorted(runs, key=lambda r: r['execution_date'])` remains in recent-run code with no inline migration note."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_remove_direct_pause_db_write
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — exclusive] pause decision reporting must not write DagModel/Log directly through ORM session operations.
+      Skill-exclusive rationale: Without reading the skill, the model may keep the Airflow model's `session.execute(update(DagModel))` and `session.add(Log(...))`; the skill says workers no longer connect directly to metadata DB and should use the API server/client, so the conflict is direct DB update/reporting vs a supported API boundary.
+    signal:
+      judge_question: |
+        Based only on the final contents actually written to assets/airflow_2_to_3_t3_metadata_helper/input/plugins/dagrun_failure_guard.py, not agent explanations, answer YES if the worker-side failure guard / pause-decision reporting path does not directly write DagModel, Log, or other Airflow metadata models through ORM session operations. Ignore unrelated copied Airflow internals or explanatory comments only if they are clearly not used by the helper path.
+        Answer NO if the guard or pause/reporting path still performs direct metadata DB writes such as `session.execute(update(DagModel))`, `session.add(Log(...))`, constructing `Log(...)` then adding it to a session, or any wrapper that still writes those records through a local metadata DB session.
+      acceptable: "Pause/reporting is delegated to an Airflow API client or REST PATCH/POST call, with no local session write in the guard path."
+      unacceptable: "`session.execute(update(DagModel).where(...))`, `log = Log(...); session.add(log)`, or a local helper wrapping those writes inside the pause-decision path."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Whether the helper is still a coherent recent-run failure guard / pause-decision reporting refactor.
+    signal:
+      judge_question: |
+        Based strictly on final file contents, not agent self-claims, answer YES iff:
+        1. assets/airflow_2_to_3_t3_metadata_helper/input/plugins/dagrun_failure_guard.py remains a coherent Python module or clearly scoped refactor patch.
+        2. It still represents the ability to inspect recent DAG run history and decide/report whether a DAG should be paused after consecutive failures.
+        3. The behavior was not simply deleted or replaced by a stub that always returns a fixed answer.
+        Acceptable: a smaller helper class/function that fetches recent run states and reports/applies a pause decision through some boundary.
+        Unacceptable: a file that deletes the failure guard, leaves only comments, or always returns False without inspecting history.
+      judge_expected: "YES"

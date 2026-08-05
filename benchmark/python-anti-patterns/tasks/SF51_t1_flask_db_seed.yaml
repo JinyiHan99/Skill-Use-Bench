@@ -1,0 +1,61 @@
+task_id: SF51_t1_flask_db_seed
+level: L3
+skill_id: skill_51_python_anti_patterns
+description: |
+  I’m adapting the small Flask tutorial database module in `assets/SF51_t1_flask_db_seed/input/db.py` for a staging demo. Please extend it so the app can automatically populate the database using the starter data in `assets/SF51_t1_flask_db_seed/input/sample_posts.csv` right after the schema defined in `assets/SF51_t1_flask_db_seed/input/schema.sql` is initialized.
+
+  Save the extended module as `db_seed.py` and write tests for it in `test_db_seed.py`. Ensure that you preserve the original request-scoped database connection lifecycle of the Flask helper. The seeding process must fail cleanly with detailed errors if it encounters an inaccessible or bad seed dataset.
+initial_state:
+  assets:
+    - path: assets/SF51_t1_flask_db_seed/input/db.py
+      source: "https://raw.githubusercontent.com/pallets/flask/main/examples/tutorial/flaskr/db.py"
+      real_state: "Real Flask tutorial database helper with unannotated public functions and app-scoped SQLite connection lifecycle."
+      preparation: |
+        Downloaded from the Flask repository raw file and kept function bodies unchanged.
+    - path: assets/SF51_t1_flask_db_seed/input/schema.sql
+      source: "https://raw.githubusercontent.com/pallets/flask/main/examples/tutorial/flaskr/schema.sql plus one audit table required by the staging scenario"
+      real_state: "SQLite schema matching the Flask tutorial user/post tables, with an added seed_audit table for the requested staging load record."
+      preparation: |
+        Downloaded the Flask tutorial schema and appended a single audit table using the same SQLite DDL style.
+    - path: assets/SF51_t1_flask_db_seed/input/sample_posts.csv
+      source: "Public documentation/release-note excerpts from SQLite, Flask, and Click project documentation, normalized into CSV rows for the staging demo."
+      real_state: "Three real documentation-derived post rows with username, title, and body columns."
+      preparation: |
+        Collected short public documentation excerpts and normalized them into CSV without changing column meanings.
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+expected_outputs:
+  - path: db_seed.py
+  - path: test_db_seed.py
+verifier_only:
+  skill_constraints_tested:
+    - id: retrofit_full_public_typing
+      description: "The solution must retrofit complete parameter and return annotations onto all inherited public functions copied from the Flask helper, including get_db, close_db, init_db, init_db_command, and init_app, as well as any new public APIs and test helper APIs; all collection annotations must be parameterized."
+      exclusive: "Without the skill, a strong model may type newly added seed-loading helpers while preserving the original Flask tutorial functions in their unannotated style, especially close_db/init_app signatures and test helper utilities."
+    - id: specific_contextual_error_handling
+      description: "Seed loading errors must catch specific parse/file/database errors, include the failing path or row identifier in the exception message, and chain any re-raised exception to the original cause."
+      exclusive: "A default solution often catches Exception, prints a generic message, or raises a new ValueError without preserving the original CSV or SQLite failure."
+    - id: scoped_resource_and_transaction_handling
+      description: "Seed loading must use context-managed file access and an explicit SQLite transaction boundary that rolls back seed inserts on failure without bypassing or replacing the existing Flask request-scoped connection lifecycle."
+      exclusive: "Without the skill, a model may still use `with open(...)` for the CSV, but often performs ad hoc row-by-row inserts without a clear rollback boundary or mixes manual database cleanup paths into the Flask-managed connection lifecycle."
+    - id: error_paths_tested
+      description: "Tests must include explicit failing-path assertions for a missing seed file and malformed CSV row."
+      exclusive: "A default solution usually verifies only the successful seed path and skips exception behavior."
+  asset_reality:
+    - "db.py is the Flask tutorial database helper from pallets/flask."
+    - "schema.sql is based on the Flask tutorial user/post schema and includes one staging audit table."
+    - "sample_posts.csv contains three documentation-derived rows with realistic comma/quote handling."
+  sr_verification:
+    artifact_checks:
+      - "db_seed.py exists and preserves get_db request-scoped connection caching."
+      - "All public functions have complete annotations, and no annotation uses bare list/dict/set/tuple."
+      - "No `except Exception`, bare `except:`, or silent pass handler appears in db_seed.py or test_db_seed.py."
+      - "Any raise inside an except block uses exception chaining and includes the seed path or row number."
+      - "test_db_seed.py contains pytest.raises checks for missing seed file and malformed CSV content."
+      - "Seed rows are validated for required username/title/body fields before insertion, and malformed-row failures identify the source row."
+      - "A seed failure does not leave partially inserted seed rows committed; the implementation uses rollback semantics for the seed operation."
+    process_log_checks:
+      - "No hardcoded database URL, password, API key, or absolute input path is introduced."
+notes: |
+  - Positive example: writing/refactoring Python production-style code from real Flask project material.
+  - Main trap is a quick CSV loader that works but violates typing, broad exception, resource, or error-test requirements.

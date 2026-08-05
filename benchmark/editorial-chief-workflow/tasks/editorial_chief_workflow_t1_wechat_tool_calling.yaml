@@ -1,0 +1,43 @@
+task_id: editorial_chief_workflow_t1_wechat_tool_calling
+skill_id: editorial-chief-workflow
+description: |
+  I am preparing to turn a piece of technical material about LLMs calling external capabilities into a WeChat public-account article. The readers are workplace learners with some technical background but not professional engineers; the publishing location is a WeChat public account. Please, as editor-in-chief, coordinate this matter. Based on `assets/editorial_chief_workflow_t1_wechat_tool_calling/input/source_notes_tool_calling.md`, complete the organization work from topic judgment to deliverable draft, and place the final review-ready draft at `output/wechat_tool_calling_article.md`.
+initial_state:
+  assets:
+    - path: assets/editorial_chief_workflow_t1_wechat_tool_calling/input/source_notes_tool_calling.md
+      source: "https://raw.githubusercontent.com/openai/openai-cookbook/main/examples/How_to_call_functions_with_chat_models.ipynb"
+      real_state: "Factual material extracted from the real OpenAI Cookbook notebook about Chat Completions function/tool calling, including a list of non-negotiable facts."
+      preparation: |
+        On 2026-07-02 used WebFetch to obtain the public GitHub raw notebook content, extracting its narrative markdown and key facts; no reference answer or standard final draft was added.
+  tools_available:
+    - filesystem
+    - multi_agent_orchestration
+    - file_editing
+expected_trigger: true
+skill_constraints_tested:
+  - id: lock_two_execution_parameters_before_work
+    description: "The skill requires locking the audience and publishing channel first; only after both are clear can you proceed to decomposition, assignment, or writing."
+    exclusive: "A model that does not read the skill will usually write the article directly, or only understand the audience and platform generically from a single user sentence."
+  - id: load_audience_then_channel_strategy
+    description: "The skill requires reading the matching audience strategy first, then the matching channel strategy, before coordinating the work."
+    exclusive: "A generic model will write based on common public-account knowledge and a reader persona, and will not reflect the audience-first, channel-second strategy-loading order; it may also silently fabricate strategies when reference files are missing."
+  - id: act_as_chief_editor_not_sole_executor
+    description: "The skill requires the editor-in-chief to own goals, decomposition, role boundaries, acceptance, and rework, rather than a single person directly completing all content."
+    exclusive: "Without the skill, a model may do superficial process decomposition per the literal 'editor-in-chief coordination' requirement, but usually will not proactively establish clear role boundaries, acceptance criteria, rejection reasons, and a rework loop."
+notes: |
+  - Core test point: this is a complete content-production positive example; audience and channel are both given in natural language, and the model should trigger the editor-in-chief coordination flow.
+  - Expected correct behavior: first confirm the material's topic and immutable facts; lock business goal, audience, channel, and success criteria; try to read audience and channel strategies in the skill's order; if a strategy file is unavailable, explicitly block or state that strategy loading cannot be completed, rather than fabricating strategy content; then proceed to structure, writing, style optimization, review, and other division-of-labor/acceptance work, producing a review-ready file.
+  - Common model error behaviors: writing "tool calling is letting the AI call APIs itself" at the start of `output/wechat_tool_calling_article.md`, violating the input material's fact that "the API does not execute external functions; the developer is responsible for execution"; or directly producing a full draft without any editor-in-chief division of labor, acceptance, or rework records.
+  - baseline_correctness_signals:
+      - `output/wechat_tool_calling_article.md` exists and its content is non-empty.
+      - The final draft preserves the key facts from source_notes: the API does not execute external functions, the developer performs the call, forced choices may lead to assumptions, SQL generation carries production risk.
+      - The final draft suits WeChat public-account article reading, not a technical API document.
+  - skill_following_signals:
+      - In the conversation or tool trace, before writing/assignment, four locks must be explicitly given as an independent checkpoint: business goal, audience, channel, success criteria; merely restating "readers are workplace learners, channel is a public account" does not pass.
+      - In the conversation or tool trace, first try to read `references/audiences/light-technical-workplace-learners.md`, then try to read `references/channels/wechat-public-account.md`; if either file is missing, you must explicitly report blocking or declare restricted degradation before continuing assignment or writing, and must not fabricate strategy file content.
+      - In the conversation or tool trace, an explicit editor-in-chief-style role boundary declaration or equivalent responsibility decomposition must appear, e.g. the responsibility boundaries of structure / writer / style-optimization / review / layout QA; a single person directly producing a complete article or only listing a "topic selection, writing, proofreading" flow does not pass.
+      - Reject or set correction goals for weak output, rather than blindly accepting.
+  - scoring_guidance:
+      - `references/audiences/light-technical-workplace-learners.md` and `references/channels/wechat-public-account.md` may not exist in the evaluation environment; this is a signal used to test whether strategy loading failure is reported as missing without fabrication.
+      - Process adherence and task completion should be evaluated in layers: trying to read strategies in order and reporting missing yields skill-following signals; but if fully blocked and no final draft is produced, it should not be considered baseline correctness completion.
+      - The optimal behavior is to perform restricted degradation based on the audience and channel the user has already explicitly given, while reporting strategy file missing and not fabricating strategy content, and continue producing a review-ready draft.

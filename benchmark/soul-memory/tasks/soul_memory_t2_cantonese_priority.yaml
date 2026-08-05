@@ -1,0 +1,60 @@
+task_id: soul_memory_t2_cantonese_priority
+skill_id: skill_98_soul-memory
+description: |
+  While using this memory component to organize mixed Chinese-English-Cantonese conversation snippets, I found that its judgment of "which content is worth remembering long-term, which is just casual chatter, and which carries obvious Cantonese tone" is not stable enough. Based on the modules related to priority, dynamic classification, and Cantonese grammar in `assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/`, please stabilize the judgment logic, and compile the actual outputs of several representative samples into `output/` for my review.
+initial_state:
+  assets:
+    - path: assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Core files extracted from the real Soul Memory repository, test entry points, Cantonese grammar, priority parsing, and dynamic classification modules; reference implementations are not included. This snapshot is a subset of the task; some upstream full modules are not included."
+      preparation: |
+        On 2026-07-03, the public repository was cloned with git clone --depth 1, then core.py, test_all_modules.py, modules/cantonese_syntax.py, modules/priority_parser.py, and modules/dynamic_classifier.py were copied to the task input directory without modifying file contents.
+    - path: assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/core.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Sliced file of the real repository's core.py; some dependencies are not fully copied with this task."
+    - path: assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/test_all_modules.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Test entry point slice from the real repository; includes upstream full-module test items, some of whose dependent modules are not fully copied with this task."
+    - path: assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/priority_parser.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Priority parsing module from the real repository."
+    - path: assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/dynamic_classifier.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Dynamic classification module from the real repository."
+    - path: assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/cantonese_syntax.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Cantonese grammar module from the real repository."
+  tools_available:
+    - filesystem
+    - shell
+    - python
+expected_trigger: true
+skill_constraints_tested:
+  - id: priority_tag_semantics
+    description: "The skill treats [C]/[I]/[N] as a memory priority system: [C] critical definitions must be remembered, [I] important material/configuration should be noted, [N] daily chatter may decay."
+    exclusive: "Without reading the skill, even if the model follows the existing [C]/[I]/[N] code structure, it is prone to mistakenly treating emotional intensity, admiration, or imperative tone as memory priority during semantic enhancement; the skill requires judging primarily by long-term retention value, e.g., definitions, configuration, and reference-type information should rank higher than exaggerated praise or greetings."
+  - id: cantonese_particle_context
+    description: "The skill explicitly includes a Cantonese branch: particle grading, context mapping, Cantonese detection, and supports simplified/traditional/CJK scenarios."
+    exclusive: "Without reading the skill, even if the model follows the existing Cantonese detection structure, it is prone to conflating Cantonese detection, emotional intensity, and memory priority; the skill requires treating Cantonese tone signals as an independent analysis dimension, outputting intensity and context judgment, while avoiding generalizing all plain Chinese, occasional Cantonese particles, or high-emotion expressions as strong Cantonese tone."
+notes: |
+  - Core test point: whether the model improves judgment according to Soul Memory's memory priority and Cantonese grammar branches, rather than introducing general NLP services or only doing surface keyword matching.
+  - Expected correct behavior: give higher memory priority to "definition/data/configuration/search-reference" type content; maintain normal or skip tendency for "greetings/casual instructions/chatter"; Cantonese detection should recognize relevant tone signals and output tone intensity and context suggestions, but Cantonese tone itself should not automatically elevate memory priority.
+  - Common model error behaviors (specific counterexamples):
+      - Adjusting priority only by emotional intensity or exclamatory degree, causing high-emotion chatter to be elevated to high memory priority.
+      - Expanding the Cantonese word list but not keeping "Cantonese tone analysis" and "memory priority judgment" mutually independent, causing obviously Cantonese chatter to be misjudged as high-value memory.
+      - Classifying all occasional Cantonese particles or plain Chinese high-emotion sentences as strong Cantonese tone, without reflecting intensity grading and context differences.
+      - Adding online translation, external emotion APIs, or non-standard library dependencies to the input snapshot, breaking the local processing boundary.
+  - baseline_correctness_signals:
+      - `output/` contains no fewer than 6 representative samples, each providing both the original text and the actual classification/analysis result.
+      - Samples cover at least: high-emotion chatter, definition/configuration information, search/reference information, plain Chinese, obvious Cantonese tone, and expressions with occasional Cantonese particles but not strong tone.
+      - After modification, the modules directly related to this task `modules/priority_parser.py`, `modules/cantonese_syntax.py`, `modules/dynamic_classifier.py` can be independently imported by Python and can run basic samples.
+      - Running the full upstream `test_all_modules.py` test items that depend on modules not copied with the task is not required.
+      - The full test results of the original `test_all_modules.py` are not the sole pass criterion; additional task samples must cover `priority_parser.py`, `dynamic_classifier.py`, and `cantonese_syntax.py`.
+      - The implementation must not add third-party dependencies, online calls, or cloud services; the existing local processing approach must be preserved.
+      - Changes are confined to the input snapshot, with no reference answers generated to the model-visible input directory.
+  - skill_following_signals:
+      - Results reflect the memory priority semantics of [C]/[I]/[N] rather than generic emotion tags.
+      - At least one "high-emotion but low-memory-priority" sample, proving that emotional intensity is not directly mapped to high priority.
+      - At least one "bland tone but should-be-high-memory-priority" sample, proving that priority is based on long-term retention value rather than emotion.
+      - At least one sample that simultaneously reflects "Cantonese signal detected + intensity judgment + context judgment", and whose memory priority is not automatically elevated due to Cantonese tone itself.
+      - At least one plain Chinese or only-occasional-Cantonese-particle sample, proving that not all Chinese high-emotion expressions are generalized as strong Cantonese tone.

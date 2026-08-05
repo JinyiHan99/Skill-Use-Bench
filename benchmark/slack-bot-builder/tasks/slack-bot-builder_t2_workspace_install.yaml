@@ -1,0 +1,77 @@
+task_id: slack-bot-builder_t2_workspace_install
+skill_id: slack-bot-builder
+description: |
+  We are preparing to open an internal Slack tool for installation across multiple customer workspaces. Based on the Node examples in `./assets/slack-bot-builder_t2_workspace_install/input/`, produce a release-ready installable app version suitable for stable use across multiple customer workspaces. After installation, the installer needs to be informed that the app is ready, and it should support a `/hello` slash command for greeting. Place the deliverable in `output/workspace_install/`.
+initial_state:
+  assets:
+    - path: ./assets/slack-bot-builder_t2_workspace_install/input/examples/oauth/app.js
+      source: "https://github.com/slackapi/bolt-js/blob/e3936b40488786f748d4d1f8ad2d34464fba1e64/examples/oauth/app.js"
+      real_state: "Bolt for JavaScript OAuth example, including in-memory installation store and basic installation config."
+      preparation: |
+        Copied directly from the slackapi/bolt-js repo main branch e3936b40488786f748d4d1f8ad2d34464fba1e64, content unchanged.
+    - path: ./assets/slack-bot-builder_t2_workspace_install/input/examples/oauth/package.json
+      source: "https://github.com/slackapi/bolt-js/blob/e3936b40488786f748d4d1f8ad2d34464fba1e64/examples/oauth/package.json"
+      real_state: "npm package config for the OAuth example."
+      preparation: |
+        Copied directly from the slackapi/bolt-js repo main branch e3936b40488786f748d4d1f8ad2d34464fba1e64, content unchanged.
+    - path: ./assets/slack-bot-builder_t2_workspace_install/input/examples/oauth/README.md
+      source: "https://github.com/slackapi/bolt-js/blob/e3936b40488786f748d4d1f8ad2d34464fba1e64/examples/oauth/README.md"
+      real_state: "OAuth example readme documentation."
+      preparation: |
+        Copied directly from the slackapi/bolt-js repo main branch e3936b40488786f748d4d1f8ad2d34464fba1e64, content unchanged.
+    - path: ./assets/slack-bot-builder_t2_workspace_install/input/examples/oauth-express-receiver/app.js
+      source: "https://github.com/slackapi/bolt-js/blob/e3936b40488786f748d4d1f8ad2d34464fba1e64/examples/oauth-express-receiver/app.js"
+      real_state: "Bolt JS OAuth example using the Express receiver."
+      preparation: |
+        Copied directly from the slackapi/bolt-js repo main branch e3936b40488786f748d4d1f8ad2d34464fba1e64, content unchanged.
+    - path: ./assets/slack-bot-builder_t2_workspace_install/input/examples/oauth-express-receiver/package.json
+      source: "https://github.com/slackapi/bolt-js/blob/e3936b40488786f748d4d1f8ad2d34464fba1e64/examples/oauth-express-receiver/package.json"
+      real_state: "npm package config for the Express receiver OAuth example."
+      preparation: |
+        Copied directly from the slackapi/bolt-js repo main branch e3936b40488786f748d4d1f8ad2d34464fba1e64, content unchanged.
+    - path: ./assets/slack-bot-builder_t2_workspace_install/input/docs/english/concepts/authenticating-oauth.md
+      source: "https://github.com/slackapi/bolt-js/blob/e3936b40488786f748d4d1f8ad2d34464fba1e64/docs/english/concepts/authenticating-oauth.md"
+      real_state: "Bolt JS OAuth concept documentation."
+      preparation: |
+        Copied directly from the slackapi/bolt-js repo main branch e3936b40488786f748d4d1f8ad2d34464fba1e64, content unchanged.
+  tools_available:
+    - filesystem
+    - node
+expected_trigger: true
+skill_constraints_tested:
+  - id: persistent_workspace_installation_store_with_token_protection
+    description: "Multi-workspace Slack apps must persist installation data per team/enterprise, and sensitive token fields must be protected at rest in the persistence layer rather than stored as plain process memory or plaintext records."
+    exclusive: "Without the skill, a model may replace the demo object store with a plain JSON/file/SQLite store that survives restarts but still saves Slack bot/user tokens in plaintext."
+  - id: oauth_install_success_uses_installation_token
+    description: "OAuth install-success handling should keep state protection intact and use the installation-specific bot token from the OAuth installation result when sending the welcome message."
+    exclusive: "Without the skill, a model may preserve generic OAuth routes but send the welcome message with a global token, hardcoded token, or omit the install-specific token flow."
+  - id: minimum_scopes_for_current_features
+    description: "Slack OAuth scopes should be exactly the minimum needed for the requested features: welcome message plus /hello slash command."
+    exclusive: "Without the skill, a model may add users:read, users:read.email, channels:history, or admin scopes as generic production-hardening scopes instead of limiting the app to chat:write and commands."
+notes: |
+  - Core test point: advance the real Bolt JS OAuth example from an in-memory demo to a multi-workspace installation scenario, while complying with Slack OAuth's installation storage, state protection, and least-privilege requirements.
+  - Expected correct behavior:
+    - `output/workspace_install/` contains runnable Node project code and a package.json.
+    - The app retains the Slack OAuth install entry and callback handling, and supports store/fetch/delete of multi-workspace installation records.
+    - The install-success path can send a brief welcome message to the installer.
+    - The app implements the `/hello` slash command.
+    - OAuth scopes include only `chat:write` and `commands` needed for the current features.
+  - Common model error behaviors (specific counter-examples):
+    - Retaining `const databaseData = {};` and continuing to write installations only to an in-process object.
+    - Switching to JSON/file/SQLite persistence but saving sensitive fields such as `botToken` and `userToken` in plaintext.
+    - Using the global `SLACK_BOT_TOKEN` or a hardcoded token to send the welcome message in the install-success callback, instead of using the bot token from this installation result.
+    - Requesting unrelated permissions such as `users:read`, `users:read.email`, `channels:history`, or `admin` for `/hello` or the welcome message.
+    - Adding `/hello` handling logic but omitting the `commands` scope, or retaining extra scopes.
+  - baseline_correctness_signals:
+      - `output/workspace_install/` contains runnable Node project files.
+      - The project includes `app.js` and a `package.json` with the `@slack/bolt` dependency.
+      - The app retains the OAuth install/callback path.
+      - There is visible feedback logic after successful installation.
+      - There is `/hello` slash command handling logic.
+  - skill_following_signals:
+      - `installationStore.storeInstallation/fetchInstallation/deleteInstallation` does not use an in-process object as the final store.
+      - The persistence layer has code-level protection for Slack token fields: there is explicit encrypt/decrypt, a crypto wrapper, a KMS wrapper, or an equivalent interface; README-only statements do not count.
+      - OAuth state protection was not removed during the refactor; `stateSecret` or an equivalent state store still comes from environment/deployment secrets.
+      - The install-success welcome message uses the bot token from the installation result, not a global or hardcoded token.
+      - `new App({ ... })` does not configure a global static `token` to bypass the installationStore's dynamic lookup.
+      - Scopes exactly cover the welcome message and `/hello`: include `chat:write`, `commands`, and do not include `admin`, `users:read.email`, `channels:history`, or other unrelated permissions.

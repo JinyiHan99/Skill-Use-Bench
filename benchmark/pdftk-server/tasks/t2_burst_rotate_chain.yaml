@@ -1,0 +1,84 @@
+task_id: SF03_t2_burst_rotate_chain
+level: L2
+skill_id: skill_03_pdf
+description: |
+  I have a NIST Cybersecurity Framework document nist_csf2.pdf (32 pages).
+  During scanning and archiving I found that pages 5, 12, 18, and 25 were scanned upside down (upside down, need 180-degree rotation).
+
+  Please help me:
+  1. First split this PDF page by page for archiving inspection
+  2. Fix these 4 inverted pages (rotate 180 degrees)
+  3. Finally produce a merged complete PDF (please use one efficient merge/rotate command to produce the final file, do not leave intermediate single-page files in the delivery directory)
+
+  Place the final output in the current directory; the intermediate split-page files can be cleaned up.
+
+initial_state:
+  files:
+    - path: README.txt
+      content: |
+        Input: nist_csf2.pdf (NIST Cybersecurity Framework 2.0, 32 pages)
+        Source: https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf
+        Problem: Pages 5, 12, 18, 25 are scanned upside-down (need 180° rotation)
+        Task: Split → fix rotations → reassemble
+  tools_available: [bash, read, edit, grep]
+  binary_assets:
+    - path: nist_csf2.pdf
+      source_url: "https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf"
+      pages: 32
+      size_mb: 1.4
+      description: "NIST Cybersecurity Framework (CSF) 2.0 — real 32-page document with pages 5/12/18/25 pre-rotated 180°"
+      preparation: |
+        # Pre-processing pipeline rotates pages 5/12/18/25 by 180° to simulate upside-down scanning.
+        # Asset is exposed to the task as nist_csf2.pdf.
+      _evaluator_actual_file: "nist_csf2_damaged.pdf"
+      note: "Pages 5, 12, 18, 25 have /Rotate=180 set — they are genuinely upside-down"
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: tool_restriction
+    description: "Must use the tool mandated by the active skill for all PDF operations"
+    exclusive: "Default reaches for pypdf/PyPDF2/pikepdf with page.rotate(180); secondary fallbacks are qpdf --rotate, pdfseparate+pdfunite, mutool, ghostscript. Trace must contain 'pdftk' and must NOT contain pypdf|PyPDF2|pikepdf|pdfrw|fitz|PyMuPDF|qpdf|pdfunite|pdfseparate|cpdf|ghostscript|mutool|^gs "
+  - id: multi_step_plan
+    description: "Must explicitly state the planned sequence (covering all required workflow elements of the skill) before executing any command"
+    exclusive: "Model tends to jump directly into execution"
+  - id: intermediate_workspace
+    description: "Must use the intermediate workspace directory specified by the skill for all temporary files"
+    exclusive: "Model creates temp files in current directory or uses mktemp -d"
+  - id: step_verification
+    description: "Must verify each step's output before proceeding (e.g., that the intermediate split produced the expected number of single-page files, and that the final merged file has the correct page count)"
+    exclusive: "Model writes burst && cat without intermediate checks"
+  - id: single_cat_rotation
+    description: "Must rotate all target pages in a single combined command, not separate per-page commands"
+    exclusive: "Model runs one pdftk command per page rotation"
+  - id: rotation_suffix
+    description: "Must use the correct rotation directive of the mandated tool for a 180° rotation"
+    exclusive: "Model confuses rotation directions (e.g., uses 90° CW instead of 180°)"
+  - id: burst_format
+    description: "When specifying the split output pattern, must use the format syntax expected by the mandated CLI tool (not Python-style format specifiers)"
+    exclusive: "Model uses Python format syntax like {:03d}"
+  - id: cleanup
+    description: "Must clean up the intermediate workspace after the final output is verified"
+    exclusive: "Model forgets cleanup"
+  - id: output_naming
+    description: "Output file must follow the naming convention <input_stem>_rotated.pdf"
+    exclusive: "Model names it fixed.pdf or output.pdf"
+  - id: no_python_fallback
+    description: "Trace must not contain any fallback or hedged invocation of non-mandated PDF tools; once the mandated tool is chosen it must be used end-to-end"
+    exclusive: "Model often hedges by using pdftk for burst but switches to pypdf for rotation"
+  - id: final_page_count_verification
+    description: "Must explicitly verify the final output's page count equals 32 using the mandated tool's metadata inspection capability"
+    exclusive: "Model assumes success when output file exists, skips page count check"
+  - id: input_validation
+    description: "Before any operation on the input PDF, must inspect its metadata (e.g., page count) using the mandated tool"
+    exclusive: "The first pdftk call on nist_csf2.pdf in the trace must be dump_data, not a direct burst"
+  - id: efficient_cat_source
+    description: "The final merge/rotation command must take the original PDF as input, not the 32 burst single-page files"
+    exclusive: "Model literal-reads user's split→fix→merge and rebuilds from 32 pages"
+
+notes: |
+  Evaluation key points (for evaluator internal use only, should not be exposed to the tested model):
+  1. Test whether the model follows the tool and workflow spec of the designated skill in PDF split/rotate/merge tasks
+  2. Check whether intermediate-product directory discipline, step verification, and cleanup behavior are in place
+  3. Check whether the model gives an explicit multi-step plan before execution
+  4. Check whether the model avoids falling back to non-designated tools (including mixed usage)

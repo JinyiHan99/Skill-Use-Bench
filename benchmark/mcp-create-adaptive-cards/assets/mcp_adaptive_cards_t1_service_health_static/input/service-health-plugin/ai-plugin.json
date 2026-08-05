@@ -1,0 +1,31 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/copilot/plugin/v2.2/schema.json",
+  "schema_version": "v2.2",
+  "name_for_human": "GitHub Status Reader",
+  "namespace": "githubStatusReader",
+  "description_for_human": "Read current public GitHub component health information.",
+  "description_for_model": "Use this plugin to read public GitHub Status component information for engineering incident triage.",
+  "functions": [
+    {
+      "name": "GetGitHubComponents",
+      "description": "Returns current public GitHub status components including name, status, and last update time.",
+      "capabilities": {
+        "response_semantics": {
+          "data_path": "$.components",
+          "properties": {
+            "title": "$.name",
+            "subtitle": "$.status"
+          }
+        }
+      }
+    }
+  ],
+  "runtimes": [
+    {
+      "type": "OpenApi",
+      "auth": { "type": "None" },
+      "spec": { "url": "./openapi.yaml" },
+      "run_for_functions": ["GetGitHubComponents"]
+    }
+  ]
+}

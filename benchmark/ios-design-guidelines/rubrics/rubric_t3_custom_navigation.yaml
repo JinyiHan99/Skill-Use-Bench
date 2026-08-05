@@ -1,0 +1,136 @@
+# Rubric for ios_design_guidelines_t3_custom_navigation
+rules:
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: "(?is)^(Read):.*(?:NavigationView\\.swift|README\\.md)\\b"
+    spec: "[GATE] The trace reads the navigation component source code or README to be evaluated."
+
+  - id: r1_not_suitable_for_direct_launch_due_to_hig_risk
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] For third-party components that replace system navigation, whether they are suitable for direct production use should be judged primarily from the perspective of iPhone HIG/system navigation consistency risk.
+      Skill-exclusive rationale: Without reading the skill, the model may review as an ordinary open-source library, focusing on API usability, code quality, performance, or README-claimed stability; the skill requires prioritizing the standard iPhone navigation experience. The conflict point is that "library is usable/powerful" does not equal "suitable for direct production use."
+    signal:
+      query: >
+        Based on the final assessment content delivered to the product team and the evidence actually read from NavigationView.swift/README.md, not the agent's self-description, does the report explicitly place HIG/system navigation experience conflicts above code quality, library features, or integration cost, as the main basis for not recommending direct production launch or direct adoption into a production iPhone product? Answer only YES or NO.
+      acceptable: "The conclusion states 'not recommended for direct launch / cannot be directly adopted,' and ties the main reasons to conflicts between the custom NavigationView, full-screen container, gestures, safe area, or animations and iPhone expectations."
+      unacceptable: "The conclusion mainly praises the library as powerful and recommends direct adoption; only lists generic code-quality or integration risks; does not treat HIG/system navigation consistency as the main launch-decision criterion."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: low
+
+  - id: r2_flags_custom_drag_as_system_back_gesture_risk
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Custom DragGesture must not break iPhone system left-edge back/edge-gesture expectations.
+      Skill-exclusive rationale: Without reading the skill, the model may treat drag-back only as a featured capability or generically say 'gestures need testing'; the skill explicitly forbids overriding system gestures. The conflict point is that a custom back gesture is not a plus but a high-priority HIG risk.
+    signal:
+      query: >
+        Based on the final assessment content and source-code evidence such as .gesture(createDragGesture()), DragGesture, backGesturePosition/anywhere, not the agent's self-description, does the report explicitly flag the custom drag-back/anywhere/edge gesture as a high-priority risk that may break system back or edge-gesture expectations, and recommend avoiding it, limiting its scope, or reverting to the system gesture? Answer only YES or NO.
+      acceptable: "Points out that the DragGesture/anywhere gesture conflicts with the system back swipe or edge gesture, and recommends avoiding interception, limiting scope, or switching to the system NavigationStack gesture."
+      unacceptable: "Only says supporting gestures is convenient; only suggests testing gesture sensitivity; only mentions providing an explicit back button but does not identify the system back/edge-gesture conflict."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_requires_visible_alternative_for_custom_gestures
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Custom gestures must have a visible button, menu, or standard navigation control as an alternative, supporting users who cannot perform complex gestures.
+      Skill-exclusive rationale: Without reading the skill, the model may suggest optimizing drag thresholds or animation feel; the skill requires all complex/custom gestures to have a tap/menu alternative path. The conflict point is that 'gesture is usable' is insufficient for accessibility and discoverability.
+    signal:
+      query: >
+        Based on the final assessment/remediation recommendations, not the agent's self-description, does the report explicitly require providing a visible alternative path for custom back/navigation gestures (e.g., a standard back button, explicit back button, or menu item)? Answer only YES or NO.
+      acceptable: "Remediation includes 'keep the system back button / explicit Back button, do not put back only in the drag gesture.'"
+      unacceptable: "Only suggests adjusting the DragGesture threshold or animation; no visible alternative interaction at all."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_safe_area_risk_distinguishes_background_from_content
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Ignoring safe areas applies only to decorative backgrounds; body text, key content, and interactions must not enter the unsafe area.
+      Skill-exclusive rationale: Without reading the skill, the model may generically mention safe area compatibility or accept the component compensating with padding; the skill explicitly draws the line: .ignoresSafeArea() may be used only for backgrounds. The conflict point is that custom containers must not let body and interactions depend on configurable ignoredSafeAreas to enter dangerous regions.
+    signal:
+      query: >
+        Based on the final assessment content and source-code evidence such as ZStack .ignoresSafeArea(), getPadding/getSafeAreaValue, ignoredSafeAreas, not the agent's self-description, does the report explicitly distinguish 'decorative backgrounds may ignore safe area' from 'body/key content/interactions must not ignore safe area,' and point out that the current full-screen ignoresSafeArea or padding scheme risks letting content enter the unsafe area? Answer only YES or NO.
+      acceptable: "Points out that the full-screen container .ignoresSafeArea() and per-view ignoredSafeAreas need remediation: backgrounds may extend, but body, buttons, back controls and other content must avoid the status bar, Dynamic Island, or Home indicator."
+      unacceptable: "Only says to check safe area; or only suggests adding padding, without explaining the distinction between background and key content."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_reduce_motion_for_custom_transitions
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Custom navigation transitions, cube rotation, scale, spring and other animations should respect Reduce Motion and prioritize converging to standard navigation transitions familiar to users.
+      Skill-exclusive rationale: Without reading the skill, the model may treat custom animations as product differentiation or only suggest exposing configuration options; the skill requires disabling/replacing decorative motion based on accessibilityReduceMotion. The conflict point is that flashy transitions must not take priority over system accessibility preferences.
+    signal:
+      query: >
+        Based on the final assessment content and source-code evidence such as transitionAnimation, cubeRotation, scale, interpolatingSpring/easeOut, not the agent's self-description, does the report explicitly flag the lack of Reduce Motion handling for custom navigation animations as a risk and recommend disabling or replacing per the system preference? Answer only YES or NO.
+      acceptable: "Recommends adopting @Environment(\\.accessibilityReduceMotion) or UIAccessibility.isReduceMotionEnabled, and disabling cube/scale/spring animations when Reduce Motion is on, using standard/no-animation navigation."
+      unacceptable: "Only says animations are rich and configurable; only suggests shortening duration, without mentioning Reduce Motion."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_prefers_standard_navigationstack_as_minimal_remediation
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] For iPhone hierarchical content, system NavigationStack/standard back behavior should be prioritized; if a custom library is still adopted, deviation from standard navigation should be minimized.
+      Skill-exclusive rationale: Without reading the skill, the model may give a remediation list centered on the third-party library's existing API; the skill requires prioritizing system navigation patterns. The conflict point is that remediation should not just patch a custom system but also consider reverting to standard iPhone navigation vocabulary.
+    signal:
+      query: >
+        Based on the final minimal remediation recommendations, not the agent's self-description, does the report recommend prioritizing use of or alignment with system NavigationStack/standard iOS navigation behavior, rather than continuing to fully rely on the custom full-screen NavigationView semantics? Answer only YES or NO.
+      acceptable: "Recommends replacing direct adoption with NavigationStack, or at least converging gestures, back button, title, and transition behavior to NavigationStack expectations."
+      unacceptable: "Remediation only includes optimizing library configuration, adding tests, and fixing bugs, without mentioning standard NavigationStack or system navigation behavior."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether an adoption risk assessment and a small number of minimal remediation recommendations for the product team were produced."
+    signal:
+      query: >
+        Based on the final answer content, not the agent's self-description, is the task completed: is the report addressed to the product team, containing a conclusion on whether it is suitable for direct production launch, the main user-experience risks, and a few prioritized remediation recommendations if adoption continues? Answer only YES or NO.
+      acceptable: "Has a clear conclusion, a risk list, and 2-4 prioritized remediation recommendations."
+      unacceptable: "Only does line-by-line source-code explanation; has no launch conclusion; has no remediation recommendations; or directly rewrites code without giving a product assessment."

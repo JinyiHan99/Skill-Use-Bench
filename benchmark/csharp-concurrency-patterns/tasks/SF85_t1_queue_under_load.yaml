@@ -1,0 +1,42 @@
+task_id: SF85_t1_queue_under_load
+skill_id: csharp-concurrency-patterns
+level: L2
+description: |
+  After converting a small sample into a background importer, the production side often pushes memory high during burst imports on the live system, and it occasionally hangs when shutting down. The material is in `assets/SF85_t1_queue_under_load/input/`. Please refactor this implementation into a version suitable for a long-running background queue, and preserve the behavior of exiting as quickly as possible on cancellation.
+initial_state:
+  assets:
+    - path: assets/SF85_t1_queue_under_load/input/ConsumingEnumerableDemo.cs
+      source: "Microsoft Learn: BlockingCollection<T>.GetConsumingEnumerable Method example, https://learn.microsoft.com/en-us/dotnet/api/system.collections.concurrent.blockingcollection-1.getconsumingenumerable?view=net-10.0"
+      real_state: "A real Microsoft Learn C# sample using BlockingCollection<T>, Task.Run, CompleteAdding, and GetConsumingEnumerable. The sample is finite and educational rather than a long-running service queue."
+      preparation: |
+        Extracted the published C# example code block from Microsoft Learn and saved it unchanged as a standalone source file under this task's input directory.
+  tools_available: [read_file, write_file, edit_file, bash]
+expected_trigger: true
+skill_constraints_tested:
+  - id: producer_consumer_channel_backpressure
+    description: "For producer/consumer work queues, the skill requires System.Threading.Channels, preferably bounded with waiting behavior to provide backpressure and decouple producers from consumers."
+    exclusive: "Without the skill, many models may choose an incremental repair that stays within the current BlockingCollection-based design, such as adding bounded capacity, cancellation checks, extra Task.Run wrapping, or ConcurrentQueue/SemaphoreSlim. Strong models may still choose Channel<T> from general .NET knowledge, so the skill-exclusive signal is not Channel<T> alone, but the bounded Channel<T> + wait-mode backpressure + cancellable async read/write pattern."
+  - id: avoid_manual_blocking_queue_patterns
+    description: "The skill says locks and manual synchronization are last resorts and that blocking in async code should be avoided."
+    exclusive: "Without the skill, a common repair is to preserve GetConsumingEnumerable() and only patch shutdown/cancellation around it, or move the blocking loop into another Task.Run. The skill-following signal is that the BlockingCollection/GetConsumingEnumerable pattern is replaced by asynchronous channel-based consumption with cancellation-aware read/write operations."
+notes: |
+  - Core test point: this is a producer/consumer queue problem, and the symptoms are lack of backpressure under burst traffic and unclean shutdown; it should be elevated to a message-passing queue, rather than adding more synchronization code to the existing blocking collection.
+  - Expected correct behavior: the implementation should reflect a bounded queue, the write side waiting for available capacity, the read side consuming asynchronously, and cancellation token propagation; code changes or a clear patch description may be submitted.
+  - Common model mistakes (code-level counter-examples):
+      - Common but non-skill fix: keep the `BlockingCollection<T>` system and only add bounded capacity, cancellation checks, or shutdown exception handling; this may alleviate some symptoms but does not elevate the background work queue to an async message-passing abstraction.
+      - Wrapping `GetConsumingEnumerable()` in another `Task.Run` only moves the blocking to a thread-pool thread, without eliminating synchronous blocking consumption.
+      - Using `Queue<T> + lock`, `ConcurrentQueue<T> + SemaphoreSlim`, or hand-written threads to rebuild the queue violates the skill's stance that "locks and manual synchronization are last resorts."
+      - Using `Channel<T>` but creating an unbounded Channel, not reflecting wait-when-full, or not passing the cancellation token on the read/write path only counts as partial skill following.
+  - baseline_correctness_signals:
+      - Complete and correct: the output contains a runnable or directly applicable C# queue implementation with clear producer/consumer responsibilities, and both normal shutdown and cancellation paths can end the processing loop.
+      - There should be at least an explicit capacity limit to avoid the producer side piling up memory indefinitely during burst imports.
+      - Write waits, read waits, or the consumption loop should actually receive and use `CancellationToken`, not just declare it in the method signature.
+      - Partial completion but visible skill signal: even if the patch is not fully wrapped up, as long as the core queue has been switched to a bounded channel and a cancellable async API is used on at least one of the write or read sides, it can be judged as showing a clear skill-following sign.
+      - Non-skill patches: only adding capacity, exception handling, cancellation checks, or extra `Task.Run` on top of `BlockingCollection` or a manual synchronization scheme, even if it improves some symptoms, is not counted toward skill-following.
+  - skill_following_signals:
+      - Uses `System.Threading.Channels.Channel<T>` as the core queue abstraction, rather than keeping `BlockingCollection<T>` as the main queue.
+      - Uses `Channel.CreateBounded<T>(...)` or an equivalent form to set a bounded capacity, and adopts wait-write backpressure behavior when full; must not use an unbounded Channel or a full mode that discards writes as the core scheme.
+      - The producer side reflects backpressure via a cancellable async write path such as `WriteAsync(..., ct)`, or `WaitToWriteAsync(ct)` + `TryWrite(...)`.
+      - The consumer side consumes via `ReadAllAsync(ct)`, `WaitToReadAsync(ct)` + `TryRead(...)`, or an equivalent async read pattern, rather than `GetConsumingEnumerable()`.
+      - The shutdown path explicitly completes the writer, e.g., `Complete()` or `TryComplete()`, so the consumer can end naturally.
+      - Does not use `lock`, hand-written threads, `SemaphoreSlim + Queue<T>`, `.Result` / `.Wait()` / `.GetAwaiter().GetResult()`, or extra wrapping `Task.Run` as the core queue scheme.

@@ -1,0 +1,69 @@
+task_id: docs_writer_t1_quota_refresh
+skill_id: docs-writer
+description: |
+  We are preparing a short update for the Gemini CLI docs after the billing flow
+  changed. The existing page in `assets/docs_writer_t1_quota_refresh/input/docs/resources/quota-and-pricing.md`
+  still talks about running out of requests in a way that doesn't match the code
+  anymore.
+
+  Please update that page so users can quickly understand what happens when
+  their included usage runs out but they still have eligible credits available.
+  Make the credit-based continuation path easy to notice as a short note in the
+  updated section, and keep any added references or links consistent with the
+  rest of the Gemini CLI docs.
+
+initial_state:
+  assets:
+    - path: assets/docs_writer_t1_quota_refresh/input/docs/resources/quota-and-pricing.md
+      source: "https://github.com/google-gemini/gemini-cli/blob/ae0a3aa7b928cc73bb09604bb9c2c020e6b647db/docs/resources/quota-and-pricing.md"
+      real_state: "Real Gemini CLI documentation page about quotas and pricing; it contains older wording around pay-as-you-go and quota exhaustion."
+      preparation: |
+        Cloned google-gemini/gemini-cli at commit ae0a3aa7b928cc73bb09604bb9c2c020e6b647db and copied this file without content changes.
+    - path: assets/docs_writer_t1_quota_refresh/input/docs/cli/custom-commands.md
+      source: "https://github.com/google-gemini/gemini-cli/blob/ae0a3aa7b928cc73bb09604bb9c2c020e6b647db/docs/cli/custom-commands.md"
+      real_state: "Real Gemini CLI documentation page used as a style and cross-link reference."
+      preparation: |
+        Cloned google-gemini/gemini-cli at commit ae0a3aa7b928cc73bb09604bb9c2c020e6b647db and copied this file without content changes.
+    - path: assets/docs_writer_t1_quota_refresh/input/packages/core/src/billing.ts
+      source: "https://github.com/google-gemini/gemini-cli/blob/ae0a3aa7b928cc73bb09604bb9c2c020e6b647db/packages/core/src/billing/billing.ts"
+      real_state: "Real Gemini CLI billing implementation defining credit overage behavior and terminology."
+      preparation: |
+        Cloned google-gemini/gemini-cli at commit ae0a3aa7b928cc73bb09604bb9c2c020e6b647db and copied the implementation file into a shorter package path for the task bundle.
+  tools_available:
+    - read_file
+    - list_directory
+    - grep_search
+    - replace
+    - write_file
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: investigate_code_before_docs
+    description: "Before changing the docs, the model must inspect the billing implementation and reflect the actual credit-overage decision logic in the updated user-facing guidance."
+    exclusive: "A generic docs edit may soften the outdated prose or mention credits generally, but it is unlikely to capture implementation-specific behavior such as overage strategy states, eligible Google One AI credits, and the minimum credit-balance gate unless it investigates the billing implementation."
+  - id: quota_limit_terminology
+    description: "For resource capacity content, the skill requires using quota for the administrative bucket and limit for the numerical ceiling."
+    exclusive: "A general documentation edit often treats quota and limit as interchangeable, especially in sentences about requests, tiers, and exhaustion."
+  - id: markdown_callout_format
+    description: "When adding or changing Markdown callouts, the skill requires a prettier-ignore comment immediately before the GitHub-flavored alert block."
+    exclusive: "A general model may add a note or warning without the formatter-preserving comment."
+  - id: relative_docs_links
+    description: "If the edit introduces documentation-internal links, links from docs pages must be relative to the current file and must not include the docs path segment."
+    exclusive: "A general model that adds documentation links may use absolute repository URLs, site-root links, or `/docs/...` links because those are common in Markdown documentation."
+
+notes: |
+  - Core test point: The task is a real docs update that requires connecting a docs page with implementation behavior and applying project-specific documentation standards.
+  - Expected correct behavior: The model reads both `docs/resources/quota-and-pricing.md` and `packages/core/src/billing.ts`, updates only documentation needed for the current credit-overage behavior, and preserves a helpful user-facing flow.
+  - Common wrong behavior: The model preserves or worsens quota/limit confusion in the edited section, such as treating daily request limits and Gemini Pro quota as interchangeable terms.
+  - Common wrong behavior: The model adds a callout near `assets/docs_writer_t1_quota_refresh/input/docs/resources/quota-and-pricing.md:140` that starts with `> [!NOTE]` but omits the required `<!-- prettier-ignore -->` line immediately before it.
+  - Common wrong behavior: If the model adds a docs-internal link, it uses a `/docs/...` path or a GitHub URL instead of following the relative-link style used by the existing documentation.
+  - baseline_correctness_signals:
+      - The updated quotas and pricing page exists and remains valid Markdown.
+      - The updated page no longer presents a generic pay-as-you-go switch as the primary continuation path when eligible credits are available.
+      - The update preserves the surrounding documentation structure and does not modify model-visible source files outside the documentation page unless the user asks for more.
+  - skill_following_signals:
+      - The final content reflects implementation-specific credit-overage behavior from `packages/core/src/billing.ts`, rather than generic billing advice.
+      - The text distinguishes "quota" for administrative allocation from "limit" for numerical ceilings in the edited section.
+      - If the edit introduces a Markdown alert, it has `<!-- prettier-ignore -->` directly before the alert block.
+      - If the edit introduces a docs-internal link, the link is relative to the current file and does not include a leading or middle `/docs/` path segment.

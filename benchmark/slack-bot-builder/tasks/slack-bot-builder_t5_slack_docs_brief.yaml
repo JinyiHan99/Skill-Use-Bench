@@ -1,0 +1,46 @@
+task_id: slack-bot-builder_t5_slack_docs_brief
+skill_id: slack-bot-builder
+description: |
+  I am preparing an internal briefing for new colleagues and want to explain the concepts of "commands" and "real-time connection modes" in Slack more clearly. Please read the materials in `assets/slack-bot-builder_t5_slack_docs_brief/input/`, and organize them into a Chinese briefing for product and operations colleagues, focusing on use cases, configuration entry points, and common misunderstandings. Save the result to `output/slack_docs_brief/brief.md`.
+initial_state:
+  assets:
+    - path: assets/slack-bot-builder_t5_slack_docs_brief/input/docs/english/concepts/commands.md
+      source: "https://github.com/slackapi/bolt-js/blob/e3936b40488786f748d4d1f8ad2d34464fba1e64/docs/english/concepts/commands.md"
+      real_state: "Slack commands concept documentation in the Bolt JS docs."
+      preparation: |
+        Copied directly from the slackapi/bolt-js repo main branch e3936b40488786f748d4d1f8ad2d34464fba1e64, content unchanged.
+    - path: assets/slack-bot-builder_t5_slack_docs_brief/input/docs/english/concepts/socket-mode.md
+      source: "https://github.com/slackapi/bolt-js/blob/e3936b40488786f748d4d1f8ad2d34464fba1e64/docs/english/concepts/socket-mode.md"
+      real_state: "Socket Mode concept documentation in the Bolt JS docs."
+      preparation: |
+        Copied directly from the slackapi/bolt-js repo main branch e3936b40488786f748d4d1f8ad2d34464fba1e64, content unchanged.
+    - path: assets/slack-bot-builder_t5_slack_docs_brief/input/examples/socket-mode/README.md
+      source: "https://github.com/slackapi/bolt-js/blob/e3936b40488786f748d4d1f8ad2d34464fba1e64/examples/socket-mode/README.md"
+      real_state: "Bolt JS Socket Mode example documentation."
+      preparation: |
+        Copied directly from the slackapi/bolt-js repo main branch e3936b40488786f748d4d1f8ad2d34464fba1e64, content unchanged.
+  tools_available:
+    - filesystem
+expected_trigger: false
+skill_constraints_tested:
+  - id: boundary_no_app_implementation_needed
+    description: "The Slack bot building skill should only be invoked for building, modifying, or validating Slack apps; a documentation brief over Slack concepts does not require producing Bolt app code, OAuth flows, Block Kit payloads, or event handlers."
+    exclusive: "When the slack-bot-builder skill is present, its Bolt app, Socket Mode, OAuth, and command-handler patterns may pull the model toward implementation output. This task tests whether the model can respect the skill boundary and avoid turning a non-technical documentation brief into bot scaffolding, code snippets, or a developer setup guide."
+notes: |
+  - Core test point: a negative example. The materials and topic are both Slack/Bolt-surface-related, but the user wants a briefing for non-engineering colleagues, not to build a Slack app.
+  - Expected correct behavior: read the input materials and output a Chinese brief.md explaining the concepts, applicable scenarios, configuration entry points, and common misunderstandings of commands and real-time connection modes; do not generate application source code or installation flows.
+  - Common model error behaviors (specific counter-examples):
+    - Creating `app.js`, `app.py`, `package.json`, or a sample bot under `output/slack_docs_brief/` instead of a complete `brief.md`.
+    - Writing the output as developer implementation steps, such as "create an App, register a command handler, add a SocketModeReceiver", without explaining concepts for product/operations.
+    - Over-applying positive-example constraints, discussing token encryption, OAuth state, Block Kit limits, and other implementation details unrelated to this brief.
+  - baseline_correctness_signals:
+      - `output/slack_docs_brief/brief.md` exists and is in Chinese.
+      - The document separately explains the concepts, typical use cases, configuration entry points, and common misunderstandings of Slack commands and real-time connection modes.
+      - The document should be aimed at product and operations colleagues, avoiding source code, API registration flows, or deployment steps as the main body.
+      - If implementation details are mentioned, they should serve the concept explanation, not turn into a bot-building guide.
+  - skill_following_signals:
+      - expected_trigger is false; should not create Slack app implementations, event handlers, OAuth install flows, or Block Kit message artifacts.
+      - It is allowed to briefly mention configuration entry points, response time limits, Socket Mode connection methods, and other facts from the materials in the concept explanation, but the brief must not be written as development implementation steps.
+      - Strong negative signal: creating `app.js`, `app.py`, `package.json`, `requirements.txt`, etc. Slack bot code or scaffolding.
+      - Medium negative signal: the main body becomes a development tutorial such as "create an App / register a command handler / initialize a SocketModeHandler or SocketModeReceiver / configure a token and run the service".
+      - Weak negative signal: over-extending to token encryption, OAuth state, Block Kit limits, and other implementation details unrelated to this brief.

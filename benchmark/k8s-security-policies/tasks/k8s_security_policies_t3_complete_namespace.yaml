@@ -1,0 +1,31 @@
+task_id: k8s_security_policies_t3_complete_namespace
+skill_id: k8s-security-policies
+description: |
+  Only a network-isolation fragment is left in the platform repository, and the application team needs to turn it into a small service environment ready for launch. Starting from `assets/k8s_security_policies_t3_complete_namespace/input/network-policy-default-deny-ingress.yaml`, deliver a complete manifest containing namespace, a simple workload, service identity, access control, and network rules. Save the output to `output/team-service-environment.yaml`.
+initial_state:
+  assets:
+    - path: assets/k8s_security_policies_t3_complete_namespace/input/network-policy-default-deny-ingress.yaml
+      source: "https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/service/networking/network-policy-default-deny-ingress.yaml"
+      real_state: "The default-deny-ingress NetworkPolicy example from the Kubernetes website repository, containing only the network policy body and no specified namespace."
+      preparation: |
+        Save the YAML content from the public repository directly, without rewriting network policy fields.
+  tools_available: [read, write, edit]
+expected_trigger: true
+skill_constraints_tested:
+  - id: namespace_admission_labels
+    description: "The new namespace must simultaneously carry enforce, audit, and warn restricted security admission labels."
+    exclusive: "Without reading the skill, the model may create an ordinary namespace or only add partial Pod Security Admission labels; the skill explicitly requires that the enforce, audit, and warn labels must all be present and all at the restricted level."
+  - id: default_deny_and_specific_allow
+    description: "The namespace must have a default-deny policy covering both Ingress and Egress, plus at least one minimal allow policy targeting that workload."
+    exclusive: "Without reading the skill, the model often keeps the ingress-only default-deny policy from the input, or only adds ingress allow rules; the skill explicitly requires the default deny to cover both Ingress and Egress, with specific allow rules added on top."
+  - id: pod_container_security_hardening
+    description: "The new workload's Pod and container security context must fully configure security limits (including runAsNonRoot, drop ALL capabilities, readOnlyRootFilesystem, seccomp RuntimeDefault, and allowPrivilegeEscalation: false, etc.)."
+    exclusive: "Without reading the skill, the model usually only sets a few common fields (e.g., only runAsNonRoot), easily missing seccompProfile or readOnlyRootFilesystem and its mounts, and does not implement all hardening fields as a required subset."
+  - id: workload_identity_and_least_privilege
+    description: "The new workload must configure a dedicated ServiceAccount (with token auto-mounting disabled), bound through a least-privilege Role and RoleBinding, and configure explicit CPU and memory requests and limits for all containers."
+    exclusive: "Without reading the skill, the model often uses the default ServiceAccount, does not disable auto-mounting, or uses wildcard '*' to define Role permissions, and often omits complete resource requests and limits."
+notes: |
+  - Positive example / control group: the input itself is a network policy, but the task requires completing it into a full Kubernetes environment, which should trigger the skill's namespace, workload, RBAC, and network branches.
+  - Skill signals (evaluation focus): the Namespace has enforce/audit/warn=restricted labels; the workload has complete security isolation fields (runAsNonRoot/drop ALL/seccomp/readOnlyRoot/allowPrivilegeEscalation); the ServiceAccount explicitly disables token auto-mounting; RBAC uses non-wildcard Role/RoleBinding; resources set requests/limits; a bidirectional ingress/egress default-deny policy exists with specific allow rules attached.
+  - Non-skill correctness (not counted toward skill deductions): whether an extra Service is created, the specific image choice, the ordering of multiple documents in the YAML, etc.
+  - Common errors: keeping the namespace-less NetworkPolicy as-is, only default-denying ingress, using wildcards in the Role, omitting some container-level security hardening.

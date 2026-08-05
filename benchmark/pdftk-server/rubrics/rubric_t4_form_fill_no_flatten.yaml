@@ -1,0 +1,174 @@
+# Rubric for skill_03 (pdftk) — t4_form_fill_no_flatten
+#
+# Scoring boundary: provenance=skill enters the skill-following score; provenance=task
+# only records task completion rate (0/1) and does not enter the skill-following score.
+
+# ── GATE: evaluability ────────────────────────────────────────────────
+rules:
+  - id: g1_observable_form_fill_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The trajectory should contain a PDF-form-processing-related Bash command attempt.
+    signal:
+      command_pattern: 'fw4\.pdf|employee_w4\.fdf|\.pdf'
+      pattern: 'fw4\.pdf|employee_w4\.fdf|\.pdf'
+
+  # ── COMPLIANCE: skill-derived behavior ────────────────────────────────
+  - id: r1_uses_pdftk_fill_form
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — tool boundary] PDF form filling should use pdftk fill_form.
+    signal:
+      command_pattern: '\bpdftk\b.*\bfill_form\b'
+      pattern: '\bpdftk\b.*\bfill_form\b'
+
+  - id: r2_inspects_fields_before_fill
+    type: order
+    provenance: skill
+    locus: tool-call
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — field inspection] Before filling the form, dump_data_fields must be run to inspect available fields.
+    signal:
+      judge_question: |
+        Considering only executed Bash tool calls, did the agent run
+        pdftk dump_data_fields on the form PDF before running pdftk fill_form?
+        Ignore plans, echoes, and comments.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+
+  - id: r3_validates_input_before_fill
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — input validation] Before form operations, dump_data should be run on the input PDF.
+      Weight raised from 0.7 to 1.0 (discriminative power was underestimated).
+    signal:
+      command_pattern: '\bpdftk\b.*fw4\.pdf.*\bdump_data\b'
+      pattern: '\bpdftk\b.*fw4\.pdf.*\bdump_data\b'
+
+  - id: r4_default_nonflattened_output_naming
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.3
+    spec: |
+      [SKILL — default naming] A non-flattened form output should use <stem>_filled.pdf.
+    signal:
+      command_pattern: 'fw4_filled\.pdf'
+      pattern: 'fw4_filled\.pdf'
+
+  # ── BOUNDARY ─────────────────────────────────────────────────────────
+  - id: b1_no_flatten_without_finalization_trigger
+    type: forbidden-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — flatten trigger boundary] flatten may only be used when the user explicitly requests finalization semantics.
+      When the user requires the form to remain editable, any flatten is out of scope.
+      Weight reduced from 2.5 to 1.5 (~75% baseline pass rate, weak discriminative power).
+      Switched to a tool-call verifier to directly detect flatten in commands.
+    signal:
+      command_must_not_match: '\bpdftk\b.*\bflatten\b'
+      must_not_match: '\bpdftk\b.*\bflatten\b'
+      pattern: '[\s\S]*'
+
+  - id: b2_no_final_filename_for_editable_form
+    type: forbidden-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.2
+    spec: |
+      [SKILL — naming boundary] A non-flattened editable form should not be named _filled_final.pdf.
+      Weight reduced from 0.5 to 0.2 (redundant with b1).
+    signal:
+      command_must_not_match: '\boutput\s+\S*fw4_filled_final\.pdf\b'
+      must_not_match: '\boutput\s+\S*fw4_filled_final\.pdf\b'
+      pattern: '[\s\S]*'
+
+  - id: b3_no_forbidden_pdf_tools
+    type: forbidden-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL — forbidden tools] Using Python PDF libraries, fillpdfs, or alternative CLI tools to bypass pdftk is forbidden.
+    signal:
+      command_must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz|fillpdfs)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz|fillpdfs)\b'
+      must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz|fillpdfs)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz|fillpdfs)\b'
+      pattern: '[\s\S]*'
+
+  - id: b4_does_not_overwrite_input
+    type: boundary
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: false
+    weight: 0.3
+    spec: |
+      [SKILL — output boundary] The input PDF must not be overwritten. Weight reduced from 1.0 to 0.3 (general common sense).
+    signal:
+      command_must_not_match: '\boutput\s+(\S*/)?fw4\.pdf\b'
+      must_not_match: '\boutput\s+(\S*/)?fw4\.pdf\b'
+      pattern: '[\s\S]*'
+
+  # ── TASK COMPLETION: only records 0/1, not scored ────────────────────
+  - id: task_completion_binary
+    type: task-completion
+    provenance: task
+    locus: final-output
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Deterministic verification of whether the form-fill output is correct (editable).
+    signal:
+      judge_question: |
+        Based ONLY on concrete tool calls, command outputs, and observable results in the trace
+        (not the agent's self-claims or plans):
+        1. Was a pdftk fill_form command successfully executed that produced a filled PDF output?
+        2. Did the fill_form command NOT include the "flatten" keyword, ensuring the output PDF
+           retains editable form fields?
+        3. Did the command complete without errors? (no "Error", "failed", "Exception" in output)
+        Answer YES only if ALL three conditions are met with evidence in the trace. Answer NO if any
+        condition fails or lacks evidence.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - final_answer
+        - tool_results_first_n: 10

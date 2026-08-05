@@ -1,0 +1,127 @@
+# Rubric for skill_59 cirq — t3_qft_optimization
+# Focus: skill-following for Cirq circuit transformation review and validation, with task completion recorded separately.
+
+rubric_id: skill_59_cirq_t3_qft_optimization
+task_id: cirq_t3_qft_optimization
+skill_id: cirq
+rules:
+  - id: g1_observable_outputs
+    type: required-tool
+    provenance: gate
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The agent must create the QFT review script so the trace has an observable artifact for
+      skill-following evaluation. This does not affect the skill-following score.
+    signal:
+      file: "output/qft_review.py"
+      file_must_contain: "import cirq"
+
+  - id: r1_simulation_based_equivalence_validation
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] After circuit simplification/transformation, validate correctness against the original
+      via simulation-based evidence such as final-state comparison, unitary comparison, fidelity or
+      overlap comparison, or equivalent observable comparison.
+      skill-exclusive rationale: without reading the skill, the default approach X is to give circuit diagrams and qualitative reasoning as
+      review evidence; the skill requires Y to validate correctness after transformation using simulation or
+      observables; the conflict point Z is "text/diagram evidence" vs "quantitative simulation equivalence".
+    signal:
+      query: >
+        Does output/qft_review.py validate the cleaned QFT circuit against the original circuit using
+        quantitative Cirq/Numpy simulation evidence? Judge only from final file contents and command
+        output artifacts, not from the agent's prose. Answer YES if it explicitly compares original vs
+        cleaned outputs using a numeric threshold, such as final state vectors, unitaries up to global
+        phase, fidelity/overlap, or equivalent observable values. Answer NO if correctness is only
+        asserted narratively, by drawing the circuits, by comparing a circuit to itself, or by sampling
+        a few measurements without an equivalence check.
+      acceptable: "np.allclose(original_result.final_state_vector, cleaned_result.final_state_vector, atol=...), cirq.testing.assert_allclose_up_to_global_phase(...), cirq.linalg.allclose_up_to_global_phase(...), or fidelity/overlap/unitary comparison with an explicit threshold"
+      unacceptable: "JSON says 'the rewrite is equivalent' with no original-vs-cleaned simulate/unitary/allclose check, or only prints both circuit diagrams"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_reports_before_after_depth
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Track and report circuit depth before and after the transformation.
+      skill-exclusive rationale: looking only at the task description, the default approach X is a narrative summary of what changed; the skill
+      optimization best practice requires Y to track depth reduction; the conflict point Z is "qualitative description" vs
+      "explicit before/after depth metrics".
+    signal:
+      query: >
+        Does output/qft_review.py or output/qft_review.json explicitly compute or report numeric
+        circuit depth or moment count for both the original and cleaned QFT circuits? Judge only final
+        file contents, not the agent's prose. Answer YES if original and cleaned depth/moment-count
+        values are both present or computed for reporting. Answer NO if the artifact only mentions
+        depth/moments as a concept, in comments, or reports a single value with no before/after pair.
+      acceptable: "{'original_depth': 14, 'cleaned_depth': 9} or len(original.moments) and len(cleaned.moments) saved/reported"
+      unacceptable: "A comment saying 'reduce circuit depth' or a JSON field {'depth_improved': true} without original and cleaned numeric counts."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_reports_before_after_operation_counts
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Track and report operation or gate-count changes before and after the transformation.
+      skill-exclusive rationale: without reading the skill, the default approach X is to describe the rewrite in prose; the skill requires Y to
+      quantify gate/operation count reduction; the conflict point Z is "narrative change list" vs "before/after
+      operation-count metrics".
+    signal:
+      query: >
+        Does output/qft_review.py or output/qft_review.json explicitly compute or report numeric
+        operation/gate counts for both the original and cleaned QFT circuits? Judge only final file
+        contents, not the agent's prose. Answer YES if original and cleaned operation/gate-count values
+        are both present or computed for reporting. Answer NO if the artifact only mentions operations
+        generally, traverses operations for another purpose, or reports a single value with no before/after
+        pair.
+      acceptable: "{'original_operations': 32, 'cleaned_operations': 21} or len(list(original.all_operations())) and len(list(cleaned.all_operations())) saved/reported"
+      unacceptable: "A comment saying 'fewer gates' or a loop over all_operations() with no original and cleaned numeric counts."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    weight: 0
+    spec: |
+      [TASK — not SF] The requested Python review script and JSON review artifact exist. The JSON
+      contains original circuit details, cleaned circuit details, correctness evidence, and a change
+      summary; saved metrics may be included as non-scoring review detail.
+    signal:
+      query: >
+        Do output/qft_review.py and output/qft_review.json both exist, and does the JSON contain
+        original circuit details, cleaned/equivalent circuit details, correctness evidence, and a
+        summary of what changed? Judge only the final file contents, not the agent's prose. Answer YES
+        only if both files exist and all four JSON content categories are present. Answer NO if either
+        file is missing or any category is absent.
+      acceptable: "{'original_circuit': ..., 'cleaned_circuit': ..., 'validation': {...}, 'change_summary': ..., 'metrics': {...}}"
+      unacceptable: "Only output/qft_review.json exists, or a JSON file with only a circuit diagram and no correctness evidence or change summary."

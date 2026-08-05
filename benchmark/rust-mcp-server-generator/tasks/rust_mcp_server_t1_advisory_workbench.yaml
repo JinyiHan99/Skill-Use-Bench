@@ -1,0 +1,39 @@
+task_id: rust_mcp_server_t1_advisory_workbench
+skill_id: rust-mcp-server-generator
+description: |
+  Please scaffold a small Rust MCP server for our security review workflow. Use the advisory file at `assets/rust_mcp_server_t1_advisory_workbench/input/RUSTSEC-2020-0031.md` as its seed data.
+
+  Keep the scope deliberately small — the server only needs to expose TWO assistant-callable actions:
+    1. return the advisory's structured metadata (advisory id, affected package, aliases, patched versions, keywords); and
+    2. return a short plain-language risk summary.
+
+  Write out the project source files (Cargo manifest plus the Rust sources for the server entry point, the request handler, and the per-action implementations). Keep the advisory parsing reusable so we can add more actions and more advisory files later. You do not need to compile or run the project — just produce a clean, idiomatic source tree.
+
+initial_state:
+  assets:
+    - path: assets/rust_mcp_server_t1_advisory_workbench/input/RUSTSEC-2020-0031.md
+      source: "https://raw.githubusercontent.com/rustsec/advisory-db/main/crates/tiny_http/RUSTSEC-2020-0031.md"
+      real_state: "Real RustSec advisory markdown for tiny_http, including TOML front matter with advisory id, package, aliases, CVSS vector, date, keywords, URL, and patched versions, followed by prose impact text."
+      preparation: |
+        Downloaded the raw advisory markdown from the RustSec advisory-db repository without content modification.
+  tools_available:
+    - filesystem
+    - shell
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: rmcp_stdio_server_stack
+    description: "Cargo.toml must depend on the rmcp crate with the server + transport-stdio features (the skill's prescribed MCP stack), not a hand-rolled JSON-RPC loop or a different MCP SDK."
+    exclusive: "Without the skill, models commonly hand-roll stdin/stdout JSON-RPC, pick another SDK, or just write a plain advisory-parser library/CLI."
+  - id: canonical_rust_mcp_layout
+    description: "Routing lives in `src/handler.rs` and each assistant-callable action is implemented in its own file under `src/tools/`, rather than all logic sitting in `main.rs`/`handler.rs`."
+    exclusive: "Without the skill, a small project naturally puts everything in main.rs or a single module."
+  - id: macro_routed_async_tools
+    description: "The handler impl uses the `#[tool_router]` macro and each action is an async `#[tool(...)]` fn with serde-typed params; transport is started via `rmcp::serve_stdio` under a tokio runtime, and logging uses `tracing` (never `println!`)."
+    exclusive: "Without the skill, models write manual match-dispatch, synchronous handlers, untyped JSON params, hand-rolled transport, and println-based logging."
+
+notes: |
+  - Positive example: building a Rust MCP server should trigger the skill.
+  - Scope intentionally reduced to 2 tools and source-only (no compile/run) so the task is completable in a single agent session; the skill-following signal lives in dependency choice, project layout, macro/async tool boundary, and tracing usage — all observable from the written source files.
+  - Common failures: another protocol library, manual routing, `println!`/`eprintln!` lifecycle logging, or placing advisory logic directly in the entry point.

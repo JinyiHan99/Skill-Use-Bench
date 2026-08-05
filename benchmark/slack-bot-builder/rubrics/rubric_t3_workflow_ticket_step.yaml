@@ -1,0 +1,107 @@
+rules:
+  - id: g1_observable_workflow_step_output
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trajectory contains an observable write, edit, or copy-generate attempt to the Python deliverable under output/workflow_ticket_step/."
+    signal:
+      pattern: '(?is)^(?:Write|Edit|Bash)\b[\s\S]{0,1200}?output/workflow_ticket_step/[^\n]{0,200}\.py'
+
+  - id: r1_uses_workflow_step_lifecycle
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: false
+    weight: 0.4
+    spec: |
+      [SKILL — workflow step lifecycle] The code should implement the edit, save, and execute three-phase lifecycle of a Slack Workflow Builder custom step, and register it via WorkflowStep/app.step, @app.step("create_ticket_step"), or an equivalent legacy Bolt step API, rather than only doing slash command, modal, or ordinary button flows.
+      Weak-exclusive: edit/save/execute + app.step is already given directly by the task and the legacy examples in assets, but this rule can catch models that default to slash-command/modal paths without reading the skill.
+    signal:
+      query: >
+        Based on the contents of the code files actually written to output/workflow_ticket_step/, not the agent's self-statements, answer YES/NO: does the delivered code define the edit, save, and execute workflow-step lifecycle functions, and register via WorkflowStep/app.step, @app.step("create_ticket_step"), or an equivalent legacy Bolt workflow step API, rather than only having slash command/modal/action?
+        Answer YES if all three lifecycle handlers exist and the step is registered for Workflow Builder, including decorator-based equivalent registration.
+        Answer NO if implementation ends at @app.command, @app.action, or modal-only code without workflow step registration.
+      acceptable: "create_ticket_step = WorkflowStep(callback_id='create_ticket_step', edit=edit, save=save, execute=execute); app.step(create_ticket_step), or @app.step('create_ticket_step') with edit/save/execute callbacks."
+      unacceptable: "@app.command('/ticket') opens a modal and creates a ticket, but no WorkflowStep or app.step registration."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r2_save_declares_inputs_and_outputs
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: false
+    weight: 0.3
+    spec: |
+      [SKILL — inputs/outputs declaration] The save phase should save configured inputs such as ticket_type, title, assignee from view.state.values, and declare outputs available for later steps to reference; outputs cannot be empty and should include downstream-usable outputs such as ticket_id, ticket_url.
+      Weak-exclusive: the update(inputs=..., outputs=...) contract is directly given by the example files and the task, but this rule can catch generic Slack bot implementations that create a ticket but do not expose structured workflow outputs for later steps to reference.
+    signal:
+      query: >
+        Based on the contents of the code files actually written to output/workflow_ticket_step/, not the agent's self-statements, answer YES/NO: does the save handler read the ticket type, title, and assignee configuration from view["state"]["values"], and call update(inputs=..., outputs=...) to declare inputs and non-empty downstream-usable outputs (such as ticket_id, ticket_url)?
+        Answer YES if save constructs inputs for ticket_type/title/assignee and calls update with both inputs and non-empty outputs containing ticket identifiers/URLs.
+        Answer NO if save only ack()s, omits outputs, uses outputs=[]/empty outputs, lacks ticket_id/ticket_url or does not persist configured inputs via update.
+      acceptable: "save calls update(inputs={'ticket_type': ..., 'title': ..., 'assignee': ...}, outputs=[{'name':'ticket_id',...}, {'name':'ticket_url',...}])"
+      unacceptable: "def save(ack, view): ack(); update(inputs=inputs, outputs=[]), or no update(inputs, outputs)."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r3_execute_complete_or_fail
+    type: lesson
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/DIAGNOSTIC — not counted toward SF] The execute phase should read step["inputs"] to create the ticket, call complete(outputs=...) on success to return ticket info, and call fail(error=...) on failure.
+      Downgrade reason: the complete/fail pattern is directly shown by the assets example, mainly testing task correctness and sample migration, not pure skill-following.
+    signal:
+      query: >
+        Based on the contents of the code files actually written to output/workflow_ticket_step/, not the agent's self-statements, answer YES/NO: does the execute handler read the configuration from step["inputs"], create/simulate creating the ticket, call complete(outputs=...) on success, and call fail(error=...) on exception or failure?
+        Answer YES if both complete(outputs=...) and fail(error=...) paths are present in execute.
+        Answer NO if it only posts a message, returns a dict, or lacks fail/error handling for workflow execution.
+      acceptable: "try: ticket = create_ticket(...); complete(outputs={'ticket_id': ticket['id'], 'ticket_url': ticket['url']}); except Exception as e: fail(error={'message': str(e)})"
+      unacceptable: "execute creates a ticket then client.chat_postMessage(...), with no complete() or fail()."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_no_sensitive_workflow_outputs
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: false
+    weight: 0.3
+    spec: |
+      [SKILL — no sensitive workflow outputs] Workflow outputs may only expose downstream-safe ticket information; ticket_id, ticket_url, ticket_type, title, ticket_status are explicitly allowed; Slack/API tokens, secrets, assignee email, raw user profile, raw/full API response, full user object, or other sensitive data must not be output.
+      Skill-exclusive: the provided Slack workflow step example explicitly exposes taskAuthorEmail as a workflow output. A model that has not read the skill safety guidance may directly mimic that pattern and output assignee email/profile or raw API response; the skill explicitly requires outputs to be limited to non-sensitive ticket identifiers/links.
+    signal:
+      query: >
+        Based on the contents of the code files actually written to output/workflow_ticket_step/, not the agent's self-statements, answer YES/NO: do the workflow outputs declared in save and completed in execute contain only non-sensitive ticket information (ticket_id, ticket_url, ticket_type, title, ticket_status allowed), with no token, secret, assignee email, raw Slack profile, raw/full API response, or full user object?
+        Answer YES if outputs are limited to ticket identifiers/URLs/type/title/status/basic labels.
+        Answer NO if any output name/value exposes token, secret, email, profile, raw_response, api_response, full user object, or raw/full external API response.
+      acceptable: "outputs include ticket_id, ticket_url, ticket_type, title, ticket_status; complete returns {'ticket_id': ticket.id, 'ticket_url': ticket.url}."
+      unacceptable: "outputs include assignee_email, api_token, raw_user_profile, user, or complete(outputs={'ticket': full_api_response})."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether output/workflow_ticket_step/ contains a statically structurally complete Python workflow ticket step with no obvious syntax errors, configuring ticket type, title, and assignee and creating a ticket."
+    signal:
+      query: >
+        Based on the contents of the files actually written to output/workflow_ticket_step/, not the agent's self-statements, answer YES/NO: does the deliverable contain statically structurally complete Python code with no obvious syntax errors, capable of configuring ticket type, title, assignee, creating or simulating creating a customer service ticket on execution, and returning the result to the workflow?
+        Answer YES only if these core task requirements are present under output/workflow_ticket_step/.
+        Answer NO if output is missing, only docs, or lacks configuration fields or ticket creation path.
+      acceptable: "A Python file defines ticket type/title/assignee configuration UI and execute creates a ticket."
+      unacceptable: "A README describes the workflow but no step code is written."

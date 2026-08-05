@@ -1,0 +1,211 @@
+task_id: SF43_t2_stock_data_visualization
+level: L2
+skill_id: skill_43_d3_visualization
+description: "Please use D3.js to visualize input data stored at `assets/SF43_t2_stock_data_visualization/data/stock-descriptions.json`\
+  \ and `assets/SF43_t2_stock_data_visualization/data/indiv-stock/` for company stock\
+  \ details and individual stock price histories.\nPlease return the output as a single-page\
+  \ web app at `output/index.html`. I should be able to open it in a web browser.\n\
+  Also make sure to generate files organized in the paths below to support this web\
+  \ app:\n- output/js/visualization.js\n- output/css/style.css\n- output/data/: copy\
+  \ the provided input data\n\nThis web-app should visualize the below two components\
+  \ arranged side by side horizontally:\n- A bubble chart where each bubble maps to\
+  \ one stock:\n   1. The bubbles should be sized by market capitalization (use larger\
+  \ bubble for larger market cap). ETFs don't have market cap data, so size them uniformly\n\
+  \   2. The bubbles should be colored by their corresponding sector, positioned so\
+  \ that bubbles belonging to the same sector are clustered close together without\
+  \ overlapping each other. Include a clearly visible legend showing the sector name\
+  \ for each color.\n   3. The clusters for each sector should be close together and\
+  \ centered reasonably in the chart (not scattered far away).\n   4. Ensure bubbles\
+  \ do not overlap each other.\n   5. Each bubble should be labeled by its ticker symbol\
+  \ inside\n   6. When I hover over bubbles, it should show a tooltip with the bubble's\
+  \ ticker, name, and sector. (Note: ETF entries have no marketCap, country, or website\
+  \ data, so do not show tooltip for them)\n- A data table next to the bubble chart\
+  \ listing all 50 stocks with these columns: \"Ticker symbol\", \"Full company name\"\
+  , \"Sector\", and \"Market cap\" (it should be formatted as an easy-to-read number\
+  \ e.g., \"1.64T\")\n- Also add functionality to connect the bubble chart and table:\
+  \ when user clicks a bubble, its row should be at the same time highlighted in the\
+  \ table, and vice versa.\n- All text must be displayed in full without truncation.\n\
+  The bubble layout must be fully settled and stable when the page first renders \u2014\
+  \ no sliding, drifting, or continued animation after load. The layout should be reproducible\
+  \ across page refreshes."
+initial_state:
+  assets:
+  - path: assets/SF43_t2_stock_data_visualization/data/stock-descriptions.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/stock-descriptions.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/stock-descriptions.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/C.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/C.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/C.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/CSCO.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/CSCO.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/CSCO.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/BA.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/BA.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/BA.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/CSL.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/CSL.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/CSL.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/vea.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/vea.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/vea.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/JPM.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/JPM.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/JPM.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MSFT.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/MSFT.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MSFT.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/AMZN.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/AMZN.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/AMZN.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/NFLX.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/NFLX.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/NFLX.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/spy.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/spy.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/spy.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/gld.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/gld.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/gld.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/xlu.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/xlu.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/xlu.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/HON.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/HON.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/HON.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/HFC.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/HFC.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/HFC.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/vwo.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/vwo.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/vwo.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/PXD.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/PXD.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/PXD.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MMM.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/MMM.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MMM.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/NVDA.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/NVDA.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/NVDA.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/AMD.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/AMD.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/AMD.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/RY.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/RY.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/RY.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/WFC.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/WFC.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/WFC.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MA.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/MA.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MA.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/xlv.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/xlv.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/xlv.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/GE.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/GE.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/GE.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/UPS.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/UPS.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/UPS.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/SCHW.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/SCHW.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/SCHW.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/TSM.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/TSM.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/TSM.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MET.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/MET.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MET.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/RHI.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/RHI.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/RHI.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/FDX.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/FDX.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/FDX.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/NLSN.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/NLSN.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/NLSN.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/FB.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/FB.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/FB.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/AAPL.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/AAPL.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/AAPL.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/CLR.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/CLR.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/CLR.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/xlf.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/xlf.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/xlf.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/INTC.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/INTC.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/INTC.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/BLK.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/BLK.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/BLK.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/DVN.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/DVN.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/DVN.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/qqq.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/qqq.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/qqq.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/XOM.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/XOM.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/XOM.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MPC.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/MPC.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MPC.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MRO.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/MRO.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/MRO.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/vtv.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/vtv.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/vtv.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/NEE.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/NEE.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/NEE.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/TSLA.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/TSLA.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/TSLA.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/V.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/V.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/V.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/voo.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/voo.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/voo.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/EOG.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/EOG.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/EOG.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/TRGP.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/TRGP.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/TRGP.json'
+  - path: assets/SF43_t2_stock_data_visualization/data/indiv-stock/BAC.json
+    source: SkillLearnBench/tasks/stock-data-visualization/stock-data-visualization-2/environment/data/indiv-stock/BAC.json
+    description: 'Data file: assets/SF43_t2_stock_data_visualization/data/indiv-stock/BAC.json'
+  tools_available:
+  - bash
+  - read
+  - edit
+  - grep
+expected_trigger: true
+skill_constraints_tested:
+- id: c1
+  description: Loading D3 from CDN is prohibited; must use local vendored files
+  exclusive: When the description does not enforce a specific D3 local filename, a strong model naturally prefers CDN (<script src="https://d3js.org/d3.v7.min.js">). The Skill requires offline vendoring.
+- id: c2
+  description: Pin D3 exact version to v7.9.0, filename reflects the exact version number
+  exclusive: The model typically only writes coarse-grained version references like d3.v7 or d3@7, and will not spontaneously pin to the exact patch version v7.9.0
+- id: c3
+  description: All transitions/animations are prohibited by default, including runtime tick animation of force-directed layout
+  exclusive: c3 alone has medium distinguishing power; combined with c4 it forms the "fully static deterministic rendering" constraint, which has strong distinguishing power. A model not reading the skill may happen to not write .transition(), but will produce runtime layout animation through on("tick")
+- id: c4
+  description: Force-directed layout must fix N iterations and fix initial positions; convergence-based stopping is prohibited
+  exclusive: The D3 force simulation standard paradigm is sim.on('tick') running until alpha converges
+notes: 'Source: SkillLearnBench/stock-data-visualization
+
+  Domain: data visualization/financial data
+
+  Phase1 score: 0.44
+
+  Confidence: 0.78'

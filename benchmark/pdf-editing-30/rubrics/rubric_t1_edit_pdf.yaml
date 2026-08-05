@@ -1,0 +1,274 @@
+# Rubric for skill_30_pdf_editing — SF30_t1_edit_pdf
+# Core question: Did the agent follow the PyMuPDF PDF-editing skill while updating and redacting the form?
+
+rules:
+  # ── GATE ───────────────────────────────────────────────────────────────
+  - id: g1_pdf_edit_attempted
+    type: required-tool
+    provenance: gate
+    verifier: llm-judge
+    weight: 0
+    spec: "[GATE] The trajectory contains an observable attempt to actually execute PDF-editing code (opening input.pdf and attempting to write out a PDF). This only checks evaluability; final success or exact path is not required."
+    signal:
+      query: >
+        Based only on actual tool calls, command outputs, and file writes in the trace,
+        did the agent actually EXECUTE PDF-editing code that opens
+        assets/SF30_t1_edit_pdf/input/input.pdf and attempts to produce an edited PDF?
+        Do not count prompt text, plans, or self-descriptions as evidence.
+
+        Answer YES if there is concrete evidence that a PDF-editing script was actually run
+        against the input PDF — e.g. a Bash-executed Python script that opens input.pdf and
+        calls PDF edit/save APIs — EVEN IF the run errored, or the output was saved to a path
+        other than output/output.pdf. The point of this gate is only that the trajectory contains
+        an evaluable, tool-mediated PDF-editing attempt.
+        Answer NO only if no PDF-editing code was ever actually executed (the agent only planned,
+        described intentions, or read files without running any edit), so there is nothing to evaluate.
+      judge_expected: "YES"
+
+  # ── Skill-Following rules (scored) ─────────────────────────────────────
+  - id: r1_uses_pymupdf_fitz_for_pdf_editing
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] PDF editing should use Python's PyMuPDF (fitz) to open, locate, cover/redact, insert text, and save the PDF.
+      Skill-exclusive rationale: Without reading the skill, strong models facing PDF form editing may naturally choose pypdf, reportlab, qpdf, pdf-lib, pdftk, or image/PIL workflows;
+      the skill explicitly requires "USE PYTHON WITH PyMuPDF (fitz)" to correctly preserve the text layer, and the default tool choice conflicts with the skill-specified tool.
+    signal:
+      query: >
+        Based only on actual executed commands, generated scripts, imports, and file writes in the trace
+        (not the agent's self-description), did the agent use PyMuPDF/fitz as the primary library for
+        opening, editing, and saving the final output/output.pdf?
+
+        Answer YES if the concrete editing code imports PyMuPDF through an equivalent form such as
+        `import fitz`, `import pymupdf`, `import pymupdf as fitz`, or `from pymupdf import ...`, opens
+        the input PDF with PyMuPDF, edits pages with PyMuPDF APIs, and saves the final PDF with it.
+        Answer NO if the final PDF was produced primarily with pypdf/reportlab/pdf-lib/qpdf/pdftk,
+        an image workflow, or if PyMuPDF is only mentioned/imported but not used for the actual final edit.
+      acceptable: "A Python script with `import fitz` or `import pymupdf as fitz`, `doc = fitz.open(input_pdf)`, page.search_for/insert_text/add_redact_annot, and `doc.save('output/output.pdf')`."
+      unacceptable: "Using reportlab to recreate the form, pdf-lib to draw text, pypdf only to merge pages, or importing PyMuPDF without using it to edit and save the final PDF."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_no_pdf_rasterization_or_image_roundtrip
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Rasterizing/flattening PDF pages into images before editing or reassembling is forbidden; the output must preserve the vector structure and text layer of the original PDF.
+      Skill-exclusive rationale: Without reading the skill, when PDF coordinate positioning is difficult, models often convert pages to PNG/JPG, draw text with PIL/cv2/ImageDraw, then convert back to PDF;
+      the skill explicitly forbids get_pixmap, pdf-to-image-to-pdf, PNG/JPG drawing and other image round-trips, and the default fallback conflicts with the skill.
+    signal:
+      query: >
+        Based only on actual tool calls, generated scripts, and command outputs, did the agent avoid using
+        a PDF-to-image-to-PDF or rasterized editing workflow for producing output/output.pdf?
+        Ignore evaluator-side conversions after the agent is done; focus on the agent's own editing/output construction.
+
+        Answer YES if the final PDF was edited as a PDF object and there is no evidence that rendered images
+        were used to edit, replace, or reassemble the final output/output.pdf. Debug, inspection, positioning,
+        or verification rendering such as `get_pixmap()` is acceptable if the rendered image is not used as
+        the basis for edits or final PDF construction.
+        Answer NO if the agent used get_pixmap, pdf2image, pdftoppm, ImageMagick convert, PIL/ImageDraw,
+        cv2, img2pdf, or reportlab/full-page image embedding to draw edits onto images or assemble the final PDF.
+      acceptable: "Using fitz page.search_for, draw_rect, add_redact_annot, apply_redactions, insert_text, then saving the PDF directly; optional get_pixmap only for debugging/verification is not a violation."
+      unacceptable: "Rendering input.pdf to page.png, drawing new values on the PNG with PIL/cv2, then converting that image back into output.pdf."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_student_id_uses_true_redaction
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The student ID is sensitive data and must be marked with add_redact_annot() followed by apply_redactions() to truly remove the original ID from the PDF structure,
+      then a masked value showing only the last four digits (e.g. ****5678) is inserted.
+      Skill-exclusive rationale: Without reading the skill, models likely only cover A88888888/A12345678 with a white rectangle draw_rect() or visually overwrite it;
+      the skill distinguishes "visual cover" from "true redaction", requiring add_redact_annot + apply_redactions, and the default masking approach leaves extractable sensitive text.
+    signal:
+      query: >
+        Based only on actual editing code/tool calls and any final-PDF text extraction evidence,
+        did the agent truly redact the student ID using PyMuPDF redaction annotations followed by apply_redactions(),
+        rather than only drawing a rectangle over it?
+
+        Answer YES only if there is method evidence that the code locates the original PID, calls
+        add_redact_annot on its rectangle, calls apply_redactions(), and inserts a masked value showing only
+        the last four digits. If final output/output.pdf text extraction evidence is available, it must also
+        show that no full PID matching A\d{8} remains extractable and that the masked last-four value such as
+        ****5678 or 5678 is present.
+        Answer NO if the PID is only covered with draw_rect/white fill, struck through, hidden by an image,
+        if add_redact_annot or apply_redactions() is missing, if redaction code appears not to target the actual
+        PID, or if final-PDF extraction still contains a full PID matching A\d{8}.
+      acceptable: "`page.add_redact_annot(pid_rect, fill=(1,1,1)); page.apply_redactions(); page.insert_text(..., '****5678')`, with extraction showing ****5678/5678 and no A######## PID."
+      unacceptable: "`page.draw_rect(pid_rect, fill=(1,1,1)); page.insert_text(..., '****5678')` with no apply_redactions, or extraction from output.pdf still showing A88888888/A12345678."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_redaction_fill_is_white_not_black
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: medium
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] When add_redact_annot() is used for sensitive fields, white fill fill=(1,1,1) must be used; black fill or the default black block is forbidden.
+      Skill-exclusive rationale: Without reading the skill, "redaction = black cover block" is the intuitive approach, and PyMuPDF redaction defaults/common examples easily produce black fill;
+      the skill requires white-fill redaction to keep the form visually clean, and the default black-block approach conflicts with the skill.
+    signal:
+      query: >
+        Based only on the actual redaction code/tool calls and final artifact evidence, did every redaction
+        annotation actually used for the student ID use a white fill rather than a black fill/default black box?
+
+        Evaluate only PID redaction annotations that were actually used. Answer YES if add_redact_annot for
+        the PID explicitly uses white fill such as fill=(1, 1, 1) or an equivalent white color. Also answer YES
+        for this rule if the agent did not use any redaction annotation at all; that failure is covered by
+        r3_student_id_uses_true_redaction, and this rule should not double-penalize absence of redaction.
+        Answer NO if an actual PID redaction annotation uses fill=(0,0,0), another dark fill, omits fill in a
+        way that produces a black box, or uses black rectangles for masking.
+      acceptable: "`page.add_redact_annot(tight_rect, fill=(1, 1, 1))`; or no add_redact_annot at all, which is neutral/YES here and handled by r3."
+      unacceptable: "`page.add_redact_annot(rect, fill=(0, 0, 0))`, `page.add_redact_annot(rect)` producing a black box, or drawing a black rectangle."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_existing_values_replaced_at_same_position
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] For non-sensitive field values that already exist in the PDF but are outdated/incorrect, first cover the old value with a white rectangle, then insert the new value in the same area/original field region of the old value; appending the new value next to the old one is forbidden.
+      This rule only covers the non-sensitive old values Yaya, jiang@gmail.com, 2003/06/18; true redaction of the student PID is evaluated by r3/r4.
+      Skill-exclusive rationale: Without reading the skill, models often append new values such as Jinya Jiang, jiang@ucsd.edu, 2004/06/18 after the label or to the right of the old value
+      to avoid coordinate overwriting failure; the skill explicitly requires "REPLACE them at the SAME position", and appending/side-by-side writing conflicts with the skill.
+    signal:
+      query: >
+        Based only on actual editing code/tool calls and final artifact evidence, did the agent replace
+        existing outdated non-sensitive values (Yaya, jiang@gmail.com, 2003/06/18) in their original field
+        areas rather than adding the new values next to the old ones?
+
+        Answer YES if the code searches for old non-sensitive values, covers their rectangles with white fill,
+        and inserts replacement text in the same area/original field region, including equivalent coordinates,
+        insert_textbox, or slight baseline adjustments needed for PDF text placement. Final artifact evidence
+        should not show old and new non-sensitive values side by side or duplicated.
+        Answer NO if it inserts new values at rect.x1 + offset, next to labels while leaving visible old values,
+        appends duplicate values elsewhere, leaves old and new values both present in the same field, or uses
+        strikethrough instead of replacement.
+      acceptable: "For `Yaya`, `jiang@gmail.com`, and `2003/06/18`, search_for(old_value) -> draw_rect(old_rect, white fill) -> insert_text/insert_textbox in the old field area."
+      unacceptable: "`insert_text((old_rect.x1 + 10, old_rect.y1), 'Jinya Jiang')`, producing old and new values side by side or duplicate field values."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_no_strikethrough_for_corrections
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: low
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] Using horizontal lines/strikethrough to cross out old text to indicate corrections is forbidden; the PDF should directly cover and replace field values.
+      Skill-exclusive rationale: Without reading the skill, facing an "edit/update existing PDF" task, models may adopt review-style visual markers (draw_line across the old value) to show changes;
+      the skill explicitly states NEVER use strikethrough lines, and the default review-style approach conflicts with the skill.
+    signal:
+      query: >
+        Based only on actual drawing/editing code and final artifact evidence, did the agent avoid using
+        strikethrough/cross-out lines to correct old PDF values?
+
+        Answer YES if no line-drawing operation is used to cross out old values.
+        Answer NO if the agent draws horizontal lines through old text, uses strikeout annotations,
+        or otherwise marks obsolete values with a visible cross-out instead of replacing them.
+      acceptable: "Old values are covered with white rectangles/redactions and replacement text is inserted without cross-out marks."
+      unacceptable: "Using `page.draw_line(...)` across Yaya or A88888888, or adding a strikeout annotation over old field values."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: low
+
+  - id: r7_final_pdf_preserves_extractable_text_layer
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The edited PDF must preserve an extractable text layer; newly inserted/replaced text should be readable by PDF text-extraction tools such as PyMuPDF/pypdf, rather than existing only in image pixels.
+      Skill-exclusive rationale: Without reading the skill, models may produce visually correct scanned/image-style PDFs that pass OCR or human inspection;
+      the skill emphasizes that PyMuPDF preserves the text layer and requires text to be extractable from the PDF structure, and image-based output conflicts with the skill.
+    signal:
+      query: >
+        Based on final artifact evidence, concrete PyMuPDF/pypdf text extraction output from output/output.pdf,
+        and actual editing method evidence (not OCR output and not agent self-claims), does the final PDF
+        preserve an extractable text layer containing the inserted/updated values?
+
+        Answer YES if non-OCR extraction from output/output.pdf returns expected inserted text such as
+        Jinya Jiang, jiang@ucsd.edu, 2004/06/18, 5678/****5678, and appeal-reason terms. If there is no final
+        text extraction output, answer YES when the code directly edits the PDF with PyMuPDF native text APIs
+        such as insert_text or insert_textbox and there is no rasterization/image-roundtrip evidence.
+        Answer NO if the PDF is image-only, requires OCR to read the inserted values, was assembled from page
+        images, or the inserted values are visible only as pixels.
+      acceptable: "A PyMuPDF `page.get_text()` or pypdf `extract_text()` result from output/output.pdf includes the updated form values; fallback: native PyMuPDF insert_text/insert_textbox with no rasterization."
+      unacceptable: "The final PDF only passes via OCR after pages were rasterized; pypdf/PyMuPDF text extraction has no inserted values, or edits were drawn onto full-page images."
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  # ── TASK COMPLETION (bypass, not counted toward SF) ────────────────────
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/output.pdf has been generated, and the form content is completed per input.txt: full name instead of nickname, school email, DOB, phone, appeal reason, signature, and today's date filled in;
+      the student ID shows only the last four digits; original form labels and structure remain visible.
+    signal:
+      query: >
+        Based only on the final output/output.pdf artifact, concrete file existence checks, and concrete
+        PDF text/visual extraction evidence (not the agent's self-description), were the task requirements completed?
+
+        Required evidence:
+        1. output/output.pdf exists and is a readable PDF.
+        2. The final form contains Jinya Jiang as the student name and signature (full name, not only Yaya),
+           jiang@ucsd.edu, 2004/06/18, (253) 798-6666, today's date in a reasonable date format,
+           and an appeal reason semantically covering a health insurance waiver/coverage issue for Spring 2026
+           with a January-to-June timeline; exact keyword order or verbatim wording is not required.
+        3. The student ID is redacted to show only the last four digits 5678, with no visible/extractable full PID
+           matching A\d{8}.
+        4. Core labels/structure remain present: STUDENT NAME, STUDENT PID, UCSD E-MAIL, DATE OF BIRTH,
+           PHONE NUMBER, Reason for appeal, Applicant's signature, and Date.
+
+        Answer YES only if all four conditions are met. Answer NO if the output file is missing/unreadable,
+        any required value is absent, the full PID remains visible/extractable, or form labels are removed/covered.
+      acceptable: "Final PDF text/visual evidence includes Jinya Jiang twice, jiang@ucsd.edu, 2004/06/18, (253) 798-6666, ****5678 or 5678 only, a semantically correct health-insurance waiver/coverage appeal for Spring 2026 with Jan-to-June timing, today's date, and all core labels."
+      unacceptable: "Missing output.pdf; using Yaya as the only name/signature; leaving A88888888 or A12345678; missing the appeal reason; or covering STUDENT PID/DATE OF BIRTH labels."
+      judge_expected: "YES"

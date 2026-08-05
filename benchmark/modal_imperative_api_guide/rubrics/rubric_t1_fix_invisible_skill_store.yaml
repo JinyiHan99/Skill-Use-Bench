@@ -1,0 +1,98 @@
+# Rubric for skill_60_modal_imperative_api_guide — t1: fix invisible SkillStore modal
+
+rules:
+  - id: g1_observable_output
+    type: required-tool
+    provenance: gate
+    verifier: state-diff
+    weight: 0
+    spec: "[GATE] An AppProviders output file is present for evaluation."
+    signal:
+      file: "assets/SF60_t1_fix_invisible_skill_store/output/src/app/AppProviders.tsx"
+      file_must_contain: "AppProviders"
+
+  - id: r1_mount_matching_base_ui_modal_host
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] base-ui createModal calls require the matching global ModalHost from @lobehub/ui/base-ui to be mounted once near the app root.
+      Skill-exclusive rationale: Without reading the skill, a strong model seeing an existing @lobehub/ui ModalHost will assume the host already exists and instead fix the click handler or rewrite the modal; the skill requires additionally mounting the base-ui ModalHost. The conflict point is "hosts with the same name but different modal stacks must not be mixed."
+    signal:
+      file: "assets/SF60_t1_fix_invisible_skill_store/output/src/app/AppProviders.tsx"
+      file_must_contain:
+        - "from\\s+['\"]@lobehub/ui/base-ui['\"]"
+        - "<\\s*(?:BaseModalHost|ModalHost)\\b"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_preserve_existing_legacy_host
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] During partial migration, add a second ModalHost from @lobehub/ui/base-ui instead of replacing the existing @lobehub/ui host.
+      Skill-exclusive rationale: Without reading the skill, the default fix may replace the old ModalHost with a new host of the same name; the skill explicitly requires "adding a second" base-ui host when the project only has the root host mounted. The conflict point is preserving legacy-stack compatibility rather than simply replacing.
+    signal:
+      file: "assets/SF60_t1_fix_invisible_skill_store/output/src/app/AppProviders.tsx"
+      file_must_contain:
+        - "from\\s+['\"]@lobehub/ui['\"]"
+        - "<\\s*RootModalHost\\b"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_preserve_imperative_skill_store_entry
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The feature entry should remain an imperative createModal-based opener from @lobehub/ui/base-ui.
+      Skill-exclusive rationale: Without reading the skill, the default fix for "click shows no modal" may introduce a useState/open + <Modal> declarative implementation; the skill recommends createModal() with no local open state. The conflict point is that you must not revert to a declarative modal just to fix visibility.
+    signal:
+      file: "assets/SF60_t1_fix_invisible_skill_store/output/src/features/SkillStore/index.tsx"
+      file_must_contain:
+        - "import\\s*\\{[^}]*\\bcreateModal\\b[^}]*\\}\\s*from\\s*['\"]@lobehub/ui/base-ui['\"]"
+        - "export\\s+const\\s+createSkillStoreModal\\s*=\\s*\\(\\)\\s*=>\\s*(?:createModal\\s*\\(|\\{[\\s\\S]{0,160}return\\s+createModal\\s*\\()"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_do_not_rewrite_skill_store_as_declarative_modal
+    type: forbidden-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Imperative modal usage should not be replaced by local open state and inline <Modal> rendering.
+      Skill-exclusive rationale: Looking only at the task, declarative local state is the natural solution for "click to show modal"; the skill requires an imperative createModal call. The conflict point is that you must not rewrite an existing entry into a useState/open pattern.
+    signal:
+      file: "assets/SF60_t1_fix_invisible_skill_store/output/src/features/SkillStore/index.tsx"
+      file_must_not_contain: "const\\s*\\[\\s*(?:open|isOpen|visible|show\\w*)\\s*,\\s*set[A-Z]\\w*\\s*\\]\\s*=\\s*useState\\s*\\(|<(?:Modal|Dialog)\\b[\\s\\S]{0,240}\\b(?:open|visible)=\\{"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] SkillStore click invisibility is fixed while preserving content/title/opening behavior."
+    signal:
+      query: >
+        Based only on final output files under assets/SF60_t1_fix_invisible_skill_store/output/src/, is the task complete: AppProviders mounts the host needed for the existing SkillStore base-ui createModal to appear, and SkillStore still uses the same SkillStoreContent, MarketAuthProvider wrapper, title key, footer null, and width? Answer YES or NO from file contents only.
+      acceptable: "AppProviders contains both root and base-ui hosts; SkillStore index still calls createModal with SkillStoreContent, MarketAuthProvider, t('skillStore.title', { ns: 'setting' }), footer: null, width min(80%, 800px)."
+      unacceptable: "No base-ui host is mounted, or SkillStore content/title logic is removed or replaced by unrelated modal code."

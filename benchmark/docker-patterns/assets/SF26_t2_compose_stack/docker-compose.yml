@@ -1,0 +1,77 @@
+# Incomplete / problematic docker-compose.yml
+# Has several issues that need fixing per best practices
+#
+# KNOWN ISSUES (intentional for benchmark task):
+#   1. Hardcoded secrets (SECRET_KEY, POSTGRES_PASSWORD, DATABASE_URL)
+#   2. :latest image tags (postgres, redis)
+#   3. Ports bound to 0.0.0.0 (db, cache)
+#   4. No healthchecks on db/cache
+#   5. bare depends_on without condition
+#   6. No named volumes for persistent data
+#   7. No network segmentation
+#   8. Secrets duplicated across services
+
+services:
+  web:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env  # SECRET_KEY, DATABASE_URL, REDIS_URL must live here, NOT inline
+    environment:
+      - FLASK_ENV=development
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+    command: python app.py
+    networks:
+      - frontend-net
+      - backend-net
+
+  db:
+    image: postgres:16-alpine  # pin version; never use :latest
+    ports:
+      - "127.0.0.1:5432:5432"  # localhost only; prevent LAN exposure
+    env_file:
+      - .env  # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB defined here
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend-net
+
+  cache:
+    image: redis:7-alpine  # pin version; never use :latest
+    ports:
+      - "127.0.0.1:6379:6379"  # localhost only
+    volumes:
+      - redisdata:/data
+    networks:
+      - backend-net
+
+  worker:
+    build: .
+    env_file:
+      - .env  # shared secrets via env_file, not duplicated inline
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+    command: celery -A tasks worker --loglevel=info
+    networks:
+      - backend-net
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  frontend-net:
+  backend-net:

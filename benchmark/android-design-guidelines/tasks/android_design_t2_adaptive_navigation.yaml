@@ -1,0 +1,38 @@
+task_id: android_design_t2_adaptive_navigation
+skill_id: android-design-guidelines
+description: |
+  The main entry of the email sample app is at `./assets/android_design_t2_adaptive_navigation/input/ReplyApp.kt`. The product team plans to reuse it across phones, foldables, and tablets, but regression testing found: navigation presentation is unstable on some device form factors, the hierarchy after entering/leaving detail views easily confuses users, and individual fold postures are affected by the physical hinge region.
+
+  A team member suggests that, to reduce maintenance cost, the app could unify on a single large-screen navigation style, use a fixed width threshold to distinguish single/dual-pane, and remove foldable-specific handling. Please evaluate whether these directions conform to Android platform design guidelines, and fix the implementation issues in the entry file.
+
+  Save the modified file to `output/ReplyApp.kt`, and briefly describe your design trade-offs and verification scenarios in `output/navigation_notes.md`.
+initial_state:
+  assets:
+    - path: ./assets/android_design_t2_adaptive_navigation/input/ReplyApp.kt
+      source: "https://raw.githubusercontent.com/android/compose-samples/main/Reply/app/src/main/java/com/example/reply/ui/ReplyApp.kt"
+      real_state: "The real main entry file of the Android compose-samples Reply example; uses WindowSizeClass, DisplayFeature, and fold posture to derive content type, but the file contains a navSuiteType reference that is not defined within the current function. The file can carry navigation type selection and single-pane detail-state system back handling, but the complete Up button semantics may live in child screen files."
+      preparation: |
+        Downloaded ReplyApp.kt directly from the android/compose-samples repository main branch, content unmodified.
+  tools_available:
+    - filesystem
+    - text_editor
+expected_trigger: true
+skill_constraints_tested:
+  - id: window_size_class_not_fixed_threshold
+    description: "Adaptive layout decisions should follow platform window size classes, rather than adopting fixed width thresholds or hand-written breakpoints."
+    exclusive: "Without reading the skill, a model may comply with the product team's fixed-threshold simplification suggestion; after reading the skill, it should preserve platform window size classes and avoid introducing hand-written breakpoints."
+  - id: navigation_component_by_destination_count
+    description: "Select navigation presentation based on top-level destination count and window size; do not unify on a single large-screen navigation style across all device form factors for simplification."
+    exclusive: "Without reading the skill, a model may adopt the standard library default or the product team's simplification suggestion, biasing toward Drawer under Expanded or unifying on Drawer across all screens; after reading the skill, it should choose a more appropriate component based on destination count and window size."
+  - id: foldable_hinge_avoidance
+    description: "Foldable devices should retain detection and avoidance of the physical hinge region; do not delete existing foldable handling for simplification."
+    exclusive: "Without reading the skill, a model may comply with the product team's suggestion to remove foldable-specific handling; after reading the skill, it should preserve and maintain existing FoldingFeature / DevicePosture branches."
+  - id: single_pane_detail_back_behavior
+    description: "In single-pane detail state, system back should close the detail rather than unconditionally exiting the app or resetting the top-level destination; do not extend this into a complete Up behavior test that the current asset cannot verify."
+    exclusive: "Without reading the skill, a model may only fix navSuiteType or rely on default NavController behavior; after reading the skill, it should explicitly handle system back semantics for single-pane detail state."
+notes: |
+  - Evaluator-only: the description should not directly expose correct component names, API names, or conditional expressions.
+  - Check whether navSuiteType is fixed and that existing WindowSizeClass / FoldingFeature / DevicePosture related logic is not deleted.
+  - Check whether product simplification schemes such as unifying navigation style across all devices, fixed width thresholds, and removing foldable handling are avoided.
+  - Check whether single-pane detail-state system back has independent handling; do not judge this single-file task as a complete Up semantics test.
+  - If the actual skill.md does not contain navigation/responsive/foldable/back rules, this task is not skill-exclusive and should be returned.

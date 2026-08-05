@@ -1,0 +1,59 @@
+task_id: SF51_t2_http_client_async
+level: L3
+skill_id: skill_51_python_anti_patterns
+description: |
+  The HTTP client configuration excerpt in `assets/SF51_t2_http_client_async/input/http_config.py` is being reused by a monitoring worker. Please add a small asynchronous health-check module that reads the endpoint definitions from `assets/SF51_t2_http_client_async/input/endpoints.json`, probes every configured endpoint, and writes a compact JSON status report.
+
+  Save the implementation as `healthcheck.py` and tests as `test_healthcheck.py`. The report should identify each endpoint by name, record whether it responded successfully, and make failures understandable enough for an operator to debug the affected endpoint.
+initial_state:
+  assets:
+    - path: assets/SF51_t2_http_client_async/input/http_config.py
+      source: "https://raw.githubusercontent.com/encode/httpx/master/httpx/_config.py"
+      real_state: "Real HTTPX configuration excerpt containing the typed Timeout class, SSL context factory, and contextual ValueError messages."
+      preparation: |
+        Downloaded from the HTTPX repository raw file and trimmed to the configuration classes used as reference material.
+    - path: assets/SF51_t2_http_client_async/input/endpoints.json
+      source: "https://httpbin.org public test endpoints, captured as a small endpoint list for offline task input"
+      real_state: "JSON object containing a staging environment label, timeout setting, and three public httpbin test endpoint entries."
+      preparation: |
+        Recorded stable httpbin endpoint URLs and stored them in JSON so the evaluation does not depend on live discovery.
+    - path: assets/SF51_t2_http_client_async/input/__pycache__/http_config.cpython-311.pyc
+      source: "Generated Python bytecode cache from importing the local http_config.py excerpt during asset preparation or validation."
+      real_state: "Compiled CPython 3.11 bytecode cache for the http_config.py asset; not intended as task input."
+      preparation: |
+        Generated automatically by Python when the local http_config.py excerpt was imported or inspected.
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+expected_outputs:
+  - path: healthcheck.py
+  - path: test_healthcheck.py
+verifier_only:
+  skill_constraints_tested:
+    - id: async_without_blocking_calls
+      description: "The asynchronous probing code must not perform synchronous HTTP requests, blocking sleeps, or synchronous file I/O inside async functions."
+      exclusive: "A default solution often writes async def wrappers around requests.get, time.sleep, or open().read(), which appears concurrent but blocks the event loop."
+    - id: external_input_validation
+      description: "The endpoint JSON must be validated at the boundary before use, including endpoint name, URL, and timeout shape."
+      exclusive: "A default solution often trusts the JSON structure and indexes directly into dictionaries."
+    - id: externalized_configuration
+      description: "Timeouts, output path, and endpoint source must be accepted from function parameters or parsed input rather than embedded as hidden production constants."
+      exclusive: "A default solution often hardcodes URLs, timeout values, or output filenames in the module."
+    - id: specific_errors_with_context_and_tests
+      description: "Network/configuration failures must use specific exception handling with endpoint context, preserve causes when re-raising, and include tests for invalid configuration and failed endpoint behavior."
+      exclusive: "A default solution often catches Exception around the whole gather call, returns a generic failure, and tests only successful responses."
+  asset_reality:
+    - "http_config.py is a real excerpt from encode/httpx."
+    - "endpoints.json contains public httpbin endpoint URLs captured for the task."
+  sr_verification:
+    artifact_checks:
+      - "healthcheck.py defines fully typed public functions and parameterized collection annotations."
+      - "Async functions contain no requests.*, urllib.request.*, time.sleep, pathlib.Path.read_text, or built-in open calls."
+      - "Input JSON is validated before probing; invalid endpoint entries produce contextual errors."
+      - "Public entry points accept endpoint source and output destination as parameters rather than embedding the asset path or report filename as module constants."
+      - "test_healthcheck.py contains pytest.raises or equivalent assertions for invalid config and a simulated endpoint failure."
+      - "No bare except, except Exception, or unchained raise inside except blocks appears."
+    process_log_checks:
+      - "The implementation does not add hardcoded secrets, production URLs beyond the provided asset data, or absolute asset paths."
+notes: |
+  - Positive example: adding new async Python functionality where the event-loop blocking rule is easy to miss.
+  - The task separates normal completion from skill following: a synchronous solution can produce a report but should fail the skill constraints.

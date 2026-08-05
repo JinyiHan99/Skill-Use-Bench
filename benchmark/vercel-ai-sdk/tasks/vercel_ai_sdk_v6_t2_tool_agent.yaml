@@ -1,0 +1,33 @@
+task_id: vercel_ai_sdk_v6_t2_tool_agent
+skill_id: vercel-ai-sdk
+description: |
+  In `assets/vercel_ai_sdk_v6_t2_tool_agent/input/support-agent/`, turn the support triage endpoint into a small streaming assistant that can look up ticket details before drafting an escalation note. Keep the local ticket data source, preserve streaming behavior for the caller, and structure the assistant so it can safely perform multiple reasoning/tool steps when the user asks about a ticket.
+initial_state:
+  assets:
+    - path: assets/vercel_ai_sdk_v6_t2_tool_agent/input/support-agent/app/api/support/route.ts
+      source: "Adapted from real Vercel AI repository examples https://github.com/vercel/ai/blob/main/examples/next-agent/app/api/chat/route.ts and https://github.com/vercel/ai/blob/main/examples/next-agent/tool/weather-tool.ts"
+      real_state: "Streaming support endpoint with an inline legacy-style tool definition and older stream response format."
+      preparation: |
+        Started from public Vercel AI agent and tool examples, then transformed the route into a support-ticket fixture with an inline ticket lookup tool using a legacy tool shape.
+    - path: assets/vercel_ai_sdk_v6_t2_tool_agent/input/support-agent/lib/tickets.ts
+      source: "Derived from a realistic local support-ticket seed file based on common incident fields used in support systems."
+      real_state: "Small local TypeScript ticket data source used by the endpoint for lookup."
+      preparation: |
+        Created a minimal local data module to make the real endpoint scenario self-contained while retaining realistic ticket fields and priorities.
+  tools_available: [Read, Write, Edit, Glob, Grep, Bash, WebFetch]
+expected_trigger: true
+skill_constraints_tested:
+  - id: helper_wrapped_tools
+    description: "The ticket lookup tool must be defined using the current helper wrapper with a zod-backed input schema field."
+    exclusive: "Without the skill and without adjacent answer-bearing examples, a model may preserve the legacy plain-object tool shape with a parameters field."
+  - id: tool_loop_agent
+    description: "The multi-step support assistant must be represented with the current agent abstraction for repeated reasoning and tool steps, not only as a single streamText call."
+    exclusive: "Without the skill, a model often uses streamText with maxSteps or regular streaming rather than the dedicated agent pattern required by the skill."
+  - id: agent_ui_stream_route
+    description: "The route must expose the assistant through the current agent UI streaming response path rather than the legacy data/text stream response."
+    exclusive: "Without the skill, a model may preserve toDataStreamResponse() or switch only to a direct streamText UI response instead of the agent UI stream integration."
+notes: |
+  - Positive trigger: this asks for an agentic AI SDK endpoint with tool calling and streaming.
+  - Observable correct behavior: the solution defines the ticket lookup tool with the current helper wrapper and input schema, introduces an agent abstraction for repeated ticket lookup/reasoning steps, and returns the current agent UI stream response from the route.
+  - Common failure modes: keeping the legacy inline tool object, using a single-step streamText route with maxSteps instead of the agent pattern required by the skill, or returning a legacy data/text stream.
+  - The model-visible input assets intentionally expose only the legacy support route and the local ticket fixture, not current v6 reference implementations.

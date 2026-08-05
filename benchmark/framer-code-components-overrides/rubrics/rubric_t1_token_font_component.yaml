@@ -1,0 +1,60 @@
+task_id: framer_code_components_overrides_t1_token_font_component
+skill_id: framer-code-components-overrides
+rules:
+  - id: g1_observable_output_write
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: '(?is)\b(?:Write|Edit)\b.{0,1000}?assets/framer_code_components_overrides_t1_token_font_component/output/CircularFlow\.brand\.tsx'
+    spec: "[GATE] The trace contains an observable write or edit to the final artifact output/CircularFlow.brand.tsx."
+
+  - id: r1_color_controls_unwrapped_for_tokens
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] ControlType.Color values in Framer may be token wrapper objects; all color props used for CSS/SVG styles, color parsing, or calculations must be unwrapped to real strings first.
+      skill-exclusive rationale: without reading the skill, a strong model will usually follow ordinary React/Framer intuition and pass accentColor, circleColor, textColor, labelTextColor directly as strings to stroke/fill/color; the skill explicitly states that token-bound colors become { value: "#..." }, so direct use by default conflicts with the skill's requirement to tok()/unwrap first.
+    signal:
+      query: >
+        In the finally written assets/framer_code_components_overrides_t1_token_font_component/output/CircularFlow.brand.tsx, are all color values exposed and consumed from ControlType.Color first token-wrapper-unwrapped before being used for CSS/SVG styles, parsing, or calculations? Judgment basis: look only at the actual Write/Edit written file content, not the agent's self-description. Answer YES if every consumed accentColor/circleColor/textColor/labelTextColor value is first unwrapped via an equivalent helper, inline unwrap, local safe variable, or precomputed style object before use. This includes conditional expressions, derived state, annotation color switching, SVG stroke/fill, CSS color, parsing, and computed style paths. Answer NO if a helper exists but any consumed color prop is still used directly in a CSS/SVG/calculation/conditional consumption point without unwrapping, including expressions such as isAnnotated ? accentColor : labelTextColor.
+      acceptable: "const tok = (v:any) => v && typeof v === 'object' && 'value' in v ? v.value : v; const safeCircleColor = tok(circleColor); const annotationColor = isAnnotated ? tok(accentColor) : tok(labelTextColor); ... <circle stroke={safeCircleColor} />"
+      unacceptable: "Defines tok() but still uses <circle stroke={circleColor} />, style={{ color: textColor }}, or isAnnotated ? accentColor : labelTextColor."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_font_controls_spread_whole_object
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Framer Font controls must be applied by spreading the entire font object, not by reading fontFamily/fontSize/fontWeight/fontStyle/letterSpacing fields one by one.
+      skill-exclusive rationale: without reading the skill, a strong model will naturally follow the existing code or generic React writing to map font properties field by field; the skill explicitly says field-by-field access causes Framer font styles to be incomplete or ineffective, and requires using ...props.font / ...titleFont / ...labelFont in style. The two conflict.
+    signal:
+      query: >
+        In the finally written assets/framer_code_components_overrides_t1_token_font_component/output/CircularFlow.brand.tsx, are titleFont and labelFont applied as a whole-object spread in actual rendered styles, and does it avoid reading Framer font properties field by field? Judgment basis: look only at the actual Write/Edit written file content, not the agent's self-description. Answer YES if the rendered title and step/label text styles include equivalent whole-object spreads such as ...titleFont and ...labelFont, including through local style objects or helpers, and may add non-font-control styles such as color, lineHeight, textAlign, or margin after the spread. Answer NO if the implementation primarily applies the Font control by manually mapping fontFamily/fontSize/fontWeight/fontStyle/letterSpacing from those props instead of spreading the whole object.
+      acceptable: "style={{ ...titleFont, color: safeTextColor, lineHeight: '1.1' }} and style={{ ...labelFont, color: safeLabelColor }}"
+      unacceptable: "style={{ fontFamily: titleFont?.fontFamily, fontSize: titleFont?.fontSize, fontWeight: titleFont?.fontWeight }}"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] The final delivery is a usable CircularFlow Framer code component, preserving the default export and property controls."
+    signal:
+      file: "assets/framer_code_components_overrides_t1_token_font_component/output/CircularFlow.brand.tsx"
+      file_must_contain: "(?s)(?=.*(?:export\\s+default\\s+(?:function\\s+)?CircularFlow\\b|export\\s+default\\s+CircularFlow\\b))(?=.*addPropertyControls\\s*\\(\\s*CircularFlow)"
+      file_must_not_contain: "\\b(?:TODO|PLACEHOLDER)\\b"

@@ -1,0 +1,74 @@
+task_id: SF03_t3_encrypted_extract
+level: L2
+skill_id: skill_03_pdf
+description: |
+  The compliance department gave me an encrypted internal financial analysis report PDF (jpmorgan_ar2024_secured.pdf),
+  compiled from the JP Morgan 2024 annual report. The password is JPM$ecure_2024!
+
+  I only need the Financial Highlights section; the compliance department has confirmed it corresponds to PDF pages 38-67, please extract directly by this range.
+  Just extract this part for me; the output does not need to be encrypted.
+
+initial_state:
+  files:
+    - path: README.txt
+      content: |
+        Input: jpmorgan_ar2024_secured.pdf (owner+user password encrypted)
+        Password: JPM$ecure_2024!
+        Source: Internal financial analysis report based on JP Morgan Chase 2024 Annual Report
+        Task: Extract Financial Highlights section (approx pages 38-67)
+        Output: unencrypted PDF with the extracted pages
+  tools_available: [bash, read, edit, grep]
+  binary_assets:
+    - path: jpmorgan_ar2024_secured.pdf
+      pages: 372
+      size_mb: 16.3
+      encryption: "owner_pw + user_pw = JPM$ecure_2024!"
+      description: "JP Morgan 2024 Annual Report — encrypted internal financial analysis report"
+      preparation: |
+        # Asset prepared by encrypting the source PDF with both owner and user passwords.
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: tool_restriction
+    description: "Must use pdftk, not pikepdf/pypdf for decryption + extraction"
+    exclusive: "Model often uses pikepdf for encrypted PDFs since it has better crypto support"
+  - id: inline_password
+    description: "Must use input_pw in same command as cat — single step, no intermediate decrypted file; no intermediate files like decrypted.pdf / *_unlocked.pdf / /tmp/*.pdf should exist after task"
+    exclusive: "Model's instinct is: (1) decrypt to temp, (2) extract. Skill forbids this."
+  - id: password_variable
+    description: "Must store password in shell variable using single quotes (PDF_PW='JPM$ecure_2024!'), not double quotes (which would expand $ecure_2024) or plaintext in command"
+    exclusive: "Model uses double quotes and gets silent $-expansion, or pastes password directly: pdftk file.pdf input_pw JPM$ecure_2024! ..."
+  - id: output_naming
+    description: "Split/Extract convention: jpmorgan_ar2024_secured_p38-67.pdf"
+    exclusive: "Model names it financial_highlights.pdf or extract.pdf"
+  - id: input_validation
+    description: "Must validate input (will need password for dump_data too)"
+    exclusive: "Model writes 'pdftk file.pdf dump_data | grep NumberOfPages' missing input_pw $PDF_PW, gets OWNER PASSWORD REQUIRED error"
+  - id: output_verification
+    description: "Must verify output = 30 pages using 'pdftk output.pdf dump_data | grep NumberOfPages' (matching 67-38+1=30)"
+    exclusive: "Model skips page count check"
+  - id: cli_tool_restriction
+    description: "Must not use qpdf/mutool/gs/pdfunite as alternatives to pdftk"
+    exclusive: "Model picks 'qpdf --password=... --decrypt in.pdf | qpdf --pages ...' for encrypted PDFs"
+  - id: trust_user_range
+    description: "Must trust user-given range (38-67) and only validate via NumberOfPages >= 67, not OCR/text-search to relocate section boundaries"
+    exclusive: "Model tries to extract text and search 'Financial Highlights' to refine page range"
+
+notes: |
+  Core test points (372-page real annual report, user describes it as "roughly pages 38 to 67"):
+  1. The user gave a fuzzy page range "roughly around pages 38 to 67" → the model should use the user-given range (38-67),
+     and verify range reasonableness via the input_validation step by confirming the actual page count
+  2. The most critical constraint — single-step inline password:
+     Wrong (model instinct):
+       PDF_PW="JPM\$ecure_2024!"
+       pdftk jpmorgan_ar2024_secured.pdf input_pw $PDF_PW output /tmp/decrypted.pdf
+       pdftk /tmp/decrypted.pdf cat 38-67 output extract.pdf
+     Correct (skill requires):
+       PDF_PW='JPM$ecure_2024!'
+       pdftk jpmorgan_ar2024_secured.pdf input_pw $PDF_PW cat 38-67 output jpmorgan_ar2024_secured_p38-67.pdf
+  3. The password contains special characters ($, !) → must use single quotes or proper escaping
+  4. Output naming: <stem>_p<range>.pdf = jpmorgan_ar2024_secured_p38-67.pdf
+  5. Input validation must also carry the password:
+     pdftk jpmorgan_ar2024_secured.pdf input_pw $PDF_PW dump_data | grep NumberOfPages
+  6. Verify the output is 30 pages

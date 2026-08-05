@@ -1,0 +1,32 @@
+task_id: swiftui_view_refactor_t1_orders_sections
+skill_id: swiftui-view-refactor
+description: |
+  I am cleaning up the order page of the Food Truck sample project. Please refactor `assets/swiftui_view_refactor_t1_orders_sections/input/OrdersView.swift` to make this page easier to maintain, while keeping the existing order filtering, search, navigation, table/list switching, and complete-order sheet behavior unchanged. Save the result to `output/OrdersView.swift`.
+initial_state:
+  assets:
+    - path: assets/swiftui_view_refactor_t1_orders_sections/input/OrdersView.swift
+      source: "https://github.com/apple/sample-food-truck/blob/main/App/Orders/OrdersView.swift"
+      real_state: "Real SwiftUI order page from the Apple sample-food-truck project; includes both list/table displays, multiple order status sections, toolbar actions, and row selection state."
+      preparation: |
+        Downloaded App/Orders/OrdersView.swift from the main branch of the public GitHub repository apple/sample-food-truck, without modifying file content; only placed into the task asset directory.
+  tools_available:
+    - file_editing
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: dedicated_section_subviews
+    description: "Non-trivial page regions should be extracted into small dedicated View types, passing required data through explicit inputs or bindings; do not hide full-screen complexity into multiple computed view helpers."
+    exclusive: "Without referencing this skill, the model typically retains or adds some View helper properties/methods like list, toolbarButtons, orderRows, only doing local cleanup."
+  - id: stable_root_structure
+    description: "Avoid using top-level conditions to switch between completely different view trees at the root; try to preserve a stable outer structure and localize differences to content regions or modifiers."
+    exclusive: "Default refactoring tends to continue keeping the ZStack if/else switching between list and table, or splitting into two more obvious complete root view branches."
+  - id: thin_body_actions
+    description: "Non-trivial actions in buttons should be moved out of view declarations; body and view builders should primarily present UI structure."
+    exclusive: "Without referencing this skill, the model may extract multi-line button closures into private methods, but usually still keeps the toolbar as a computed some View helper, and does not consistently require the Button/action area to only call small methods; this constraint should serve as an auxiliary signal, to be judged together with dedicated View type extraction."
+notes: |
+  - Core test point: whether non-trivial page regions such as order sections, order row areas, and toolbar areas are converted to dedicated small View types, with dependencies passed through explicit inputs or Bindings, rather than continuing to pile up computed some View helpers.
+  - Main judgment signal: dedicated_section_subviews. Focus on checking whether full-screen-level computed some View helpers are reduced, and corresponding private View types for real page regions are added.
+  - Secondary judgment signal: stable_root_structure. Encourages keeping a stable outer structure and avoiding further splitting the page into two complete root view branches; but do not mechanically require complete elimination of local conditions needed for list/table switching.
+  - Auxiliary judgment signal: thin_body_actions. Multi-step state updates like completing orders should be expressed as small methods; this item alone has weaker distinguishing power and should be judged together with whether the toolbar area is reasonably split.
+  - Expected correct behavior: the output file maintains functional equivalence; property ordering follows the sequence of environment, state, computed properties, body, subviews/helper methods; do not introduce new view models or rewrite business logic.
+  - Common error behaviors: continuing to use large computed some View helpers like list, toolbarButtons, orderRows to carry the main structure; introducing new view models; rewriting business logic; reinforcing top-level large if/else root view switching; producing extra files beyond the path in the description.

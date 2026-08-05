@@ -1,0 +1,167 @@
+rules:
+  - id: g1_observable_clean_file_attempt
+    type: required-output
+    provenance: gate
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The output file output/investor_update_template_clean.md must exist and be non-empty. This gates evaluability only and does not score skill-following.
+    signal:
+      file: "output/investor_update_template_clean.md"
+      file_must_contain: '(?s)\S.{50,}'
+
+  - id: r1_final_response_uses_four_skill_sections
+    type: order
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    severity: hard
+    weight: 1.0
+    spec: |
+      [SKILL] The final response should expose the skill workflow in order: Issues found, Rewritten version, What changed, and Second-pass audit.
+      skill-exclusive rationale: without reading the skill, a strong model will usually just save the cleaned Markdown and give a brief completion note; the skill requires returning a four-part audit/rewrite/change/second-pass structure. The conflict point is whether the avoid-ai-writing audit workflow is explicitly executed, rather than only delivering the edited result.
+    signal:
+      query: >
+        In the final answer only, does the response contain the avoid-ai-writing four-part workflow in this exact order: an issues/audit section, a rewritten-version section or equivalent, a what-changed/change-summary section, and a second-pass audit section? Judge only final_answer, not serialized tool steps or the agent's descriptions of intent. Answer YES if all four workflow sections are present in that order even with slightly different headings; answer NO if the response only says the file was saved, omits one of the four parts, or presents them out of order.
+      acceptable: "Final answer has sections named 'Issues found', 'Rewritten version', 'What changed', and 'Second-pass audit', in that order."
+      unacceptable: "Final answer only says 'Done, saved to output/investor_update_template_clean.md' or gives a short summary without a second-pass audit."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_audit_quotes_canned_opener_and_investor_hype
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    severity: hard
+    weight: 0.75
+    spec: |
+      [SKILL] The audit should identify AI-isms by quoting specific offending text, including chatbot/email-template filler and investor-risk promotional or significance-inflation language.
+      skill-exclusive rationale: without reading the skill, a strong model may silently rewrite or summarize the tone problem generally; the skill requires first auditing and quoting each offending text. The conflict point is whether concrete AI-ism evidence is exposed, rather than only doing ordinary polishing.
+    signal:
+      query: >
+        In the final answer only, focusing on the Issues found/audit section rather than the change summary, does the audit quote at least one canned opener from the input (for example "I hope this email finds you well", "I hope this message finds you well", "I hope you're doing well", or "I hope all is well with you") AND at least one investor hype/significance-inflation phrase (for example "Exciting News", "thrilled", "significant milestone", or "key growth opportunity") as identified issues? Judge only final_answer, not serialized tool steps. Answer YES if both categories are quoted or clearly cited in the audit; answer NO if the audit is generic, covers only one category, or only quotes them later as edits made.
+      acceptable: "Issues found flags 'I hope this email finds you well' as a chatbot artifact and 'marks a significant milestone' as significance inflation."
+      unacceptable: "Says 'removed generic investor language' without quoting the source phrases, or only mentions the phrases in What changed."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_clean_file_removes_canned_openers
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    exclusive: true
+    severity: hard
+    weight: 1.0
+    spec: |
+      [SKILL] Chatbot artifacts and canned openers such as "I hope this email/message finds you well" must be removed entirely, not paraphrased into another polite filler opener.
+      skill-exclusive rationale: without reading the skill, a strong model will treat these lines as normal email etiquette and may keep or lightly paraphrase them; the skill requires removing chatbot artifacts entirely. The conflict point is whether polite template openers are removed as AI/chat artifacts.
+    signal:
+      file: "output/investor_update_template_clean.md"
+      file_must_not_contain:
+        - '(?i)I hope (this (email|message|note)?\s*finds you well|you.?re doing well|all is well with you)'
+        - '(?i)\bhope this (email|message|note)?\s*finds you\b'
+        - '(?i)\btrust (you|this).{0,80}\bwell\b'
+        - '(?i)\bhope.{0,80}\b(you|your team).{0,80}\bwell\b'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_investor_email_extra_strict_on_hype
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    exclusive: true
+    severity: hard
+    weight: 1.0
+    spec: |
+      [SKILL] For investor-email context, promotional language and significance inflation should be treated extra strictly: remove or neutralize phrases such as "Exciting News", "thrilled", "significant milestone", and "key growth opportunity" rather than replacing them with equivalent inflation.
+      skill-exclusive rationale: without reading the skill, a strong model may only smooth tone and leave investor-update hype as acceptable enthusiasm; the skill requires the investor-email profile to be extra strict about promotional language and significance inflation. The conflict point is whether investor-risk hype is actively reduced rather than preserved as sales copy.
+    signal:
+      file: "output/investor_update_template_clean.md"
+      file_must_not_contain:
+        - '(?i)Exciting News'
+        - '(?i)\b(excited|delighted|thrilled)\b'
+        - '(?i)\b(significant|important|major|notable|remarkable)\s+milestone\b'
+        - '(?i)\b(key|major|significant|compelling)\s+growth\s+opportunity\b'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_tier1_vocabulary_replaced
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    exclusive: true
+    severity: hard
+    weight: 0.75
+    spec: |
+      [SKILL] Tier 1 AI-writing vocabulary in the source, especially verb forms of "utilize" and "leverage", should be replaced on sight with plain wording such as "use".
+      skill-exclusive rationale: without reading the skill, a strong model may keep business words like utilized/leverage because they are common in investor templates; the skill requires Tier 1 words to always be flagged and replaced. The conflict point is whether business jargon is handled per the word list, rather than only fixing tone.
+    signal:
+      file: "output/investor_update_template_clean.md"
+      file_must_not_contain:
+        - '(?i)\butili[sz](e|ed|es|ing)\b'
+        - '(?i)\bleverag(e[ds]?|ing)\b'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_second_pass_audit_actually_reviews_rewrite
+    type: termination
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    severity: hard
+    weight: 0.75
+    spec: |
+      [SKILL] The second-pass audit must re-read the rewritten version and either identify/fix remaining AI tells or explicitly state the rewrite is clean.
+      skill-exclusive rationale: without reading the skill, a strong model usually stops after saving the edited file; the skill requires doing a second-pass audit after the rewrite. The conflict point is whether a closing review is performed, rather than a one-time rewrite.
+    signal:
+      query: >
+        In the final answer only, does the second-pass audit specifically review the rewritten investor update and either state that no AI-writing tells remain or name a remaining issue and its fix? Judge only final_answer, not serialized steps or claims made before the file was written. Answer YES if the second-pass section is substantive; answer NO if it is missing, only says "done", or repeats the first audit without reviewing the rewrite.
+      acceptable: "Second-pass audit: Clean. No canned openers, hype, Tier 1 terms, or significance inflation remain."
+      unacceptable: "No second-pass section, or 'I reviewed it' with no reference to remaining/clean AI tells."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The requested investor update template was saved and remains a reusable investor-email template with placeholders and core sections preserved.
+    signal:
+      file: "output/investor_update_template_clean.md"
+      file_must_contain:
+        - '(?s)\S.{50,}'
+        - '\[Your Company\]'
+        - '\[Investor[''’]s Name\]'
+        - '\[Month, Year\]'
+        - '\[Your Name\]'
+        - '(?im)^\s*Subject\b'
+        - '(?i)\bDear\s+\[Investor[''’]s Name\]'
+        - '(?i)\b(Best|Regards|Sincerely)\b'

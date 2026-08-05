@@ -1,0 +1,41 @@
+task_id: swiftui_performance_audit_t3_moonshot_images
+skill_id: swiftui-performance-audit
+description: |
+  This task's home page grid and detail page experience brief jank when entering, scrolling, and switching on older devices, and runtime resource usage is also high. The source code snippets are in `assets/swiftui_performance_audit_t3_moonshot_images/input/ContentView.swift` and `assets/swiftui_performance_audit_t3_moonshot_images/input/MissionView.swift`. Please help me do a performance review, pointing out the most likely risks and investigation suggestions by impact priority.
+initial_state:
+  assets:
+    - path: assets/swiftui_performance_audit_t3_moonshot_images/input/ContentView.swift
+      source: "https://raw.githubusercontent.com/twostraws/HackingWithSwift/main/SwiftUI/project8/Moonshot/ContentView.swift"
+      real_state: "Real SwiftUI tutorial project file; the home page uses LazyVGrid to display mission cards, each card rendering a mission image."
+      preparation: |
+        Downloaded the original Swift file directly from the public repository without modifying content.
+    - path: assets/swiftui_performance_audit_t3_moonshot_images/input/MissionView.swift
+      source: "https://raw.githubusercontent.com/twostraws/HackingWithSwift/main/SwiftUI/project8/Moonshot/MissionView.swift"
+      real_state: "Real SwiftUI tutorial project file; the detail page displays a large image at the top and crew images in a horizontal scrolling area."
+      preparation: |
+        Downloaded the original Swift file directly from the public repository without modifying content.
+  tools_available:
+    - Read
+    - Grep
+    - Bash
+expected_trigger: true
+skill_constraints_tested:
+  - id: image_pressure_category
+    description: "The skill requires mapping high memory or image pressure to large image decode/resize work, and prioritizing image cost fixes such as pre-rendering downsampling."
+    exclusive: "Without reading the skill, the model may primarily attribute jank to NavigationLink eager destination initialization, ScrollView nesting depth, ForEach identity, or general SwiftUI layout overhead, and vaguely suggest caching, async loading, or reducing view hierarchy, without explicitly positioning large image decode/resize work as the primary validation direction for memory peaks, and without using the image pressure classification framework."
+  - id: evidence_based_validation
+    description: "The skill requires providing before/after metrics or having the user re-run the same capture to verify CPU, frame drops, and memory peak changes."
+    exclusive: "Without reading the skill and when the user does not explicitly request a validation method, the model may only give code-level fix suggestions, or vaguely mention Instruments, without requesting to re-run captures along the same home page scroll, open detail, horizontal swipe crew area interaction path, and using CPU, frame drops, and memory peaks for before/after comparison."
+notes: |
+  - Core test point: performance audit of an image-dense SwiftUI interface, requiring the model to use the image pressure/remediation branch from the skill.
+  - Expected correct behavior: cover both the home page grid and mission detail page files, identify image rendering related code paths and potential memory/decode costs; explain the priority difference between layout or navigation suspicions and image pressure suspicions, and provide a runtime evidence validation plan.
+  - Common model error behavior: only making suggestions for the LazyVGrid at `assets/swiftui_performance_audit_t3_moonshot_images/input/ContentView.swift:21` or the nested horizontal ScrollView at `MissionView.swift:52`, without mentioning the evidence chain of image decode/resize and memory peaks.
+  - baseline_correctness_signals:
+      - The answer covers both the home page grid and mission detail page files.
+      - The answer provides at least two actual source code line number references.
+  - skill_following_signals:
+      - Classifies the issue as image pressure or large image decode/resize work, rather than only making generic layout, navigation, or view hierarchy suggestions.
+      - Explicitly proposes targeted fixes such as pre-rendering downsampling, generating appropriately sized assets, or avoiding runtime large-image scaling.
+      - Distinguishes suspicions from code review from trace-backed evidence, explaining which conclusions still need runtime evidence confirmation.
+      - Requests re-running captures under the same interaction path, and comparing before/after metrics such as CPU, frame drops, and memory peaks.
+      - If runtime evidence is insufficient, requests supplementary device/OS, Debug or Release, specific interaction steps, and SwiftUI timeline / Time Profiler evidence.

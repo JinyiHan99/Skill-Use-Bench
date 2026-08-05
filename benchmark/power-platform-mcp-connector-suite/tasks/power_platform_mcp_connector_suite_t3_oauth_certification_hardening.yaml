@@ -1,0 +1,51 @@
+task_id: power_platform_mcp_connector_suite_t3_oauth_certification_hardening
+skill_id: power-platform-mcp-connector-suite
+description: |
+  Our partner team wants to submit the Salesforce connector package in `./assets/power_platform_mcp_connector_suite_t3_oauth_certification_hardening/input/` for a managed pilot. Sign-in works during maker testing, but the security reviewer says the current authentication flow and submission package are not sufficient for agent-mediated use. Please harden the package and put the submission-ready version in `output/salesforce_certification_ready/`, including the reviewer handoff artifacts and a concise security note.
+initial_state:
+  assets:
+    - path: ./assets/power_platform_mcp_connector_suite_t3_oauth_certification_hardening/input/apiDefinition.swagger.json
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/apiDefinition.swagger.json"
+      real_state: "Unmodified public Salesforce connector definition with agent integration."
+      preparation: "Downloaded without content changes."
+    - path: ./assets/power_platform_mcp_connector_suite_t3_oauth_certification_hardening/input/apiProperties.json
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/apiProperties.json"
+      real_state: "Unmodified public connector properties file using Salesforce sign-in settings."
+      preparation: "Downloaded without content changes."
+    - path: ./assets/power_platform_mcp_connector_suite_t3_oauth_certification_hardening/input/script.csx
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/script.csx"
+      real_state: "Unmodified public connector script file for the Salesforce connector."
+      preparation: "Downloaded without content changes."
+    - path: ./assets/power_platform_mcp_connector_suite_t3_oauth_certification_hardening/input/readme.md
+      source: "https://raw.githubusercontent.com/troystaylor/SharingIsCaring/main/Salesforce%20MCP/readme.md"
+      real_state: "Unmodified public connector documentation for the Salesforce connector."
+      preparation: "Downloaded without content changes."
+  tools_available:
+    - filesystem
+    - json_editor
+    - text_editor
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: oauth_security_hardening
+    description: "The skill requires OAuth 2.0 authentication to be enhanced with MCP security practices, including token audience validation and confused-deputy prevention."
+    exclusive: "Without the skill, a model may stop at generic Salesforce OAuth configuration or broad token-hygiene documentation, rather than tying the connector's agent-mediated MCP flow to concrete anti-confused-deputy hardening and certification-ready artifacts."
+  - id: state_parameter_protection
+    description: "The skill calls for secure state parameter protection for CSRF prevention in the authentication flow."
+    exclusive: "Without the skill, a model may mention generic CSRF or replay prevention, but is less likely to connect state/return-path protection to the Power Platform MCP connector handoff and make it part of the submission-ready package."
+  - id: certification_package_completeness
+    description: "The skill's certification preparation mode expects complete metadata, documentation, authentication security notes, and icon compliance artifacts."
+    exclusive: "A model using generic Power Platform knowledge may update only apiProperties.json and readme.md, omitting the certification-side metadata and artifact checks highlighted by the skill."
+notes: |
+  - Core test: a working sign-in connector must be raised to the skill's agent-aware security and certification bar, not merely kept functionally importable.
+  - Expected correct behavior: output includes a complete connector package, submission metadata, icon artifact or clear verified icon placeholder handling, and a security note explaining the authentication hardening for an agent context.
+  - Common wrong behavior: model leaves `./assets/power_platform_mcp_connector_suite_t3_oauth_certification_hardening/input/apiProperties.json:7` as the only authentication treatment and never adds audience/state validation guidance or script policy; model edits only documentation while `./assets/power_platform_mcp_connector_suite_t3_oauth_certification_hardening/input/script.csx:193` continues accepting request context without any hardened token/audience checks; model claims certification readiness without adding settings metadata or icon evidence.
+  - baseline_correctness_signals:
+      - `output/salesforce_certification_ready/` contains at least `apiDefinition.swagger.json`, `apiProperties.json`, `script.csx`, and `readme.md`.
+      - The Salesforce connector remains HTTPS-only and preserves the original business API coverage.
+      - JSON artifacts parse successfully.
+  - skill_following_signals:
+      - The output connector assets contain concrete audience-binding or equivalent anti-confused-deputy logic, and the security note explains why it is needed for agent-mediated sign-in.
+      - The output package includes concrete state/return-path protection guidance or connector-side validation that binds request and callback state and rejects stale or replayed returns.
+      - `output/salesforce_certification_ready/` includes complete submission metadata such as `settings.json`, plus icon compliance evidence or a correctly sized PNG artifact.
+      - The security note ties the authentication hardening to agent-mediated MCP use rather than generic web OAuth alone.

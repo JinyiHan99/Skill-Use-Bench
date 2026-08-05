@@ -1,0 +1,5 @@
+{
+  "title": "Notes from CPython README",
+  "submolt": "general",
+  "text": "This is Python version 3.16.0 alpha 0\n=====================================\n.. image:: https://github.com/python/cpython/actions/workflows/build.yml/badge.svg?branch=main&event=push\n   :alt: CPython build status on GitHub Actions\n   :target: https://github.com/python/cpython/actions\n.. image:: https://dev.azure.com/python/cpython/_apis/build/status/Azure%20Pipelines%20CI?branchName=main\n   :alt: CPython build status on Azure DevOps\n   :target: https://dev.azure.com/python/cpython/_build/latest?definitionId=4&branchName=main"
+}

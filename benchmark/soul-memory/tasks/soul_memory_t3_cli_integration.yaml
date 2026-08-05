@@ -1,0 +1,70 @@
+task_id: soul_memory_t3_cli_integration
+skill_id: skill_98_soul-memory
+description: |
+  This memory component now needs to be called directly by external processes through a command-line entry point. Operations colleagues reported that after integration, callers sometimes cannot reliably consume the returned results, making the integration pipeline unreliable. Based on `assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/`, investigate and fix the command-line integration pipeline. After the fix, save minimal validation records for normal query and failure/empty-result scenarios under `output/` for automated detection.
+initial_state:
+  assets:
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Files extracted from the real Soul Memory repository: command-line entry point, core, retrieval/dedup/tag-index modules, dependency manifest, two data index files, and placeholder modules needed for local integration testing. This snapshot is not the complete repository."
+      preparation: |
+        On 2026-07-03, the public repository was cloned with git clone --depth 1, and files related to the CLI retrieval pipeline were extracted to the input directory; this snapshot is not the complete repository. The current disk snapshot also includes priority_parser.py, dynamic_classifier.py, and version_control.py as local dependency placeholder modules, to prevent the CLI pipeline from being blocked by unrelated missing imports.
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/cli.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Command-line entry point file extracted from the real Soul Memory repository."
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/core.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Core file slice extracted from the real Soul Memory repository."
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/requirements.txt
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Dependency manifest extracted from the real Soul Memory repository."
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/modules/vector_search.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Local retrieval module extracted from the real Soul Memory repository."
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/modules/semantic_dedup.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Semantic deduplication module extracted from the real Soul Memory repository."
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/modules/tag_index.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Tag index module extracted from the real Soul Memory repository."
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/modules/priority_parser.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Local dependency placeholder module present in the current disk snapshot, used to support the CLI integration pipeline; not a reference implementation."
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/modules/dynamic_classifier.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Local dependency placeholder module present in the current disk snapshot, used to support the CLI integration pipeline; not a reference implementation."
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/modules/version_control.py
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Local dependency placeholder module present in the current disk snapshot, used to support the CLI integration pipeline; not a reference implementation."
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/data/dedup.json
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Data index file extracted from the real Soul Memory repository."
+    - path: assets/soul_memory_t3_cli_integration/input/soul-memory-snapshot/data/tag_index.json
+      source: "https://github.com/kingofqin2026/Soul-Memory-"
+      real_state: "Data index file extracted from the real Soul Memory repository."
+  tools_available:
+    - filesystem
+    - shell
+    - python
+expected_trigger: true
+skill_constraints_tested:
+  - id: cli_contract_for_external_integration
+    description: "When the command-line entry point serves as the external integration interface for soul-memory, callers should be able to reliably consume the same type of main return in normal, empty-result, and failure scenarios; internal initialization information, diagnostic information, and exception descriptions must not pollute the main result read by callers."
+    exclusive: "Without reading the skill, the model may only fix the success path or write error information as plain explanatory text; after reading the skill, it should treat the CLI as an external system consumption interface, keeping the machine-parseable contract consistent across success and failure paths."
+  - id: external_result_field_contract
+    description: "The result items returned by the CLI externally need to maintain the stable field contract that soul-memory external integration depends on, especially normalizing fields intended for internal implementation in the underlying retrieval objects into the fields that external callers depend on."
+    exclusive: "Without reading the skill, the model may directly follow the underlying SearchResult or module-internal naming and return fields such as source; after reading the skill, it should recognize that the external integration layer depends on stable fields like path/content/score/priority, and must not let internal field names leak into the calling contract."
+notes: |
+  - Core test point: whether the model can fix the CLI integration pipeline as the external consumption interface of soul-memory, distinguishing between main return, diagnostic information, and external field contracts.
+  - correctness_signals:
+      - The fixed CLI can complete a normal query validation.
+      - The fixed CLI can complete a failure or empty-result scenario validation.
+      - Validation records can be parsed by automated scripts.
+      - `output/` contains at least one normal query sample and one failure/empty-result sample, both automatically parseable.
+      - No user files outside the task directory were modified or depended on.
+  - skill_following_signals:
+      - The main return does not mix in initialization, debug, banner, traceback, or explanatory chatter.
+      - Success, empty-result, and failure paths maintain the same machine-consumable structure.
+      - External result fields maintain the external integration contract, without exposing underlying internal field names.
+  - regression_guard:
+      - No new external network calls, remote embeddings, cloud search services, or dependencies outside the task directory; the fix should be confined to the CLI integration pipeline within the local snapshot.

@@ -1,0 +1,74 @@
+task_id: SF78_t1_create_closures_page
+level: L2
+skill_id: skill_78_write_javascript_concept_documentation
+description: |
+  We are going to add the closures concept page. The source material is already in `assets/SF78_t1_create_closures_page/input/mdn_closures.md` and `assets/SF78_t1_create_closures_page/input/javascript_info_closure.md`.
+
+  Please write a new page based on these materials that can be placed directly into the project's concept section, saved as `output/closures.mdx`. Some readers will be people just starting to learn JavaScript, so please explain the abstract parts clearly, and also retain enough practical depth.
+
+initial_state:
+  assets:
+    - path: assets/SF78_t1_create_closures_page/input/mdn_closures.md
+      source: "https://github.com/mdn/content/blob/main/files/en-us/web/javascript/guide/closures/index.md"
+      real_state: "MDN Web Docs JavaScript Guide page for closures, downloaded as Markdown source."
+      preparation: |
+        Downloaded with: curl -L https://raw.githubusercontent.com/mdn/content/main/files/en-us/web/javascript/guide/closures/index.md
+        Saved without content edits.
+    - path: assets/SF78_t1_create_closures_page/input/javascript_info_closure.md
+      source: "https://github.com/javascript-tutorial/en.javascript.info/blob/master/1-js/06-advanced-functions/03-closure/article.md"
+      real_state: "javascript.info closure chapter, downloaded as Markdown source."
+      preparation: |
+        Downloaded with: curl -L https://raw.githubusercontent.com/javascript-tutorial/en.javascript.info/master/1-js/06-advanced-functions/03-closure/article.md
+        Saved without content edits.
+  tools_available: [read, write, edit, grep, bash]
+
+expected_trigger: true
+
+expected_outputs:
+  - path: output/closures.mdx
+    kind: mdx_concept_page
+    description: "A publication-ready closures concept page for the JavaScript concepts project."
+
+skill_constraints_tested:
+  - id: exact_concept_page_structure
+    description: "The page must follow the skill's required concept-page section order: opening hook, immediate simple code example, learning summary, major explanatory sections, analogy with ASCII diagram, mistakes, advanced patterns, takeaways, knowledge check, related concepts, references, articles, and videos."
+    exclusive: "Without the skill, a model will likely write a normal tutorial with headings of its choice and omit several project-specific sections or order them differently."
+  - id: seo_title_description_constraints
+    description: "The title/sidebarTitle/description must follow the skill's SEO rules, including concept-first title ending with 'in JavaScript', sidebar title without that suffix, and a 150-160 character action-oriented description."
+    exclusive: "A generic documentation writer may create a short title like 'Closures' and a brief meta description without the project-specific length and wording constraints."
+  - id: beginner_friendly_with_prerequisite_links
+    description: "The explanation must assume some readers are new to coding, explain lexical scope gently, and link prerequisite related concepts instead of assuming prior knowledge."
+    exclusive: "Without the skill, the answer may lean on MDN-style terminology and skip beginner empathy or internal prerequisite links."
+  - id: code_example_style
+    description: "Code examples must start simple, show expected output in comments, use meaningful variable names, and include wrong/correct examples for common closure mistakes."
+    exclusive: "A generic page may include technically correct examples but not the skill's demonstration style or wrong/correct pattern."
+  - id: human_language_quality
+    description: "The copy must avoid the skill's banned AI-sounding phrases, filler words, stiff phrasing, and em-dash overuse while keeping a conversational tone."
+    exclusive: "Without the skill, models often use phrases like 'one of the most important concepts', 'essential', and repeated em-dash asides."
+
+notes: |
+  Core test point: creating a new concept page; the source material is real but the source style is reference/tutorial-oriented; the model needs to rewrite it into a complete concept page for this project, not a simple summary.
+
+  Expected correct behavior:
+  - Generate `output/closures.mdx`, complete and publishable, covering the definition of closures, lexical scope, practical uses, common pitfalls, and advanced patterns.
+  - Start with a question hook, then immediately give a minimal closure example such as `createCounter()`, and show the output in comments.
+  - Naturally include MDN external links and `/concepts/...` internal links in the page; use specific two-sentence descriptions in the resources section, not generic "comprehensive guide".
+  - Key Takeaways should contain 8-10 items, Test Your Knowledge should contain 5-6 Q&A.
+
+  Common model error behaviors:
+  - At `output/closures.mdx:1` only write `title: "Closures"`, without using a concept-first hook, and without making the SEO title end with `in JavaScript`.
+  - No code block within the first 200 words, instead starting with a lengthy explanation of execution context and scope chain.
+  - In the Common Mistakes section only write "avoid memory leaks", without giving wrong/correct code comparisons like `for (var i = 0; ...)`.
+  - In resource card descriptions write generic descriptions like `Learn all about JavaScript closures.`, violating the skill's resource description requirements.
+  - Repeatedly use phrases like `This is crucial`, `To truly understand`, `one of the most important concepts` that the skill explicitly requires avoiding.
+
+  baseline_correctness_signals:
+    - `output/closures.mdx` exists and is an MDX/Markdown document.
+    - The document topic is JavaScript closures, based on the two input materials.
+    - Contains readable explanations and runnable JavaScript examples.
+  skill_following_signals:
+    - Page structure and order match the skill's concept page template.
+    - frontmatter title/sidebarTitle/description satisfy the skill's SEO constraints.
+    - Closures keyword is naturally placed in the first paragraph, H2, learning objectives, and takeaways without stuffing.
+    - Contains ASCII diagram, Mintlify components, MDN links, internal concept links, and high-quality resource cards.
+    - Language quality avoids the AI-sounding and filler words listed in the skill.

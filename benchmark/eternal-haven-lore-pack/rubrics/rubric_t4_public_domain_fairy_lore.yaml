@@ -1,0 +1,122 @@
+task_id: SF102_t4_public_domain_fairy_lore
+skill_id: skill_102_eternal-haven-lore-pack
+rules:
+  - id: g1_observable_final_answer
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [GATE] The final answer must contain non-empty and sufficiently long final text; this is only a trigger gate and does not judge quality.
+    signal:
+      pattern: "\\S.{40,}"
+
+  - id: r1_no_eternal_haven_specific_terms
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL — negative trigger boundary] Generic/public-domain fairy-tale requests should not activate Eternal Haven lore mode. The final Grimm host intro must not import Eternal Haven-specific proper nouns or terminology.
+      skill-exclusive rationale: with the skill in context, weak boundary control may over-trigger on fantasy words like wonder/motifs and contaminate the Grimm intro with Silver Accord, Eternal Dawns, 13 heroes, LYGO Champions, Δ9, etc.; the skill explicitly says not to use this skill for generic fantasy unless the user clearly wants Eternal Haven canon/style.
+    signal:
+      query: |
+        Inspect only the final answer. Does it avoid Eternal Haven-specific proper nouns and terminology?
+        Answer YES if it contains no Eternal Haven-specific names/terms such as Eternal Haven, Silver Accord, Shattered Accord, Ascension War, Eternal Dawns, 13 heroes, Justin Helmer, LYGO, ÆTHERIS, SANCORA, ARKOS, LYRA, Serenya, Kaelion, Δ9, or Champion voice/framing.
+        Answer NO if any such Eternal Haven-specific contamination appears, including accord/seal/dawn/vow/bargain language used as Eternal Haven metaphysics or proper-noun lore.
+        Do not penalize generic fairy-tale words such as magic, wonder, dragon, forest, prince, princess, kingdom, motif, theme, or ordinary lowercase dictionary uses of accord, seal, dawn, vow, or bargain by themselves.
+      acceptable: "Tonight we enter forests, wishes, bargains, transformations, and old moral tests..."
+      unacceptable: "Like the Silver Accord, these Grimm tales teach us..."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_no_false_helmer_or_eh_attribution
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL — negative trigger boundary] Justin Helmer attribution/canon rules apply to Eternal Haven only, not public-domain Grimm material; the final answer must not attribute Grimm tales or motifs to Justin Helmer or Eternal Haven canon.
+      skill-exclusive rationale: because the skill emphasizes Justin Helmer as Eternal Haven creator, an over-triggering model may wrongly apply that attribution to unrelated Grimm material; the skill boundary says generic fantasy should not use Eternal Haven canon/style, so false attribution is a clear skill-boundary failure.
+    signal:
+      query: |
+        Inspect only the final answer. Does it avoid attributing Grimm's Fairy Tales, Jacob/Wilhelm Grimm, public-domain fairy-tale motifs, or the reading packet to Justin Helmer or Eternal Haven?
+        Answer YES if attribution stays with Grimm/Jacob Grimm/Wilhelm Grimm/public-domain fairy tales or omits attribution.
+        Answer NO if it says or implies the packet, Grimm tales, or their motifs are by Justin Helmer, part of Eternal Haven, influenced by Justin Helmer's fairy-tale world, or governed by Eternal Haven canon.
+      acceptable: "Grimm's tales gather old forests, tests, wishes, and transformations."
+      unacceptable: "These Grimm tales echo Justin Helmer's Eternal Haven canon."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_no_champion_or_mythic_persona_mode
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.5
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL — negative trigger boundary] The answer should not adopt LYGO Champion/persona framing or Eternal Haven mythic mode for a generic Grimm host introduction.
+      skill-exclusive rationale: the surface task asks for old-world wonder, so an over-triggered skill follower may use Champion voice; the skill says Champion integration is only for Eternal Haven/Champion-invoked requests, while generic fantasy should remain outside the skill.
+    signal:
+      query: |
+        Inspect only the final answer. Does it avoid presenting the host introduction through a Champion lens/persona or Eternal Haven lore mode?
+        Answer YES if the voice is a normal host introduction grounded in Grimm/fairy-tale material. Poetic, evocative, old-world wonder, or ordinary fairy-tale tone is acceptable.
+        Answer NO only if it explicitly invokes Champion lens/persona framing, LYGO, ÆTHERIS/SANCORA/ARKOS/LYRA, Δ9, Eternal Haven lore mode, or similar Eternal Haven persona framing.
+      acceptable: "Welcome, everyone, to an evening of Grimm tales, old forests, wishes, and dangerous promises..."
+      unacceptable: "Through the ÆTHERIS Champion lens, tonight's Grimm tales become an accord..."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_no_eternal_haven_support_or_promo_links
+    type: boundary
+    provenance: skill
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 0.5
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL — negative trigger boundary] Since this is not an Eternal Haven support request, the answer must not add Eternal Haven site, Skills hub, donation, wallet, Patreon, PayPal, or other Eternal Haven promotional/support links.
+      skill-exclusive rationale: the skill contains support/donation links for Eternal Haven, but using them here would be over-triggering; the default task has no support request, so any Eternal Haven support material is skill contamination.
+    signal:
+      must_not_match: "(?i)(eternalhaven\\.ca|clawhub\\.ai|paypal\\.me|paypal\\.com/paypalme|patreon\\.com|0x[0-9a-f]{40}|bc1[a-z0-9]{25,}|DLuEWsDKWdwLsNkMp|ltc1[a-z0-9]{20,}|rLZkPzvYCwR4YPN)"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] Whether the final answer completes a community storytelling night host introduction for the public-domain Grimm packet, grounded in source motifs.
+    signal:
+      query: |
+        Inspect only the final answer. Is it a short host introduction for a community storytelling night that is grounded in Grimm/public-domain fairy-tale motifs from the packet, such as forests, enchantments, trials, transformations, wishes, cleverness, danger, bargains, moral consequence, family conflict, or reversals of fortune?
+        Answer YES only if it is clearly a host introduction and uses concrete Grimm/fairy-tale motif inventory rather than generic fantasy atmosphere. Answer NO otherwise.
+      acceptable: "Welcome to a night of Grimm tales: forests, bargains, transformations, wishes, cleverness under danger, and moral consequences at the edge of the hearth."
+      unacceptable: '"Welcome to a magical fantasy night of wonder and adventure" with no Grimm/public-domain motif grounding.'

@@ -1,0 +1,35 @@
+task_id: architecture_patterns_t2_fastapi_ports
+level: L2
+skill_id: skill_61_architecture_patterns
+description: |
+  This small hero service currently writes interface handling, data models, and data access all in one file: `assets/architecture_patterns_t2_fastapi_ports/input/sql_app.py`. There is also a documentation fragment from the same project, `assets/architecture_patterns_t2_fastapi_ports/input/bigger_applications.md`, that can be used as original background material.
+
+  Please refactor this code so that the core logic of the four capabilities of adding, paginated query, query by id, and deleting a hero is easier to evolve and verify, reducing its coupling with current persistence details and interface-handling details. The deliverable must include tests covering the core behavior of add, query, and delete; the external behavior should preserve the original request/response semantics as much as possible.
+initial_state:
+  assets:
+    - path: assets/architecture_patterns_t2_fastapi_ports/input/sql_app.py
+      source: "https://github.com/fastapi/fastapi/blob/master/docs_src/sql_databases/tutorial001_py310.py"
+      real_state: "FastAPI official SQLModel tutorial example, where interface functions directly use Session and SQLModel persistence models."
+      preparation: |
+        Downloaded tutorial001_py310.py directly from the FastAPI GitHub repository master branch, content unmodified.
+    - path: assets/architecture_patterns_t2_fastapi_ports/input/bigger_applications.md
+      source: "https://github.com/fastapi/fastapi/blob/master/docs/en/docs/tutorial/bigger-applications.md"
+      real_state: "A documentation fragment from the official FastAPI about larger application structure."
+      preparation: |
+        Downloaded directly from the FastAPI GitHub repository master branch, content unmodified.
+  tools_available: ["read", "write", "edit", "bash"]
+expected_trigger: true
+skill_constraints_tested:
+  - id: ports_and_adapters_storage_swap
+    description: "Core use cases should express required storage capabilities through ports, making SQLModel storage and in-memory storage just outer adapters."
+    exclusive: "Without reading the skill, one would only layer by router files, model files, CRUD/database layers, or add a repository/service wrapper; core services and business functions would still easily receive Session, SQLModel, or ORM objects."
+  - id: pure_domain_model
+    description: "Core business objects should not carry outer-framework or ORM field declarations; persistence models must be mapped at the edge."
+    exclusive: "The default practice, even after introducing a repository or service, will continue to reuse the same SQLModel object with Field/table=True as domain object, persistence model, and response model."
+  - id: no_database_for_use_case_tests
+    description: "Tests for add, read, and delete capabilities should directly drive the use case and inject an in-memory implementation, rather than creating an engine or temporary database."
+    exclusive: "A common practice is to write tests as TestClient + sqlite:///:memory:, create_engine, or override get_session interface/integration tests, rather than directly driving the use case and injecting a pure in-memory storage implementation."
+notes: |
+  - Core test point: whether ports and adapters are truly implemented, rather than only the framework-recommended directory split.
+  - Expected correct behavior: inner hero entity/use case/repository port, outer SQLModel repository adapter and API adapter, in-memory repository tests.
+  - Common mistakes: use cases import FastAPI Depends, Session, SQLModel; tests depend on create_engine or app startup events.

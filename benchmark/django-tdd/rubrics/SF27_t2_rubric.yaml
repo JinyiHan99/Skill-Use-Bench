@@ -1,0 +1,139 @@
+# Rubric for SF27 — SF27_t2_celery_notification_tests (V3, migrated to engine-supported verifier)
+# Background same as t1: the original files_any/file_must_contain_* state-check fields are not implemented by the scoring engine -> compliance always 0.
+# Migration: switched to regex (based on real Write/Edit tool-call content in the trace) and llm-judge.
+# Balance: MUST NOT total weight (1.0) <= MUST DO total weight (4.5).
+task_id: SF27_t2_celery_notification_tests
+skill_id: SF27
+expected_trigger: true
+rules:
+
+  # ── GATE ──────────────────────────────────────────────────────────────
+  - id: g1_test_files_written
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains real writes of Python test files under tests/ that involve notification/celery behavior."
+    signal:
+      pattern: '(?is)"file_path"\s*:\s*"[^"]*tests?/[^"]*\.py"[\s\S]{0,12000}?(?:notification|celery|\.delay\s*\(|apply_async\s*\(|def\s+test_)'
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  # ── MUST DO ───────────────────────────────────────────────────────────
+  - id: r1_celery_always_eager_in_settings
+    type: required-arg
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] The test settings set CELERY_TASK_ALWAYS_EAGER=True and CELERY_TASK_EAGER_PROPAGATES=True,
+      to execute Celery tasks synchronously and propagate exceptions for deterministic assertions.
+      Skill-exclusive rationale: without reading the skill, a model often mocks celery tasks; the skill requires eager synchronous execution + exception propagation.
+    signal:
+      pattern: '(?is)CELERY_TASK_ALWAYS_EAGER\s*=\s*True[\s\S]{0,400}?CELERY_TASK_EAGER_PROPAGATES\s*=\s*True|CELERY_TASK_EAGER_PROPAGATES\s*=\s*True[\s\S]{0,400}?CELERY_TASK_ALWAYS_EAGER\s*=\s*True'
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  - id: r2_factory_boy_for_test_data
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] User/Notification test data is created via factory_boy factories (or factory-backed fixtures); no direct ORM creation in tests.
+      Skill-exclusive rationale: Django tests default to .objects.create_user/.objects.create for quick construction; the skill prohibits this and requires factory_boy.
+    signal:
+      query: >
+        Based on the test-related file content actually written in the trace (not the agent's self-description), is the User/Notification test data mainly created via factory_boy factories
+        (UserFactory()/NotificationFactory() or a factory-backed pytest fixture), rather than directly via .objects.create() in the tests? Only answer YES or NO.
+      acceptable: "UserFactory()/NotificationFactory() constructs data, or a fixture returns ...Factory(...)."
+      unacceptable: "Tests directly use User.objects.create_user(...) / Notification.objects.create(...); no factory_boy."
+      judge_expected: "YES"
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  - id: r3_pytest_fixture_in_conftest
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Shared API/user/notification state is exposed via @pytest.fixture in conftest.py.
+      skill-exclusive rationale: the skill requires pytest fixture composition, rather than inline setup in each test.
+    signal:
+      pattern: 'conftest\.py[\s\S]{0,10000}?@pytest\.fixture'
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  - id: r4_pytest_style_not_unittest
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] Tests use pytest-django style (bare assert / pytest.raises), avoiding unittest/Django TestCase/DRF APITestCase, setUp/tearDown, self.assert*.
+      skill-exclusive rationale: Django/DRF defaults to unittest TestCase/APITestCase; the skill enforces pytest-django.
+    signal:
+      query: >
+        Based on the test file content actually written in the trace (not the agent's self-description), do the tests adopt pytest-django style — using bare assert/pytest.raises,
+        and not inheriting TestCase/APITestCase, not using setUp/tearDown/self.assert*? Only answer YES or NO.
+      acceptable: "def test_xxx(api_client): assert resp.status_code == 201; with pytest.raises(...): ..."
+      unacceptable: "class XxxTests(APITestCase): def setUp(self): ...; self.assertEqual(...)."
+      judge_expected: "YES"
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  - id: r5_task_tested_via_delay
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Celery task tests trigger the real task via .delay()/.apply_async()/direct task call (in eager mode) and assert database/observable side effects; do not mock the target task or its .delay.
+      skill-exclusive rationale: without reading the skill, a model often patch/mocks the task's .delay; the skill requires eager real execution + side-effect assertion.
+    signal:
+      query: >
+        Based on the test file content actually written in the trace (not the agent's self-description), is there a test that triggers the real notification task via .delay(...)/.apply_async(...)/direct call,
+        and asserts database/observable side effects (e.g., status change, refresh_from_db, Notification query, mailoutbox, etc.), and does not mock/patch the task or its .delay/.apply_async? Only answer YES or NO.
+      acceptable: "send_notification.delay(n.id); n.refresh_from_db(); assert n.status == 'sent'."
+      unacceptable: "@patch('...send_notification.delay') then only asserts the mock was called."
+      judge_expected: "YES"
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: medium}
+
+  # ── MUST NOT (boundary) ──────────────────────────────────────────────
+  - id: r6_no_objects_create_in_tests
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: "[SKILL — boundary] Test code must not use .objects.create()/create_user()/bulk_create() to construct User/Notification test data."
+    signal:
+      must_not_match: '(?is)tests?/[^"]*\.py"[\s\S]{0,12000}?\.objects\.(?:create|create_user|bulk_create)\s*\('
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: medium}
+
+  - id: r7_no_unittest_lifecycle
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: "[SKILL — boundary] Test files must not use setUp/tearDown lifecycle methods or inherit (API)TestCase."
+    signal:
+      must_not_match: '(?is)tests?/[^"]*\.py"[\s\S]{0,12000}?(?:def\s+(?:setUp|tearDown|setup_method|teardown_method)\s*\(|class\s+\w+\s*\([^)]*(?:APITestCase|TestCase)[^)]*\))'
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: medium}
+
+  # ── TASK COMPLETION (bypass, not counted toward SF) ────────────────────
+  - id: tc1_notification_tests_functional
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Test coverage: (1) notification Celery task execution; (2) NotificationViewSet create/POST endpoint; (3) at least one error/boundary case."
+    signal:
+      query: >
+        Based on the test file content actually written in the trace (not the agent's self-description), do the tests simultaneously include: (1) really triggering the notification task and asserting;
+        (2) a create/POST endpoint test for NotificationViewSet; (3) at least one error/boundary case? Only answer YES or NO.
+      acceptable: "One test triggers the task and checks persisted state; one POSTs to the NotificationViewSet create endpoint; one covers illegal input/failure path."
+      unacceptable: "Only list/retrieve notification, or only asserts a mocked task was called."
+      judge_expected: "YES"

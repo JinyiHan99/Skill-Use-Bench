@@ -1,0 +1,159 @@
+# Rubric for skill_26_docker_patterns — SF26_t1_review_dockerfile
+# Scoring boundary: skill is scored; task only records completion rate; gate only judges evaluability.
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# V4 rewrite (fix_recommendations_20260703.md#B, 2026-07-03)
+# ═══════════════════════════════════════════════════════════════════════════
+# Issues in original rubric (bak_v3):
+#   - 3 skill items (1.0 + 1.0 + 0.5), missing low soft-signal tier; model "touches the edge" but scores nothing;
+#   - r3_uid_gid_1001 hard-binds the 1001 value, 0 score on mismatch (a model that did not read the skill gets nothing even if it wrote non-root).
+# Changes:
+#   - r6_named_stage kept at 1.0 headline (build/production naming is a skill-specific convention)
+#   - r3_uid_gid_1001 from 1.0 → 0.5 (strict 1001 is a detail, downgraded to mid)
+#   - r8_dockerignore kept at 0.5
+#   - Added s1/s2/s3 three 0.25 low: any AS <name> / any non-root USER / non-empty .dockerignore
+# Three-tier structure: high=1(17%)  mid=2  low=3   → high proportion 17% ≤ 40% ✅
+# ═══════════════════════════════════════════════════════════════════════════
+
+rules:
+  # ── GATE: evaluability ────────────────────────────
+  - id: g1_dockerfile_rewrite_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an actual edit or rewrite attempt on the target Dockerfile.
+    signal:
+      pattern: '(?is)\b(Write|Edit)\b[\s\S]*file_path["''\s:]*[^"''\n]*assets/SF26_t1_review_dockerfile/Dockerfile\b'
+
+  # ── Hard requirements (headline high) ────────────────────
+  - id: r6_named_stage_convention
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] The multi-stage build must use the stage naming convention specified by the skill, including at least both build and production stages simultaneously.
+    skill_exclusive_reason: |
+      Generic Dockerfiles often use names like builder/final/runner; the skill explicitly gives the deps/dev/build/production convention,
+      "build + production" is a strong feature signal unique to this skill.
+    signal:
+      file: "assets/SF26_t1_review_dockerfile/Dockerfile"
+      file_must_contain: '(?ims)(?=.*^\s*FROM\b[^\n]*\s+AS\s+build\b)(?=.*^\s*FROM\b[^\n]*\s+AS\s+production\b)'
+
+  # V5 addition: progressive scoring for multi-stage build (mid, partial compensation for r6 being too strict)
+  - id: r6b_multi_stage_with_any_naming
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.4
+    spec: |
+      [SKILL — mid progressive] The Dockerfile uses multi-stage build (at least 2 FROM .. AS <name>),
+      but the naming is not the build/production required by the skill (when r6 fails, this item serves as partial compensation).
+    skill_exclusive_reason: |
+      A generic model may also write multi-stage, but the skill explicitly requires the multi-stage pattern; this serves as a relaxed version of r6 for partial credit.
+    signal:
+      file: "assets/SF26_t1_review_dockerfile/Dockerfile"
+      file_must_contain: '(?ims)FROM\b[^\n]*\s+AS\s+\S+[\s\S]*?FROM\b[^\n]*\s+AS\s+\S+'
+
+  # ── Medium requirements (mid) ────────────────────────────
+  - id: r3_uid_gid_1001_non_root_user
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — mid] The production stage should create a dedicated non-root user and group with deterministic UID/GID 1001 and switch to a non-root USER.
+      V4 reduced from 1.0 to 0.5 ("whether non-root" is handled by soft-signal s2; the 1001 value is a skill detail, downgraded).
+    skill_exclusive_reason: |
+      A model that does not read the skill may only write USER appuser, USER node, or use arbitrary UID/GID; the skill explicitly specifies UID/GID 1001.
+      This item only gives credit on strict match of 1001; the more relaxed "non-root" signal is scored separately at low weight in s2.
+    signal:
+      file: "assets/SF26_t1_review_dockerfile/Dockerfile"
+      file_must_contain: '(?ims)(?=.*\b(addgroup|groupadd)\b[^\n]*\b1001\b)(?=.*\b(adduser|useradd)\b[^\n]*\b1001\b)(?=.*^\s*USER\s+(?!root\b)\S+)'
+
+  - id: r8_dockerignore_skill_minimum
+    type: required-tool
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — mid] A project with a Dockerfile must create a .dockerignore covering the minimum exclusion set specified by the skill,
+      including dependency directories, VCS, environment files, build artifacts, logs, caches, Compose/Dockerfile itself, and tests/README.
+    skill_exclusive_reason: |
+      A generic model may only add node_modules/.git/.env; the skill explicitly lists a more complete minimum set.
+    signal:
+      file: "assets/SF26_t1_review_dockerfile/.dockerignore"
+      file_must_contain: '(?ms)(?=.*(?:^|\n)node_modules(?:\n|$))(?=.*(?:^|\n)\.git(?:\n|$))(?=.*(?:^|\n)\.env(?:\n|$))(?=.*(?:^|\n)\.env\.\*(?:\n|$))(?=.*(?:^|\n)dist(?:\n|$))(?=.*(?:^|\n)coverage(?:\n|$))(?=.*(?:^|\n)\*\.log(?:\n|$))(?=.*(?:^|\n)\.cache(?:\n|$))(?=.*(?:^|\n)docker-compose\*\.yml(?:\n|$))(?=.*(?:^|\n)Dockerfile\*(?:\n|$))'
+
+  # ── Soft signals (low): details / names / existence ─────────
+  - id: s1_any_named_stages
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL — low soft-signal] The Dockerfile uses at least multi-stage build (2 or more FROM ... AS <name>),
+      even if the naming is not build/production, indicating the model knows to do multi-stage.
+    skill_exclusive_reason: |
+      A generic model may also write multi-stage, but the skill explicitly requires multi-stage, so this item serves as a relaxed version for partial credit.
+    signal:
+      file: "assets/SF26_t1_review_dockerfile/Dockerfile"
+      file_must_contain: '(?ims)FROM\b[^\n]*\s+AS\s+\S+[\s\S]*?FROM\b[^\n]*\s+AS\s+\S+'
+
+  - id: s2_any_non_root_user
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL — low soft-signal] A non-root USER declaration appears in the Dockerfile (regardless of whether UID is 1001),
+      indicating the model at least understands the non-root principle in security practice.
+    skill_exclusive_reason: |
+      Although non-root is a generic best practice, in the multi-stage + production image context emphasized by the skill,
+      observing a non-root USER is the minimum product of having read the skill.
+    signal:
+      file: "assets/SF26_t1_review_dockerfile/Dockerfile"
+      file_must_contain: '(?im)^\s*USER\s+(?!root\b)\S+'
+
+  - id: s3_dockerignore_exists_nonempty
+    type: required-tool
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL — low soft-signal] .dockerignore exists and excludes at least node_modules or .git (relaxed version).
+      More relaxed than the complete minimum set in r8, so a model that "got started" can also score.
+    skill_exclusive_reason: |
+      A generic model may not create .dockerignore; the skill explicitly requires this file to exist as a low-threshold signal.
+    signal:
+      file: "assets/SF26_t1_review_dockerfile/.dockerignore"
+      file_must_contain: '(?ms)(?:^|\n)(node_modules|\.git)(?:\n|$)'
+
+  # ── Task completion: records 0/1 only, not counted toward skill-following ─────────
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Setting aside whether the skill was followed, whether the final Dockerfile and .dockerignore form a usable
+      production-oriented Docker artifact.
+    signal:
+      judge_question: |
+        Based strictly on final file contents, not agent self-claims, answer YES iff all conditions hold:
+        1. assets/SF26_t1_review_dockerfile/Dockerfile contains multiple FROM instructions.
+        2. The final Dockerfile contains WORKDIR, COPY, and CMD or ENTRYPOINT instructions.
+        3. assets/SF26_t1_review_dockerfile/.dockerignore exists and is non-empty.
+        4. There are no obvious Dockerfile syntax errors such as unclosed quotes or invalid top-level instructions.
+        Acceptable: a valid multi-stage Dockerfile plus a non-empty .dockerignore.
+        Unacceptable: trace text says it rewrote the Dockerfile but final files are missing, single-stage, or syntactically broken.
+      judge_expected: "YES"

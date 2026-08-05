@@ -1,0 +1,5 @@
+b1b3f97 (origin/octocat-patch-1) sentence case
+b3cbd5b (origin/test) Create CONTRIBUTING.md
+7fd1a60 (HEAD -> master, origin/master, origin/HEAD) Merge pull request #6 from Spaceghost/patch-1
+7629413 New line at end of file. --Signed off by Spaceghost
+553c207 first commit

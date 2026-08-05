@@ -1,0 +1,29 @@
+task_id: cirq_t2_noise_audit
+skill_id: cirq
+description: |
+  The file `assets/cirq_t2_noise_audit/input/noisy_simulation_example.py` is a Cirq demo that prints simulation output to the console. Refactor it into a compact, rerunnable audit: write the script to `output/noise_audit.py` and a structured JSON report to `output/noise_audit.json`.
+
+  The report should summarize the behavior of the experiment configurations already defined by the source file and include a brief plain-language conclusion. Keep the original asset unchanged.
+initial_state:
+  assets:
+    - path: assets/cirq_t2_noise_audit/input/noisy_simulation_example.py
+      source: "https://raw.githubusercontent.com/quantumlib/Cirq/main/examples/noisy_simulation_example.py"
+      real_state: "Official Cirq noisy simulation Python example using amplitude damping and named measurement keys."
+      preparation: |
+        Downloaded the raw example file without modifying its contents.
+  tools_available:
+    - python
+    - package_manager
+expected_trigger: true
+skill_constraints_tested:
+  - id: noise_audit_not_text_dump
+    description: "Use Cirq execution results to build structured audit data for the source experiment rather than summarizing printed text or raw samples."
+    exclusive: "Without the skill, a generic refactor may stop at wrapping the demo's console output or raw measurement arrays in JSON; skill-following behavior should aggregate the relevant measurement outcomes into comparable structured results."
+  - id: noise_aware_reference_handling
+    description: "When characterizing a noisy Cirq experiment, preserve the noisy execution path and include a clear reference point for interpreting the noise effect without treating all runs as ideal pure-state simulations."
+    exclusive: "Without the skill, a model may either clone only the noisy sampling loop or treat the zero-noise case ambiguously; Cirq-aware behavior should separate the reference interpretation from the noisy configurations and avoid ideal-only simulation."
+notes: |
+  - Positive task: Cirq quantum noise modeling and noisy simulation should trigger the skill.
+  - Task-success signals: the script is rerunnable, preserves the original asset, reads the source experiment configuration, and writes structured JSON plus a plain-language conclusion.
+  - Skill-following signals: the implementation uses actual Cirq execution results for the noisy experiment, organizes comparable outcome summaries, and does not reduce the task to an ideal-only simulation, text-only summary, or raw console-output dump.
+  - Common non-skill failures: incomplete JSON, missing one of the source experiment configurations, brittle sampled values without a stable seed or reasonable tolerance, or no conclusion.

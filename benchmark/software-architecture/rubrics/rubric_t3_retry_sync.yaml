@@ -1,0 +1,108 @@
+rubric_id: skill_81_software_architecture_t3_retry_sync
+objective: Evaluate whether the model follows the software-architecture skill's library-first principle to add resilience to the API client, rather than counting task completion toward the SF score.
+rules:
+  - id: g1_observable_api_client_edit
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trajectory must contain an observable write/edit attempt to the retry_sync input project.
+      The gate only judges whether there is an evaluable change, not whether the resilience approach is correct.
+    signal:
+      pattern: >-
+        \b(?:Write|Edit)\b[\s\S]{0,1500}(?:assets/software_architecture_t3_retry_sync/input/|software_architecture_t3_retry_sync/input/|./assets/software_architecture_t3_retry_sync/input/)(?:agent\.js|package\.json|src/[^\s"'`]+\.(?:js|ts|jsx|tsx)|[^\s"'`]+\.(?:js|ts|jsx|tsx))
+
+  - id: r1_library_first_retry_dependency_used
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Must search for/use existing solutions first; retry logic is an explicit example of using libraries such as `cockatiel` rather than hand-writing.
+      Skill-exclusive rationale: looking only at the task, the API client is small and the request boundary is concentrated, and strong models can easily hand-write a `retry(fn, attempts)` wrapper; the skill explicitly requires library-first, and the conflict point is "locally hand-written retry" vs. "using well-maintained existing retry/resilience capability".
+    signal:
+      query: |
+        Based on all JS/TS code, `package.json`, `agent.js`, and any directly/indirectly imported new request/resilience modules under `assets/software_architecture_t3_retry_sync/input/`, not the agent's self-statements:
+        Is retry/resilience implemented by a well-maintained existing library capability and on the real request path, and not a hand-written retry control flow in the project?
+        Answer YES if the implementation uses an added retry/resilience dependency such as `cockatiel`, `async-retry`, `p-retry`, or a formal retry/resilience API provided by an already-used maintained library, and that API wraps or configures actual API client requests.
+        Answer NO if retry is hand-written, only mentioned in comments, only installed but unused, or if package/code changes do not place any library-backed resilience on the real request path.
+      acceptable: |
+        package.json adds `cockatiel` or `async-retry`/`p-retry`/similar and request code imports it, or an existing maintained client library's official retry API is configured at the shared request boundary.
+      unacceptable: |
+        Project code defines `const retry = (fn, attempts) => ...`, installs a library that no request path imports, or only adds comments about retry behavior.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_no_hand_written_retry_loops
+    type: forbidden-arg
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Use libraries instead of hand-writing retry utils/helpers; every line of custom code is a maintenance burden.
+      Skill-exclusive rationale: when implementing short network retries by default, models often write attempts/retryCount loops, recursive Promises, or `setTimeout` backoff; the skill explicitly uses retry logic as an example that should not be hand-written, and the conflict point is "custom retry control flow" vs. "delegating to library policy".
+    signal:
+      query: |
+        Based on all JS/TS code and any newly added modules under `assets/software_architecture_t3_retry_sync/input/`, not the agent's self-statements:
+        Does the implementation avoid hand-written retry control flow (e.g. attempts/retryCount counters, for/while retry loops, recursive retry promises, manual `setTimeout` scheduling retries)?
+        Answer YES if retry behavior is delegated to an imported library policy/API rather than custom retry code anywhere in the API client project.
+        Answer NO if any project file implements its own retry loop, counter, recursive retry function, timer-based retry scheduler, or equivalent hand-written retry control flow.
+      acceptable: |
+        Request code calls a library policy such as `retry(...).execute(...)` or `asyncRetry(() => request, options)` with no project-defined retry loop.
+      unacceptable: |
+        `agent.js` or a new module contains `const retry = (request, attempts) => request().catch(...)`, `setTimeout(() => retry(...))`, or a `for`/`while` loop that reissues failed requests.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_resilience_at_single_request_boundary
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] Avoid duplicate code; complex logic should be split into small focused modules/functions.
+      Skill-exclusive rationale: looking only at the task, the model may copy `.catch(...retry...)` branches in get/post/put/del or each API group; the skill requires placing cross-cutting resilience at a single request boundary. This signal has weaker discriminative power than library-first / no-handwritten-retry, so it is only a low-weight auxiliary.
+    signal:
+      query: |
+        Based on all actual code under the API client directory, not the agent's self-statements:
+        Is the retry/resilience behavior not duplicated across multiple API groups, endpoint methods, or inside each HTTP verb, but concentrated at one request-creation/transport boundary (e.g. a unified request wrapper, shared request factory, or library config point)?
+        Answer YES if API groups continue to call a shared `requests` boundary and resilience is applied there once.
+        Answer NO if similar retry/catch logic is duplicated across Auth/Tags/Articles/Comments/Profile methods or across every HTTP verb method.
+      acceptable: |
+        A single `requestWithResilience`/policy wrapper is used by the `requests` object, and exported API groups remain simple endpoint definitions.
+      unacceptable: |
+        Each of `Auth.login`, `Articles.all`, `Comments.create`, etc. has its own `.catch` retry branch, or get/post/put/del each duplicate the same retry code.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The API client should be more tolerant of brief network failures, and keep the public client shape familiar.
+    signal:
+      query: |
+        Based on the actual contents of all relevant code, `package.json`, and newly added modules under `assets/software_architecture_t3_retry_sync/input/`, not the agent's self-statements:
+        Does the API client still export Auth, Tags, Articles, Comments, Profile, setToken, preserve the original endpoint/token behavior, and add actual resilience/retry behavior for request failures?
+        Answer YES only if exports are preserved and request calls are made more resilient. Answer NO if exports/endpoints are broken or no real retry/resilience behavior exists.
+      acceptable: |
+        The default export still contains Auth, Tags, Articles, Comments, Profile, and setToken, and requests pass through a resilience wrapper.
+      unacceptable: |
+        The implementation removes `Articles` or `setToken`, changes API_ROOT endpoints, or only adds comments about retry without code.

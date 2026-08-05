@@ -1,0 +1,257 @@
+# Rubric for skill_78_write_javascript_concept_documentation — t3_create_event_loop_page
+# Objective: evaluate whether the model writes a complex event loop concept page per the write-concept skill; task completion is recorded separately with weight=0.
+rules:
+  - id: g1_observable_page_write
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable write or edit attempt to output/event-loop.mdx.
+      The gate only judges whether there is an attempt, not content quality or skill-following.
+    signal:
+      pattern: '(?s)(Write|Edit).{0,800}(file_path|path).{0,300}output/event-loop\.mdx|Bash.{0,800}(>|tee|cat\s+>|python).{0,500}output/event-loop\.mdx'
+
+  - id: r1_question_driven_sections_answer_immediately
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Major H2/H3 should use question forms that beginners would search for or ask, and each question-style section should first directly answer the question, then expand into mechanism details.
+      skill-exclusive reason: without reading the skill, a strong model may write a spec-style tutorial with "Execution model / Call stack / Task queue / Microtasks", or first lay out multiple paragraphs of background; the skill requires question-driven headings and first-paragraph direct answers.
+    signal:
+      query: |
+        Based only on the final file output/event-loop.mdx: are the major H2/H3 mostly natural questions beginners would ask, and do the first paragraphs of these question-style sections directly answer the question rather than starting with lengthy background? Answer only YES or NO.
+        Answer YES if headings include forms like “What is the event loop?”, “Why does async code run later?”, or “How do microtasks and timers differ?”, and their first paragraph gives the answer immediately.
+        Answer NO if headings are mostly topic labels like “Execution Model” or if sections delay the answer with background/history before defining the concept.
+      acceptable: '## Why Does setTimeout(..., 0) Run Later?\n\n`setTimeout(..., 0)` runs later because the callback goes into the task queue and must wait until the call stack and microtask queue are empty.'
+      unacceptable: '## Execution Model\n\nBefore we can understand the event loop, we need to discuss many details of JavaScript history and browser architecture...'
+      judge_context_window: [final_file:output/event-loop.mdx]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2a_opening_skill_page_structure
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.4
+    spec: |
+      [SKILL] New event loop pages must open with frontmatter, question hook, immediate code example, What you'll learn Info in that order.
+      skill-exclusive reason: the task only says to write a standard concept page; the skill gives the precise project opening template.
+    signal:
+      file: output/event-loop.mdx
+      file_must_contain: '(?sm)\A---\s*\n.{0,1200}^---\s*$\s*(?:[^#`\n]*\?[^\n]*\n){1,5}.{0,1600}```(?:javascript|js)\n.{0,2500}```.{0,1200}<Info>\s*\*\*What you[''’]ll learn in this guide:\*\*'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2b_body_skill_page_structure
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.4
+    spec: |
+      [SKILL] The event loop page body should contain question-style body explanations, analogy/ASCII visualization, core/API/usage, Common Mistakes, Advanced Patterns.
+      skill-exclusive reason: without reading the skill, the model will organize with its own chosen event loop tutorial structure; the skill requires the project's fixed section sequence.
+    signal:
+      file: output/event-loop.mdx
+      file_must_contain: '(?sm)^##\s+.*(?:What|Why|How|Event Loop).{0,3000}^##\s+.*(?:Analogy|Mental Model|Think|Picture|Imagine).{0,5000}^##\s+.*(?:Core|How|API|Usage|Use).{0,6000}^##\s+.*(?:Common Mistakes|#1|Mistake).{0,5000}^##\s+.*(?:Advanced|Patterns)'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2c_closing_skill_page_structure
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.4
+    spec: |
+      [SKILL] The event loop page ending must include Key Takeaways, Test Your Knowledge, Related Concepts, Reference, Articles, Videos.
+      skill-exclusive reason: without reading the skill, the model may only write a summary and reference materials; the skill requires the project-specific knowledge quiz and three-category resource sections.
+    signal:
+      file: output/event-loop.mdx
+      file_must_contain: '(?sm)^##\s+Key Takeaways.{0,5000}^##\s+Test Your Knowledge.{0,6000}^##\s+Related Concepts.{0,4000}^##\s+Reference.{0,4000}^##\s+Articles.{0,4000}^##\s+Videos'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_seo_frontmatter_event_loop
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Frontmatter must use the SEO two-title pattern: title starts with Event Loop, includes a hook, and ends with "in JavaScript"; sidebarTitle drops "in JavaScript"; description starts with an action word and includes specific event loop learning value.
+      skill-exclusive reason: without reading the skill, a strong model often uses `title: "Event Loop"` or a short description; the skill requires concept-first SEO title, sidebar title separation, and action-oriented meta description.
+    signal:
+      file: output/event-loop.mdx
+      file_must_contain: '(?sm)\A---\s*\n(?=.{0,1200}^title:\s*[''\"]Event Loop:\s+[^\n''\"]+\s+in JavaScript[''\"]\s*$)(?=.{0,1200}^sidebarTitle:\s*[''"](?![^\n''\"]*in JavaScript)[^\n''\"]+[''\"]\s*$)(?=.{0,1200}^description:\s*[''"](Learn|Understand|Discover)\s+[^''\"]{80,180}(event loop|call stack|microtask|task queue|async|timer)[^''\"]{0,120}[''\"]\s*$).{0,1200}^---\s*$'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_prerequisite_concepts_linked_before_assumed
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Before relying on prerequisite concepts like call stack, callbacks, and Promises, should first explain or link these concepts with /concepts/..., without assuming beginners already know them.
+      skill-exclusive reason: without reading the skill, event loop tutorials often go directly into stack/queue/microtask terminology; the skill requires beginner learning paths and internal links.
+    signal:
+      query: |
+        Based only on the final file output/event-loop.mdx: before first heavily relying on prerequisite terms like call stack, callbacks, and Promises, does the page first explain these concepts or link to the corresponding /concepts/... learning paths? Answer only YES or NO.
+        Answer YES if the opening/prerequisite area briefly defines or links call stack plus callbacks or Promises before using them as assumed knowledge.
+        Answer NO if the page starts using call stack/callbacks/Promises/microtasks as if the reader already understands them, with no earlier explanation or internal concept link.
+      acceptable: '<Warning>Prerequisite: This guide assumes you understand [call stack](/concepts/call-stack) and [Promises](/concepts/promises). Read those first if these are new.</Warning>'
+      unacceptable: 'The event loop checks the call stack, then drains microtasks from Promises before callbacks, with no earlier explanation or links.'
+      judge_context_window: [final_file:output/event-loop.mdx]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5a_output_order_comments
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.45
+    spec: |
+      [SKILL] Event loop code examples should adopt the project code style: simple examples first, and show output order or expected output next to console.log.
+      skill-exclusive reason: without reading the skill, the model may give correct event loop code but not annotate output order; the skill requires traceable output comments.
+    signal:
+      file: output/event-loop.mdx
+      file_must_contain: '(?si)```(?:javascript|js)\n.{0,3500}console\.log\([^\n]+\)\s*//\s*(?:\d+|"|''|prints|outputs?|runs?|after|before).{0,100}\n.{0,2500}(setTimeout|Promise|queueMicrotask|microtask|timer).{0,2500}```'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5b_wrong_correct_common_mistakes
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.45
+    spec: |
+      [SKILL] Common Mistakes should use WRONG / CORRECT format to contrast misconceptions with the correct model.
+      skill-exclusive reason: without reading the skill, the model may not use the project's fixed wrong/correct teaching markers.
+    signal:
+      file: output/event-loop.mdx
+      file_must_contain: '(?si)^##\s+.*(?:Common Mistakes|#1|Mistake).{0,5000}(❌\s*)?WRONG.{0,3000}(✓|✔|✅)\s*CORRECT'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r6a_analogy_ascii
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.35
+    spec: |
+      [SKILL] The page should contain real-world analogies that help beginners understand, and ASCII diagrams with borders/labels.
+      skill-exclusive reason: without reading the skill, a strong model may only use paragraphs and code to explain the event loop; the skill explicitly requires analogy and ASCII visualization.
+    signal:
+      file: output/event-loop.mdx
+      file_must_contain: '(?si)(analogy|think of|picture|imagine|like a|restaurant|kitchen|mailroom).{0,5000}[┌+].{0,2500}[│|].{0,2500}[└+]'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r6b_mintlify_components
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.35
+    spec: |
+      [SKILL] The page should use Mintlify components such as Info, Warning, Tip, Steps, AccordionGroup, CardGroup to organize explanations; these components are not required to appear after the ASCII diagram.
+      skill-exclusive reason: without reading the skill, the model may write a pure Markdown tutorial; the skill explicitly requires project componentized concept pages.
+    signal:
+      file: output/event-loop.mdx
+      file_must_contain: '(?si)(?=.{0,20000}<Info>)(?=.{0,20000}<(Warning|Tip|Steps|AccordionGroup)\b)(?=.{0,25000}<CardGroup\b)'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r7a_avoids_skill_listed_ai_phrases
+    type: forbidden-arg
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.35
+    spec: |
+      [SKILL] The body text and self-written descriptions should avoid the AI-sounding and filler/stiff phrases listed in the skill, such as "To truly understand", "This is crucial", "In order to", "one of the most important concepts", "dramatically/fundamentally/incredibly/extremely". Common words in resource card titles are not evaluated as body-text banned words.
+      skill-exclusive reason: without reading the skill, complex topics like the event loop often trigger AI tutorial-style language; the skill explicitly bans these expressions.
+    signal:
+      file: output/event-loop.mdx
+      file_must_not_contain: '(?i)\b(dramatically|fundamentally|incredibly|extremely|essentially|basically)\b|one of the most important concepts|essential points|To truly understand|This is crucial|It[''’]s worth noting that|It[''’]s important to remember|In order to|Due to the fact that|At the end of the day|When it comes to'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r7b_no_em_dash_overuse
+    type: forbidden-arg
+    provenance: skill
+    locus: final-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] Ordinary body text should avoid overusing em dashes; limited use in Key Takeaways, structured steps, or MDN card titles is acceptable.
+      skill-exclusive reason: the skill explicitly notes that AI-generated text overuses em dashes, and gives exception ranges; without reading the skill, the model will not self-check against this threshold.
+    signal:
+      query: |
+        Based only on the final file output/event-loop.mdx: is there no overuse of em dashes (—) in ordinary body text, and is usage mainly limited to allowed scenarios such as Key Takeaways, structured explanations, or resource titles? Answer only YES or NO.
+        Answer YES if em dashes are sparse and not a repeated sentence style in ordinary paragraphs.
+        Answer NO if ordinary explanatory prose repeatedly uses em dashes as a default connector across many paragraphs.
+      acceptable: "A few numbered sentences in Key Takeaways use —; ordinary body text mainly uses periods, commas, or colons."
+      unacceptable: "Multiple ordinary paragraphs are consecutively written as 'X — Y' 'A — B' 'C — D', using em dashes as the default connector."
+      judge_context_window: [final_file:output/event-loop.mdx]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: final-state
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/event-loop.mdx exists, is about the JavaScript event loop, and correctly covers call stack, task queue, microtask queue, timer/Promise output order.
+    signal:
+      file: output/event-loop.mdx
+      file_must_contain: '(?si)(?=.{0,20000}event loop)(?=.{0,20000}call stack)(?=.{0,20000}(task queue|macrotask))(?=.{0,20000}microtask)(?=.{0,20000}Promise)(?=.{0,20000}(setTimeout|timer))'

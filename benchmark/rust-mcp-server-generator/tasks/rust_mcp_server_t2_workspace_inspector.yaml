@@ -1,0 +1,40 @@
+task_id: rust_mcp_server_t2_workspace_inspector
+skill_id: rust-mcp-server-generator
+description: |
+  I need a small Rust MCP server that helps an assistant inspect a Rust workspace manifest. Use `assets/rust_mcp_server_t2_workspace_inspector/input/ripgrep-Cargo.toml` as the sample manifest.
+
+  Keep the scope small — the server only needs TWO assistant-callable actions:
+    1. retrieve the package metadata (name, version, edition); and
+    2. list the workspace members.
+
+  Write out the project source files (Cargo manifest plus the Rust sources for the server entry point, the request handler, and the per-action implementations). We expect to add more manifest-inspection actions later, so keep the assistant-callable actions cleanly separated into their own modules. You do not need to compile or run the project — just produce a clean, idiomatic source tree.
+
+initial_state:
+  assets:
+    - path: assets/rust_mcp_server_t2_workspace_inspector/input/ripgrep-Cargo.toml
+      source: "https://raw.githubusercontent.com/BurntSushi/ripgrep/master/Cargo.toml"
+      real_state: "Real Cargo.toml from the ripgrep repository containing package metadata, workspace members, dependency sections, a custom binary target, feature definitions, and release profiles."
+      preparation: |
+        Downloaded the raw Cargo.toml from the ripgrep GitHub repository without content modification.
+  tools_available:
+    - filesystem
+    - shell
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: rmcp_stdio_server_stack
+    description: "Cargo.toml must depend on the rmcp crate with the server + transport-stdio features (the skill's prescribed MCP stack), not hand-rolled JSON-RPC or a different MCP SDK."
+    exclusive: "Without the skill, models often implement manual JSON-RPC dispatch, hand-rolled stdin/stdout loops, or use a different MCP SDK's bootstrapping API."
+  - id: canonical_rust_mcp_layout
+    description: "Routing lives in `src/handler.rs` and each manifest-inspection action is implemented in its own file under `src/tools/`, rather than a monolithic parser in main.rs/handler.rs."
+    exclusive: "Without the skill, models often keep all parsing and server code in main.rs."
+  - id: macro_routed_async_tools
+    description: "The handler impl uses the `#[tool_router]` macro and each action is an async `#[tool(...)]` fn with serde-typed params; transport is started via `rmcp::serve_stdio` under a tokio runtime, and logging uses `tracing` (never `println!`)."
+    exclusive: "Without the skill, models write synchronous helpers, manual dispatch, untyped JSON maps at the tool boundary, and println-based logging."
+
+notes: |
+  - Positive example: adding assistant-callable Rust workspace inspection should trigger the skill.
+  - The sample manifest is intentionally real and non-trivial (workspace members, target-specific deps, dev-deps, features, custom profiles).
+  - Scope intentionally reduced to 2 tools and source-only (no compile/run) so the task is completable in a single agent session; the skill-following signal lives in dependency choice, project layout, macro/async tool boundary, and tracing usage — all observable from the written source files.
+  - Common failures: synchronous file reads in handlers, keeping all parsing/server code in main.rs, omitting tracing, or using a different protocol library.

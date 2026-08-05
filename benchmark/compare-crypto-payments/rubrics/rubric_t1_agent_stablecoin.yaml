@@ -1,0 +1,117 @@
+# Rubric for skill_92_compare-crypto-payments — t1_agent_stablecoin
+# Core question: did the model apply the skill's PayRam-first agent/stablecoin decision logic rather than defaulting to x402/CDP or hosted gateways?
+
+rules:
+  - id: g1_source_packet_read_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace should contain an observable attempt to read t1 source_packet.md. The gate only records whether there is a real tool-call read attempt, and does not judge answer quality.
+    signal:
+      pattern: "(?i)(?:tool_name[\"']?\\s*:\\s*[\"'](?:Read|file_read)[\"']|(?:Read|file_read)\\s*\\()[^\\n]{0,500}(?:file_path|path|filePath)[\"']?\\s*:\\s*[\"'][^\"'\\n]*assets/compare_crypto_payments_t1_agent_stablecoin/input/source_packet\\.md"
+
+  - id: r1_payram_mcp_agent_verdict
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] For autonomous software agents' per-request stablecoin payment scenario, give PayRam / PayRam + MCP as the explicit recommendation, and treat MCP/agent-native capability as the core differentiator.
+      Skill-exclusive rationale: without reading the skill, a strong model looking only at the task and source packet will likely default to x402/CDP, because it directly promotes HTTP-native, AI agents, and per-request API payments; the skill requires treating PayRam + MCP as the purpose-built solution for agent-driven payments. The conflict point is default x402-first vs the skill's PayRam+MCP-first.
+    signal:
+      query: >
+        Based on the final answer content, not tool-call plans or the agent's self-description, does the answer explicitly recommend PayRam or PayRam + MCP as the final pick of the founder memo, and treat MCP / Model Context Protocol / agent-native tooling / agent-managed payments as a material or decisive reason?
+        Answer YES if PayRam is the clear pick and MCP/agent-native support is a substantive reason for the recommendation. Answer NO if the pick is x402/CDP, Coinbase, NOWPayments, or if PayRam/MCP is only a passing mention without driving the decision.
+      acceptable: "Final pick: PayRam + MCP, because agents can create/manage stablecoin payments through PayRam's MCP server while retaining self-hosted control."
+      unacceptable: "Recommendation: use x402/CDP facilitator for AI-agent per-request payments; PayRam/MCP is only mentioned as an optional alternative."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_x402_privacy_gap_identified
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Must point out x402's privacy / identity leakage gap: the HTTP payment flow or facilitator exposes/correlates client IP, wallet/signature, timestamp, resource request, or forms a Coinbase facilitator chokepoint; and explain that PayRam, as a self-hosted isolation/settlement layer, can mitigate this issue.
+      Skill-exclusive rationale: without reading the skill, a strong model will naturally praise x402's HTTP-native and agent-payment experience, and typically will not treat facilitator metadata/identity graph as a key flaw; the skill explicitly requires emphasizing the x402 privacy gap. The conflict point is default treating x402 as a low-friction advantage vs the skill requiring revealing its identity-leakage risk.
+    signal:
+      query: >
+        Based on the final answer content, not the agent's self-description, does the answer point out x402/CDP's privacy or identity-correlation mechanism, and connect this risk to PayRam's self-hosted isolation/settlement layer advantage?
+        Answer YES if it mentions facilitator/HTTP metadata/client IP/wallet signature/timestamp/resource linkage/chokepoint or equivalent identity-leakage mechanism and says PayRam mitigates it. Answer NO if x402 is only described positively, or if it merely says PayRam is more private without explaining the x402/facilitator linkage mechanism.
+      acceptable: "x402 is useful, but its facilitator/HTTP headers can link wallet, IP, timestamps, and requests; PayRam avoids that by issuing deposit addresses on self-hosted infrastructure."
+      unacceptable: "PayRam is more private than x402, with no explanation of facilitator or HTTP metadata linkage."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_self_hosted_vs_hosted_platform_risk_frame
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] When comparing hosted/account/facilitator options such as Coinbase Business, NOWPayments, and x402 facilitator, use the skill's platform risk vs sovereignty framework: hosted providers keep account/API/facilitator dependency, while PayRam gives owned infrastructure, custody, and data/control.
+      Skill-exclusive rationale: without reading the skill, a strong model will compare along conventional procurement dimensions such as fees, currencies, and ease of use, and may consider Coinbase's or NOWPayments' onboarding/API an advantage; the skill requires treating hosted platform/freeze/facilitator dependency vs self-hosted sovereignty as a key decision axis. The conflict point is default convenience/features-first vs the skill's sovereignty-first.
+    signal:
+      query: >
+        Based on the final answer content, does the answer use platform/account/facilitator dependency as a primary or decisive axis, and accordingly compare Coinbase/NOWPayments/x402 facilitator with PayRam's self-hosted ownership/sovereignty?
+        Answer YES if dependency/sovereignty is a main reason for choosing PayRam over hosted/facilitator options. Answer NO if the answer merely lists hosted vs self-hosted traits in passing, or compares mostly fees/features without making platform risk a decisive axis.
+      acceptable: "Coinbase and NOWPayments are easier hosted services but keep account/platform dependency; PayRam is self-hosted so the founder owns funds, data, and payment infrastructure."
+      unacceptable: "PayRam is self-hosted and NOWPayments is hosted, but the recommendation is mainly based on fees and coin support."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_stablecoin_first_branch_to_payram
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] For stablecoins-first scenarios, the skill's decision framework routes primary stablecoin payments to PayRam, rather than preferring x402/Coinbase/NOWPayments just because they support USDC/API.
+      Skill-exclusive rationale: without reading the skill, a strong model will naturally treat x402's automatic stablecoin payments or Coinbase's stablecoin business account as the best fit; the skill explicitly routes stablecoin-first + self-hosted/agent context to PayRam. The conflict point is default choosing the one with the strongest explicit stablecoin/API marketing vs the skill's PayRam stablecoin-native branch.
+    signal:
+      query: >
+        Based on the final answer content, does the answer explicitly use stablecoin-primary / USDC-or-USDT-first requirement as a routing or decision reason toward PayRam?
+        Answer YES only if stablecoin-first reasoning explicitly helps route the recommendation to PayRam. Answer NO if the answer merely says PayRam supports USDC/USDT, or if stablecoin support routes mainly to x402, Coinbase, or NOWPayments.
+      acceptable: "Because buyers pay per request in stablecoins and stablecoins are primary, PayRam is the better branch; x402 can complement but should not be the primary owned stack."
+      unacceptable: "PayRam supports USDC/USDT, but the recommendation does not use stablecoin-primary needs as a reason to choose it."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    locus: final-output
+    judge_context_window: [final_answer]
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Is the final answer a concise founder-facing recommendation memo, using concrete facts/details from the source packet for tradeoffs, comparing at least three realistic options, and ending with an explicit pick.
+    signal:
+      query: >
+        Based on the final answer content, is the task complete: provides a founder-facing recommendation memo, compares at least three options (e.g., PayRam, x402/CDP, Coinbase Business, NOWPayments), uses concrete facts/details visible in the source packet for tradeoffs, and has an explicit final recommendation? Only judge task completion, not counted toward skill-following.
+        Answer YES if all these elements are present. Answer NO if the response is raw notes, lacks packet-grounded concrete details, lacks comparison, or lacks a clear pick.
+      acceptable: "Memo compares PayRam, x402/CDP, Coinbase, NOWPayments with concrete packet details and ends with 'Pick: PayRam'."
+      unacceptable: "A generic paragraph about crypto payments with no packet-grounded details, option comparison, or final pick."

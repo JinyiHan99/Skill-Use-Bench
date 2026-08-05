@@ -1,0 +1,217 @@
+task_id: SF10_t1_define_schema_ecommerce
+skill_id: skill_10_drizzle_orm
+rules:
+  - id: g1_schema_file_created
+    type: required-tool
+    provenance: gate
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an actual Write/Edit tool call creating or editing the final schema TypeScript file;
+      do not use path strings, prompts, self-descriptions, or Read of old files as evidence.
+    signal:
+      judge_question: |
+        Based only on actual Write/Edit tool calls and their target paths, did the agent create
+        or edit one or more TypeScript schema files for the ecommerce tables?
+        Accept paths under src/database/schemas/ or the task asset's equivalent schema directory.
+        Answer YES for real file writes/edits. Answer NO for mere prose, Read calls, or prompt text.
+
+  - id: r1_no_varchar
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] All string columns in the newly added schema code must use text(); varchar() is forbidden.
+      Skill-exclusive rationale: without reading the skill, models often use varchar(length) following common SQL/ORM habits.
+    signal:
+      judge_question: |
+        Inspect only the final generated/modified ecommerce schema code, not comments, prose,
+        prompts, or pre-existing files. Does that final schema code avoid every use of varchar(...)?
+        Answer YES if no final added/modified schema column uses varchar().
+        Answer NO if any final added/modified schema code uses varchar(...).
+
+  - id: r2_spread_timestamps
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Each newly added table — products, categories, orders, order_items — must spread `...timestamps`,
+      and must not hand-write createdAt/updatedAt/accessedAt timestamp columns.
+      Skill-exclusive rationale: models by default often hand-write createdAt/updatedAt, while the skill requires a unified helper.
+    signal:
+      judge_question: |
+        Inspect only the final generated/modified schema code for the new products, categories,
+        orders, and order_items tables. Does each of these table definitions include `...timestamps`,
+        and do none of them manually define createdAt, updatedAt, or accessedAt timestamp columns?
+        Answer YES only if all four tables satisfy both conditions. Answer NO otherwise.
+
+  - id: r3_index_array_format
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: false
+    weight: 0.5
+    spec: |
+      [SKILL] If pgTable uses a third argument to define indexes/constraints, the callback must return an array `(t) => [...]`;
+      the legacy object format `(t) => ({ ... })` is forbidden. When there is no third argument, this rule automatically passes.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified schema code. For every pgTable call that has a third
+        argument callback, does that callback return an array, such as `(t) => [...]`, rather than
+        an object literal, such as `(t) => ({ ... })`?
+        Answer YES if all third-argument callbacks return arrays, or if no pgTable has a third argument.
+        Answer NO if any third-argument callback returns an object literal.
+
+  - id: r4_id_prefix_generator
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Entity tables products, categories, orders must use text("id") + .primaryKey()
+      + .$defaultFn(() => idGenerator("<plural>")), with prefixes products/categories/orders respectively.
+      Skill-exclusive rationale: models by default often use serial or uuid; the skill requires readable prefix IDs.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified schema code. Do products, categories, and orders each
+        define an id column using text("id"), .primaryKey(), and .$defaultFn(() => idGenerator(...))
+        with the exact plural prefixes "products", "categories", and "orders" respectively?
+        Answer YES only if all three entity tables match. Answer NO otherwise.
+
+  - id: r6_column_name_snake
+    type: boundary
+    provenance: generic
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0
+    spec: |
+      [DIAGNOSTIC — not counted toward skill-following] SQL column name strings in the newly added schema should be snake_case;
+      this rule mainly reflects generic/existing code style and is not a skill main score.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified ecommerce schema code. Are all SQL column name strings
+        passed as the first argument to column builders snake_case where applicable?
+        Single words such as "id", "name", and "slug" are acceptable. CamelCase SQL names such as
+        "categoryId" or "unitPrice" are unacceptable. Answer YES or NO.
+
+  - id: r7_foreign_key_on_delete
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] All `.references()` foreign keys in the newly added schema must explicitly specify onDelete,
+      including categories' self-referencing parent FK. cascade, set null, and restrict are acceptable.
+      Skill-exclusive rationale: Drizzle/ORM defaults often omit onDelete; the skill explicitly enforces it.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified schema code. Does every `.references(...)` call include
+        an options object with `onDelete` set to "cascade", "set null", or "restrict", including any
+        self-referencing parent category FK?
+        Answer YES if all references include onDelete. Answer NO if any reference lacks onDelete.
+
+  - id: r8_junction_composite_pk
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The order_items junction table must use a composite primaryKey; it must not have a standalone id primary key.
+      Skill-exclusive rationale: models by default often add id to every table; the skill requires composite primary keys for junction tables.
+    signal:
+      judge_question: |
+        Inspect only the final schema definition for the SQL table named "order_items" or equivalent
+        order-items junction table. Does it define a composite primary key over its relationship columns
+        using primaryKey({ columns: [...] }) or an equivalent Drizzle composite primary key, and does it
+        avoid a standalone `id` primary key column?
+        Answer YES only if both conditions hold. Answer NO otherwise.
+
+  - id: r9_zod_insert_schema
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0.25
+    spec: |
+      [SKILL] products, categories, and orders should each export an insert schema based on createInsertSchema().
+      This signal is influenced by the existing users.ts example and is retained as a low-weight soft skill signal.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified ecommerce schema code. Are insert schemas exported for
+        products, categories, and orders using createInsertSchema(<table>) rather than hand-written Zod
+        schemas? Answer YES only if all three entity tables have createInsertSchema exports. Answer NO otherwise.
+
+  - id: r10_timestamp_with_timezone
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0.25
+    spec: |
+      [SKILL] Conditional fallback: any hand-written timestamp column must use `{ withTimezone: true }`;
+      when there are no hand-written timestamps, this rule automatically passes. This rule does not replace r2's `...timestamps` requirement.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified schema code. If there are no manually defined timestamp(...)
+        columns, answer YES. If any timestamp(...) columns are manually defined, do all of them include
+        `{ withTimezone: true }`? Answer YES if all manual timestamps include withTimezone: true. Answer NO otherwise.
+
+  - id: r11_junction_includes_user_id
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The SQL table `order_items` must include a `user_id` access-control column,
+      even when user_id is derivable from orders.
+      Skill-exclusive rationale: a model that does not read the skill will likely omit derivable fields.
+    signal:
+      judge_question: |
+        Inspect only the final schema definition for the SQL table named "order_items". Does that
+        junction table include a user_id SQL column, such as `userId: text("user_id")`, for access control?
+        Answer YES if user_id is present in order_items. Answer NO if it is missing or only appears elsewhere.
+
+  - id: b1_no_raw_sql_in_schema
+    type: boundary
+    provenance: generic
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [DIAGNOSTIC — not counted toward skill-following] Newly added schema files should not use Drizzle raw SQL template `sql\`...\``
+      to define column defaults or constraints; only the final schema code is checked, the trace is not scanned.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified schema code, not prose or prompts. Does the schema avoid
+        raw SQL template literals using `sql\`...\``? Answer YES if no raw SQL template is used in the final
+        schema code. Answer NO if any final schema code uses `sql\`...\``.
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] The final schema should cover four table types: products, categories, orders, order_items.
+    signal:
+      judge_question: |
+        Inspect only final generated/modified schema code. Are there pgTable definitions for SQL tables
+        "products", "categories", "orders", and "order_items"? Accept either one file or multiple schema files.
+        Answer YES only if all four tables are defined. Answer NO otherwise.

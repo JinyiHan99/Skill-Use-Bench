@@ -1,0 +1,128 @@
+rules:
+  - id: g1_observable_inventory_service_edit
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] Trace contains a real Write/Edit tool call against the inventory-service project."
+    signal:
+      pattern: '(?is)^(?:Write|Edit)\b[\s\S]{0,2000}?inventory-service/'
+
+  - id: tc_request_body_is_class_validator_dto
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/CONVENTION — not SF] Reservation request bodies are represented by a DTO class with class-validator decorators, including audit/note input.
+      This is not skill-exclusive because NestJS conventions and the task's 400-before-business-logic requirement naturally imply DTO validation.
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, does the reservation commit request use a class-validator-decorated DTO class for sku, quantity, and audit/note input instead of only an interface, `any`, or `Record<string, unknown>`? Answer YES or NO.
+      acceptable: "A CreateReservationDto/CommitReservationDto class has validators such as @IsString, @IsNotEmpty, @IsInt, @Min, and a validated note/auditNote/auditRemark field; the controller uses it in @Body()."
+      unacceptable: "The controller still uses `interface ReservationBody`, `@Body() body: any`, or leaves note/audit input outside DTO validation."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B"]
+      consensus: low
+
+  - id: tc_validation_pipe_rejects_before_business_logic
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/CORRECTNESS — not SF] Runtime validation is wired so invalid requests are rejected before service/repository persistence.
+      This diagnostic is task completion, not skill-following, because the task explicitly requires invalid bodies to receive 400 responses before business logic.
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, is Nest validation wired before service/repository business logic for the reservation commit route, for example via global ValidationPipe, APP_PIPE, or route/controller-level @UsePipes? Answer YES or NO.
+      acceptable: "ValidationPipe is applied globally, through APP_PIPE, or on the reservation controller/route before the service is called."
+      unacceptable: "Only service-layer if checks or TypeScript interfaces validate input after the controller has entered business logic."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B", "reviewer_C"]
+      consensus: medium
+
+  - id: r3_audit_write_uses_same_transaction_scoped_drizzle_path
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Stock deduction, reservation creation, and separate audit/history persistence should share the same concise Drizzle transaction-scoped path.
+      skill-exclusive reason: Without the skill, a model may add the audit insert after `commitReservation()` using the normal client or reuse `reservations.note`; the skill emphasizes transactions for multi-table operations, so the conflict is split/non-atomic writes versus one transaction-scoped persistence path.
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, is a separate audit/history table or resource inserted with the same transaction-scoped Drizzle client/path as the inventory update and reservation insert, rather than merely storing the note on `reservations.note`? Answer YES or NO.
+      acceptable: "reserveWithInjectedTransaction uses the injected transaction client for updating inventory, inserting reservations, and inserting a separate audit/history row."
+      unacceptable: "Audit is only `reservations.note`, or inventory/reservation use the transaction client but audit is inserted later with a normal database client."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A"]
+      consensus: medium
+
+  - id: r4_no_nested_transaction_added_around_transactional_method
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Preserve the existing `@Transactional()` reservation boundary and do not introduce or substitute a nested/manual Drizzle transaction wrapper around that flow.
+      skill-exclusive reason: Without the skill, a model trying to ensure atomicity may wrap the method in `db.transaction()` despite the existing transaction decorator; the skill warns to avoid nested transactions, so the conflict is defensive nested wrapping versus extending the existing transaction boundary.
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, does the reservation commit flow keep the existing `@Transactional()` boundary and avoid adding or replacing it with a hand-written `db.transaction(...)`/`.transaction(...)` wrapper around the same flow? Answer YES or NO.
+      acceptable: "The existing @Transactional method remains the transaction boundary and repository writes use the injected transaction client."
+      unacceptable: "commitReservation or reserveWithInjectedTransaction is wrapped in another `this.db.transaction(...)`, or @Transactional is removed and replaced by a manual transaction wrapper for the same flow."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc_independent_audit_persistence
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not SF] Reservation commits create an independent audit/history record."
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, does the implementation persist audit/note information as an independent audit/history record rather than only on the reservation row? Answer YES or NO.
+      acceptable: "A separate audit/history table/model or equivalent resource is created and inserted for reservation commits."
+      unacceptable: "The note is only stored on reservations.note or logged without persistence."
+
+  - id: tc_atomic_transaction
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not SF] Stock deduction, reservation creation, and audit persistence are atomic."
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, are stock deduction, reservation creation, and independent audit persistence performed atomically as one success/failure unit? Answer YES or NO.
+      acceptable: "All three writes occur inside the same existing transactional reservation flow."
+      unacceptable: "Audit is inserted after the transaction commits or can succeed/fail independently of stock/reservation writes."
+
+  - id: tc_validation_400_before_persistence
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not SF] Invalid reservation bodies receive 400 responses before persistence."
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, would missing sku, empty sku, and invalid quantity requests be rejected with a 400-style validation response before repository persistence starts? Answer YES or NO.
+      acceptable: "DTO validation plus ValidationPipe rejects missing/empty sku and invalid quantity at the request boundary."
+      unacceptable: "Invalid input is accepted into service/repository code before validation, or failures happen after persistence begins."

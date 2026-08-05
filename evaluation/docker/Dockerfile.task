@@ -1,0 +1,45 @@
+# Skill-Use-Bench shared runner image
+#
+# Layered on top of skill-use-bench:latest, this image adds the three
+# entrypoint scripts that drive the two supported harnesses:
+#   - agent_entrypoint.sh                CC harness (Claude Code CLI)
+#   - codex_entrypoint.sh                Codex pre-load channel
+#   - codex_native_skill_entrypoint.sh   Codex on-demand skill channel
+#
+# Skill files and task assets are NOT baked into the image; they are volume
+# mounted at run time by tasks/run_task.sh into /opt/template/. This keeps the
+# image reusable across all 79 skills and 177 tasks.
+#
+# Build (once):
+#   docker build -t skill-use-bench-runner:latest -f evaluation/docker/Dockerfile.task .
+
+FROM skill-use-bench:latest
+
+USER root
+
+# Silence Claude Code's bundled skills (debug/simplify/batch/loop/claude-api).
+# They would otherwise leak into every trace.system.skills entry and pollute
+# the "single-skill-following" measurement.
+ENV CLAUDE_CODE_DISABLE_BUNDLED_SKILLS=1
+RUN python3 -c "from pathlib import Path; p=Path('/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js'); s=p.read_text(encoding='utf-8', errors='ignore'); old='function dw(A){let q={type:\"prompt\",name:A.name,description:A.description,'; new='function dw(A){if(process.env.CLAUDE_CODE_DISABLE_BUNDLED_SKILLS===\"1\")return;let q={type:\"prompt\",name:A.name,description:A.description,'; (new in s and print('[runner] bundled skill patch already present')) or (old in s and (p.write_text(s.replace(old,new,1), encoding='utf-8') or print('[runner] patched Claude Code bundled skill registration'))) or (_ for _ in ()).throw(SystemExit('[runner] failed to locate Claude Code bundled skill registration function'))"
+
+# /opt/template/ is where run_task.sh mounts the per-task skill and asset
+# directories at run time; entrypoint scripts read from here.
+RUN mkdir -p /opt/template/.claude/skills /opt/template/assets
+
+# Harness entrypoints
+COPY evaluation/docker/agent_entrypoint.sh               /opt/agent/agent_entrypoint.sh
+COPY evaluation/docker/codex_entrypoint.sh               /opt/agent/codex_entrypoint.sh
+COPY evaluation/docker/codex_native_skill_entrypoint.sh  /opt/agent/codex_native_skill_entrypoint.sh
+RUN chmod +x /opt/agent/agent_entrypoint.sh \
+             /opt/agent/codex_entrypoint.sh \
+             /opt/agent/codex_native_skill_entrypoint.sh
+
+ENV PATH="/opt/agent:${PATH}"
+
+# Non-root user for the agent (Claude Code refuses to run as root by default).
+RUN useradd -ms /bin/bash -u 1000 agent \
+    && mkdir -p /workspace/runtime /home/agent/.claude \
+    && chown -R agent:agent /workspace /home/agent /opt/template
+
+WORKDIR /workspace/runtime

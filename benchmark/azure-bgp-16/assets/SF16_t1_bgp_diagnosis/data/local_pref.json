@@ -1,0 +1,6 @@
+{
+  "customer": 200,
+  "peer": 100,
+  "provider": 50,
+  "description": "Standard local preference: customer routes preferred over peer, peer over provider"
+}

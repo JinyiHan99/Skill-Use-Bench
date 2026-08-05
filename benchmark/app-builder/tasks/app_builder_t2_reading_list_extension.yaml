@@ -1,0 +1,40 @@
+task_id: app_builder_t2_reading_list_extension
+skill_id: app-builder
+description: |
+  Please first read `assets/app_builder_t2_reading_list_extension/input/source_brief.md`. Based on the reading-list experience described there, build a prototype project from scratch that can be further refined. The final deliverable should be easy to invoke and manage in the browser, support add, update, and delete operations, and include local verification instructions and project notes.
+initial_state:
+  assets:
+    - path: assets/app_builder_t2_reading_list_extension/input/source_brief.md
+      source: "https://github.com/GoogleChrome/chrome-extensions-samples/tree/main/api-samples/readingList"
+      real_state: "A real README summary and visible file list compiled from the GoogleChrome public sample page."
+      preparation: |
+        2026-07-01 visited the public GitHub sample directory, excerpting purpose, run instructions, implementation notes, and visible file names from the README; the reference implementation was not included.
+  tools_available:
+    - filesystem
+    - shell
+    - package_manager
+    - web_access
+expected_trigger: true
+skill_constraints_tested:
+  - id: chrome_extension_template_detection
+    description: "The skill template table maps the Browser extension scenario to the chrome-extension template with Chrome MV3 as the tech stack. The model should first perform project-type detection, select the single extension branch, and produce a structure that conforms to the Chrome MV3 extension boundary."
+    exclusive: "Without reading the skill, a model may also identify it as a Chrome extension based on the brief and common sense; this constraint should not be judged solely on whether it says `chrome-extension`, but should evaluate whether it first performs project-type detection, selects the single extension branch, and produces a structure that conforms to the Chrome MV3 extension boundary."
+  - id: orchestrated_multi_agent_planning
+    description: "The skill is an application-building orchestrator and requires the engineering planning to reflect a behavior chain of first summarizing brief constraints, judging project type, planning engineering structure, and then moving to implementation and verification."
+    exclusive: "Without reading the skill, a model can usually complete the extension prototype directly, but less stably reflects app-builder's orchestrator behavior chain; it should be evaluated on whether it first summarizes brief constraints, judges project type, plans engineering structure, then moves to implementation and verification, rather than only checking whether it restates Related Agents or App Builder Process names."
+  - id: matching_template_isolation
+    description: "The skill requires strictly adopting a single matching template when building a new project; technologies, components, or structures from unrelated templates (such as full-stack, mobile, or cli-tool) must not be mixed into the extension prototype."
+    exclusive: "Without reading the skill, a model may also maintain extension boundaries; therefore this item is only an auxiliary constraint, focusing on whether it avoids full-stack, mobile, CLI, and other unrelated engineering structures and keeps the single browser-extension prototype direction."
+notes: |
+  - Core test point: this is a positive example of a new browser-extension project, which should trigger app-builder and select the extension template branch.
+  - Expected correct behavior: the artifact should contain an installable prototype structure with extension manifest, panel page, scripts, and styles, and explain how to load and verify.
+  - Common model mistakes: the model only creates `index.html` and `src/App.jsx` without `manifest.json`; the model generates `server.js`, database schemas, or mobile `app.json`, indicating that it did not select the extension branch.
+  - baseline_correctness_signals:
+      - The output project has the entry and configuration files required by a browser tool.
+      - Add, update, or delete interactions for managing reading items are locatable in the code.
+      - The final notes describe how to open or install locally for verification.
+  - skill_following_signals:
+      - In the early output, it first summarizes the product constraints in the brief, then explicitly performs project-type detection and tech-boundary selection.
+      - The plan reflects a single browser-extension prototype path, avoiding expanding the task into a full-stack web page, mobile, CLI, or server app.
+      - The artifact structure conforms to the Chrome MV3 extension prototype boundary, e.g., containing manifest.json, panel entry, scripts, and styles, and using MV3-compliant manifest fields.
+      - There is a clear engineering structure plan before implementation, after which file creation, interaction implementation, and local verification notes follow.

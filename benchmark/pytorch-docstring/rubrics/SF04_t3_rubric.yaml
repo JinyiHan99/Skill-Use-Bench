@@ -1,0 +1,252 @@
+# Compact scoring rubric for skill_04_pytorch_docstring — SF04_t3_c_binding_docstring
+# Goal: evaluate C-binding docstring skill-following, especially signature-first-line behavior.
+
+version: 4
+task_id: SF04_t3_c_binding_docstring
+skill_id: skill_04_pytorch_docstring
+expected_trigger: true
+artifact_main: src/ops/_custom_ops.py
+target_bindings: [randomized_svd, truncated_eigh, sparse_cholesky]
+weight_scale: {high: 3, mid: 2, low: 1, zero: 0}
+scoring_policy:
+  trigger_gate: "If g1 fails, following checks are reported as null. Static trigger metadata is recorded separately and final docstring quality never gates MD/MN checks."
+  adherence: "Weighted: max(0, Σw(MD passed) - Σw(MN violated)) / Σw(MD applicable)."
+  scope: "All MD/MN checks operate only on the second string argument of each target _add_docstr call."
+  verifier_priority: "Use deterministic AST/regex state checks. No llm-judge is required."
+
+rules:
+- id: g1_target_add_docstrs_evaluable
+  type: required-tool
+  provenance: gate
+  signal_dimension: trigger
+  verifier: state-check
+  exclusive: false
+  weight: 0
+  outcome_field: process
+  spec: |
+    [GATE] The exact target file exists, parses, and contains randomized_svd,
+    truncated_eigh, and sparse_cholesky as _add_docstr(...) assignments with
+    non-TODO string second arguments.
+  signal:
+    file: src/ops/_custom_ops.py
+    method: ast_python
+    checks:
+      - ast.parse succeeds
+      - locate Assign target name in target_bindings
+      - assigned value is Call to _add_docstr
+      - second positional argument is a string literal
+      - string is non-empty and does not match case-insensitive '^\s*(todo|tbd)\b'
+    passed_condition: all checks pass for every target binding
+
+- id: P1_triggers_c_binding_docstring_skill
+  type: boundary
+  provenance: gate
+  signal_dimension: trigger
+  verifier: state-check
+  exclusive: false
+  weight: 0
+  outcome_field: process
+  spec: |
+    [GATE] Static trigger metadata only: this task is expected to trigger the
+    PyTorch docstring skill because expected_trigger is true, the artifact is
+    src/ops/_custom_ops.py, and the target operation is adding _add_docstr
+    documentation. Do not inspect final docstring quality for trigger evidence.
+  signal:
+    method: metadata_check
+    required_metadata:
+      expected_trigger: true
+      artifact_main: src/ops/_custom_ops.py
+      target_scenario: _add_docstr C-binding documentation
+    passed_condition: required_metadata matches the benchmark task definition
+
+- id: MD1_signature_first_line_all_bindings
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: high
+  outcome_field: must_do
+  spec: |
+    [SKILL] Each _add_docstr docstring must start with the public function
+    signature as the first meaningful line: <binding_name>(...) -> <ReturnType>.
+    Skill-exclusive reason: the skill explicitly requires signature-first
+    C-binding docs; generic prose docstrings usually start with a summary sentence.
+  signal:
+    file: src/ops/_custom_ops.py
+    scope: second_argument_docstrings:randomized_svd,truncated_eigh,sparse_cholesky
+    method: first_line_regex
+    first_line_pattern_template: '^<binding_name>\s*\([^)]*\)\s*->\s*.+$'
+    placeholder_only_parameter_forbidden_pattern: '^\s*(\.\.\.|args|foo)\s*$'
+    passed_condition: first non-empty line of each binding doc matches template after substituting the real binding name, return type text is non-empty, and parameter list is not placeholder-only
+
+- id: MD2_raw_string_and_section_order_all_bindings
+  type: order
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: high
+  outcome_field: must_do
+  spec: |
+    [SKILL] Each _add_docstr second-argument literal must be raw, and present
+    block-level sections must preserve PyTorch order: signature/description,
+    .. math::, Args:, Returns:, Examples::. Sphinx roles are not order anchors.
+    Skill-exclusive reason: the skill requires raw reST literals and fixed PyTorch
+    section order for C-binding documentation.
+  signal:
+    file: src/ops/_custom_ops.py
+    scope: second_argument_docstrings:randomized_svd,truncated_eigh,sparse_cholesky
+    method: ast_source_segment_and_section_offsets
+    raw_literal_check: ast.get_source_segment(src, second_arg_node) begins with r/R string prefix after whitespace
+    section_markers:
+      - name: math
+        pattern: '(?m)^\s*\.\.\s+math::\s*$'
+      - name: args
+        pattern: '(?m)^\s*Args:\s*$'
+      - name: returns
+        pattern: '(?m)^\s*Returns:\s*$'
+      - name: examples
+        pattern: '(?m)^\s*Examples::\s*$'
+    ignored_markers:
+      - inline Sphinx roles such as :class:, :func:, :math:
+    passed_condition: raw_literal_check is true for every target and offsets of present section_markers are monotonically increasing
+
+- id: MD3_args_and_returns_present_pytorch_style
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: high
+  outcome_field: must_do
+  spec: |
+    [SKILL] Every binding docstring must include Args and Returns in PyTorch style.
+    Args entries use 4-space-indented name (Type): lines; Returns contains typed
+    tensor output documentation.
+    Skill-exclusive reason: the skill requires PyTorch Args/Returns syntax for
+    _add_docstr docs rather than prose-only or Google/NumPy sections.
+  signal:
+    file: src/ops/_custom_ops.py
+    scope: second_argument_docstrings:randomized_svd,truncated_eigh,sparse_cholesky
+    method: section_scoped_regex
+    args_section: "text between block-level Args: and block-level Returns:"
+    returns_section: "text between block-level Returns: and block-level Examples:: or end"
+    args_entry_pattern: '(?m)^\s{4}\w+\s*\([^)]*\):'
+    minimum_args_entries: 1
+    returns_patterns:
+      - '(?m)^\s{4}.*(?:Tensor|tuple|Tuple).*:'
+      - '\bTensor\b'
+    passed_condition: Args and Returns sections exist in order, Args section has at least minimum_args_entries typed entry, and returns_patterns match in Returns section
+
+- id: MD4_math_and_shape_rst_format
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: mid
+  outcome_field: must_do
+  spec: |
+    [SKILL] Linear algebra formulas should use .. math:: blocks, and matrix/tensor
+    shapes should use :math:`...`. Named dimensions with underscores inside
+    \text{} must escape underscores.
+    Skill-exclusive reason: the skill specifically requires reST math markup for
+    formulas and shapes; generic docs often leave plain shapes/formulas.
+  signal:
+    file: src/ops/_custom_ops.py
+    scope: second_argument_docstrings:randomized_svd,truncated_eigh,sparse_cholesky
+    method: rst_math_regex
+    math_block_pattern: '(?ms)^\s*\.\.\s+math::\s*\n\s*\n?\s+\S.*$'
+    shape_math_pattern: ':math:`[^`]*\([^`]*\)[^`]*`'
+    underscore_violation_pattern: '\\text\{[^}]*[^\\]_[^}]*\}'
+    removed_plain_formula_blacklist: true
+    passed_condition: each doc has a non-empty math_block_pattern, each doc has at least one shape_math_pattern when it describes shapes, and underscore_violation_pattern does not match
+
+- id: MD5_examples_call_each_binding
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: high
+  outcome_field: must_do
+  spec: |
+    [SKILL] Each binding must include a PyTorch doctest Examples:: block with
+    import torch, torch.randn, and a doctest prompt calling the corresponding
+    binding name.
+    Skill-exclusive reason: the skill mandates PyTorch doctest examples using
+    torch.randn rather than prose-only or arbitrary tensor examples.
+  signal:
+    file: src/ops/_custom_ops.py
+    scope: second_argument_docstrings:randomized_svd,truncated_eigh,sparse_cholesky
+    method: examples_section_regex
+    examples_block: "text from block-level Examples:: to end of docstring"
+    common_required_patterns:
+      - '(?m)^\s*Examples::\s*\n\s*\n\s*>>>'
+      - '(?m)^\s*>>>\s+import\s+torch\b'
+      - 'torch\.randn\s*\('
+    call_pattern_template: '(?m)^\s*>>>\s*.*\b<binding_name>\s*\('
+    passed_condition: for each binding, examples_block exists and matches every common pattern plus call_pattern_template with the real binding name
+
+- id: MN1_c_binding_docstring_violations
+  type: forbidden-arg
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: mid
+  outcome_field: must_not
+  spec: |
+    [SKILL] C-binding docstrings must not show non-PyTorch docstring remnants:
+    prose summary as first line, Google/NumPy headers, single-colon Examples,
+    NumPy underline sections, plain/code-formatted shapes in Args/Returns, or
+    torch.zeros/torch.ones examples.
+    Skill-exclusive reason: these are style failures the PyTorch docstring skill
+    explicitly rules out for C-binding documentation.
+  signal:
+    file: src/ops/_custom_ops.py
+    scope: second_argument_docstrings:randomized_svd,truncated_eigh,sparse_cholesky
+    method: scoped_violation_regex
+    preprocessing:
+      - strip :math:`...` spans before plain shape checks
+      - limit plain shape checks to Args and Returns sections
+    violation_patterns:
+      first_line_not_signature: first non-empty line fails MD1 signature pattern
+      old_headers: '(?m)^\s*(Arguments|Parameters|Params):\s*$'
+      single_colon_examples: '(?m)^\s*Example:\s*$|(?m)^\s*Examples:(?!:)\s*$'
+      numpy_parameters: '(?m)^\s*Parameters\s*\n\s*-{3,}\s*$'
+      numpy_returns: '(?m)^\s*Returns\s*\n\s*-{3,}\s*$'
+      plain_shape_after_math_removed: '(?i)\b(shape|matrix|tensor)\b[^\n]*\([A-Za-z][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z][A-Za-z0-9_]*){1,}\)'
+      examples_bad_tensor_factory: '(?m)^\s*>>>.*torch\.(zeros|ones)\s*\('
+    passed_condition: passed = not any violation_patterns match in their scoped text
+
+- id: T1_binding_artifact_integrity
+  type: task-completion
+  provenance: task
+  signal_dimension: task_completion
+  verifier: state-check
+  exclusive: false
+  weight: 0
+  outcome_field: outcome
+  spec: |
+    [TASK — not counted in skill adherence] All three placeholder docstrings were
+    replaced and the _add_docstr first arguments still point to the original
+    torch._C._linalg targets. This intentionally keeps the first-arg chain exact
+    unless the task spec allows import aliases.
+  signal:
+    file: src/ops/_custom_ops.py
+    method: ast_python
+    checks:
+      - target _add_docstr docs are non-empty and not TODO/TBD
+      - randomized_svd first arg chain equals torch._C._linalg.randomized_svd
+      - truncated_eigh first arg chain equals torch._C._linalg.truncated_eigh
+      - sparse_cholesky first arg chain equals torch._C._linalg.sparse_cholesky
+    passed_condition: all checks pass
+
+implementation_hints:
+  helpers: |
+    Implement extract_add_docstr_bindings(src) -> {name: {doc_text, literal_source, second_arg_node,
+    first_arg_chain}} using ast.get_source_segment for literal_source. Implement extract_section,
+    strip_math_spans, and extract_examples_block. All checks are deterministic AST/regex checks over
+    extracted docs.

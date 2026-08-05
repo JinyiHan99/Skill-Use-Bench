@@ -1,0 +1,99 @@
+rubric_id: skill_101_git_workflows_t3_parallel_release_view
+objective: Evaluate whether the model preserves the release-candidate working copy via the git-workflows worktree parallel-branch workflow while not changing the main working-tree draft.
+rules:
+  - id: g1_observable_parallel_copy_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace contains an observable actual worktree-creation attempt or a parallel-copy artifact write action.
+    signal:
+      pattern: >-
+        (?s)\b(?:Bash\b.{0,1200}\bgit\b.{0,160}\bworktree\b.{0,80}\badd\b|Write\b.{0,1200}output/release_compare\.md|Edit\b.{0,1200}output/release_compare\.md)
+
+  - id: r1_create_release_candidate_with_git_worktree
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] When simultaneously viewing another branch and keeping a parallel working copy, use git worktree add to create an independent working tree for release-candidate.
+      skill-exclusive rationale: looking only at the task description, a strong model may use git show release-candidate:README, git diff, copy the entire repo then checkout, or stash/checkout the main working tree; git-workflows explicitly treats worktree as the pattern for multi-branch parallel work. Default practice X = read-only viewing / copying / switching branch, skill requires Y = git worktree add, conflict point Z = the task requires keeping an independent parallel working copy on disk and the main working tree has an uncommitted draft.
+    signal:
+      pattern: >-
+        (?s)\bBash\b.{0,1500}\bgit\b(?:\s+-C\s+[^\s]+)?\s+worktree\s+add\b.{0,400}\brelease_candidate_view\b.{0,400}\brelease-candidate\b
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_final_copy_is_git_worktree_pointer
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The .git of the worktree result should be a text pointer pointing to the main repo gitdir, not a fully copied .git directory.
+      skill-exclusive rationale: without reading the skill, a model may cp -r the entire repo or re-clone; the git-workflows worktree pattern emphasizes that parallel working trees share .git storage. Default practice X = fully copy the repo, skill requires Y = worktree pointer file, conflict point Z = a full .git copy does not fit the lightweight parallel working-tree pattern.
+    signal:
+      file: output/release_candidate_view/.git
+      file_must_contain: '^gitdir:\s+.*worktrees/.+'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_preserve_dirty_main_by_avoiding_stash_commit_or_checkout_workaround
+    type: boundary
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The worktree approach should leave the main working tree's uncommitted README draft in place, without needing stash, temporary commit, reset, restore, checkout override, or switch to the target branch.
+      skill-exclusive rationale: without reading the skill, when facing a dirty working tree and branch comparison, the common default practice is stash then checkout, temporary commit, reset/restore the draft, or forcibly switch branch; the git-workflows worktree use case is exactly "review/compare another branch while keeping current work untouched". Default practice X = park/change the main working tree, skill requires Y = side-create a worktree, conflict point Z = the user explicitly has an unpolished draft and parallel viewing cannot change the main checkout.
+    signal:
+      query: |
+        Based on actual Bash tool calls — not the agent's self-description: does the model avoid executing workarounds in the main repo that would hide, commit, reset, restore, switch, or discard the README draft?
+        Answer YES if there is no git stash, temporary git commit, git reset, git restore, git checkout -- README, git checkout ., git checkout/switch release-candidate, or equivalent operation applied to the dirty main checkout.
+        Answer NO if any such main-worktree operation appears, even if a report is later written. Do not require this rule itself to prove the worktree was created; r1/r2 cover that.
+      acceptable: "No stash/commit/reset/restore/checkout/switch release-candidate or other main-repo draft parking or discard actions."
+      unacceptable: "After git stash push, checkout release-candidate to compare; or git restore README / git checkout . to clear the draft."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The comparison report exists and mentions the differences between the main working-tree draft and the release-candidate README.
+    signal:
+      file: output/release_compare.md
+      query: |
+        Only examine the actual content written to output/release_compare.md, not the agent self-report. Does the report compare the main worktree README draft with the release-candidate README and briefly explain their difference? Answer YES or NO.
+      acceptable: "The report mentions that the main working tree has a Local workspace note/draft, release-candidate has a Release candidate note, and explains the differences."
+      unacceptable: "The report only describes release-candidate, or does not mention the main working-tree draft."
+
+  - id: tc2_release_candidate_readme_present
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The preserved parallel copy contains the release-candidate branch README content.
+    signal:
+      file: output/release_candidate_view/README
+      file_must_contain: 'Release candidate note: keep hello-world wording formal'

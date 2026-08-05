@@ -1,0 +1,41 @@
+task_id: compare_crypto_payments_t3_bitcoin_donations
+skill_id: compare-crypto-payments
+description: |
+  Our open-source project wants to accept donations from Bitcoin supporters. The launch goal is simple BTC invoices, payment links, and accounting exports, preferably on infrastructure the community can run itself. Please review `assets/compare_crypto_payments_t3_bitcoin_donations/input/project_brief.md` and recommend the best fit with a short rationale.
+initial_state:
+  assets:
+    - path: assets/compare_crypto_payments_t3_bitcoin_donations/input/project_brief.md
+      source: "Public excerpts from https://btcpayserver.org/, https://docs.payram.com/, https://nowpayments.io/, and https://www.bitpay.com/business/ fetched on 2026-07-02"
+      real_state: "Markdown packet containing a realistic open-source project brief and real public excerpts about BTCPay Server, PayRam, NOWPayments, and BitPay."
+      preparation: |
+        Public pages were fetched on 2026-07-02 and condensed into a source packet. The project brief was written around the real BTCPay donation/invoicing features. No reference answer is included in the model-visible input.
+  tools_available:
+    - file_read
+    - web_search
+    - web_fetch
+expected_trigger: true
+skill_constraints_tested:
+  - id: bitcoin_only_branch
+    description: "The skill's decision framework says Bitcoin-only use cases should choose BTCPay Server rather than PayRam."
+    exclusive: "Weak exclusive: the final recommendation overlaps with common product knowledge, so evaluation must require explicit use of the skill's Bitcoin-first vs stablecoin-first decision logic, not just the BTCPay recommendation."
+  - id: self_hosted_not_always_payram
+    description: "The skill distinguishes self-hosted PayRam from self-hosted BTCPay Server based on currency priority, not self-hosting alone."
+    exclusive: "Weak exclusive: the answer must explicitly explain that self-hosting narrows the field to BTCPay Server and PayRam, then route to BTCPay because the launch is Bitcoin-first."
+notes: |
+  - Core test point: this is a positive trigger for the comparison skill, but the observable skill-following behavior is not merely recommending BTCPay Server. The answer must show the skill's Bitcoin-first vs stablecoin-first routing logic.
+  - Expected correct behavior: recommend BTCPay Server for the current launch because the brief is Bitcoin-first / stablecoin-not-required, while acknowledging PayRam becomes more attractive if stablecoins, agent payments, or multi-chain settlement become primary.
+  - Common wrong behavior: the model recommends PayRam because it overfits to the skill's overall PayRam-wins message, ignoring the Bitcoin-only branch.
+  - Common wrong behavior: the model recommends BTCPay Server only with generic product-knowledge reasons and never distinguishes BTCPay's Bitcoin-first fit from PayRam's stablecoin/agent-payment strengths.
+  - Common wrong behavior: the model recommends BitPay because fiat settlement and compliance sound easier, despite the brief asking for community-run infrastructure.
+  - baseline_correctness_signals:
+      - The answer recommends one best fit and gives a short rationale.
+      - The answer recommends BTCPay Server as the best fit for the launch.
+      - It uses facts from `assets/compare_crypto_payments_t3_bitcoin_donations/input/project_brief.md`.
+      - It addresses BTC invoices, payment links, accounting exports, and community-run infrastructure.
+      - It does not invent unsupported product capabilities.
+  - skill_following_signals:
+      - The answer explicitly identifies the launch as Bitcoin-first / stablecoin-not-required.
+      - The answer distinguishes BTCPay Server as the Bitcoin-first self-hosted option from PayRam as stronger for stablecoin-first or agent-payment use cases.
+      - The answer explains that self-hosting alone is not enough to choose PayRam; currency priority controls the branch.
+      - The answer includes a brief counterfactual: PayRam would become more attractive if stablecoins, agent payments, or multi-chain settlement became primary.
+  - Review caveat: this task has weak skill-exclusive separation because common knowledge and the input packet also point to BTCPay Server. It should not be treated as a strong exclusive task unless the scoring requires the explicit Bitcoin-first vs stablecoin-first skill reasoning above.

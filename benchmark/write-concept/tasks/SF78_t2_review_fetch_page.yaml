@@ -1,0 +1,69 @@
+task_id: SF78_t2_review_fetch_page
+level: L2
+skill_id: skill_78_write_javascript_concept_documentation
+description: |
+  We are preparing to organize Fetch-related material into a concept page in the project, but for now we are only doing a pre-publish review. The material is in `assets/SF78_t2_review_fetch_page/input/mdn_using_fetch.md`, and the nearby `assets/SF78_t2_review_fetch_page/input/mdn_async_function.md` is background material that this page may reference.
+
+  Please read it and provide a review report, saved as `output/fetch-page-review.md`. The report should help the author determine: if this material were organized into a publishable concept page for our project, what content and structure are still missing; and point out which parts may not be friendly enough for beginners.
+
+initial_state:
+  assets:
+    - path: assets/SF78_t2_review_fetch_page/input/mdn_using_fetch.md
+      source: "https://github.com/mdn/content/blob/main/files/en-us/web/api/fetch_api/using_fetch/index.md"
+      real_state: "MDN Web Docs guide for using the Fetch API, downloaded as Markdown source."
+      preparation: |
+        Downloaded with: curl -L https://raw.githubusercontent.com/mdn/content/main/files/en-us/web/api/fetch_api/using_fetch/index.md
+        Saved without content edits.
+    - path: assets/SF78_t2_review_fetch_page/input/mdn_async_function.md
+      source: "https://github.com/mdn/content/blob/main/files/en-us/web/javascript/reference/statements/async_function/index.md"
+      real_state: "MDN Web Docs reference page for async function, downloaded as Markdown source."
+      preparation: |
+        Downloaded with: curl -L https://raw.githubusercontent.com/mdn/content/main/files/en-us/web/javascript/reference/statements/async_function/index.md
+        Saved without content edits.
+  tools_available: [read, write, edit, grep, bash]
+
+expected_trigger: true
+
+expected_outputs:
+  - path: output/fetch-page-review.md
+    kind: review_report
+    description: "A review report for turning Fetch material into a project-ready JavaScript concept page."
+
+skill_constraints_tested:
+  - id: review_against_beginner_concept_page_voice
+    description: "The review must assess whether the MDN-style material would need to be reshaped into a beginner-friendly JavaScript concept page: conversational but authoritative, encouraging, practical, concise, and question-driven rather than reference-like."
+    exclusive: "Without the skill, a model may review technical accuracy and general clarity, but is less likely to apply the skill's specific target-audience and voice requirements: beginner empathy, conversational authority, practical framing, concision, and question-driven explanation."
+  - id: language_quality_review
+    description: "The review must evaluate the MDN material against the skill's writing guidance: conversational but authoritative tone, beginner empathy, practical and concise explanations, question-driven framing, avoidance of AI-sounding phrases, and limited em-dash use."
+    exclusive: "A generic reviewer may say the prose should be clearer or more beginner-friendly, but only a model following the skill is expected to apply the specific voice rules, banned-phrase guidance, repeated-emphasis guidance, and em-dash limits from the skill."
+
+notes: |
+  Core test point: this is the review branch, not requiring rewriting the entire page. The model should treat the real MDN material as candidate source and review it from the perspective of project publishing standards.
+
+  Path notes:
+  - Input paths are resolved relative to the skill task directory, not relative to the repository root or the current CLI working directory.
+
+  Expected correct behavior:
+  - Generate `output/fetch-page-review.md`.
+  - The report should clearly distinguish between "the material is technically correct" and "it still needs to be rewritten into a beginner-oriented JavaScript concept page".
+  - The report should point out that Fetch teaching needs to clearly cover `response.ok`, because 404/500 will not cause `fetch()`'s Promise to reject.
+  - The report should mention gaps for beginners, such as the need to explain prerequisite concepts like Promise, async/await, Response, and JSON first, without assuming the reader already has experience.
+  - May suggest the author check whether links and macros in the original MDN text need to be converted to the project's usable Markdown link format.
+
+  Common model error behaviors:
+  - At `output/fetch-page-review.md:1` directly write a Fetch tutorial instead of a review report.
+  - Only evaluate the accuracy of `mdn_using_fetch.md`, such as "complete content, rich examples", without pointing out the gap between MDN reference-style prose and the project concept page voice.
+  - Write error handling as "add try/catch" and stop, without pointing out that after `fetch('/missing')` resolves, you still need to check `response.ok`.
+  - Only vaguely say "make it clearer for beginners", without pointing out that prerequisite concepts like Promise, async/await, Response, and JSON may need to be explained first.
+
+  baseline_correctness_signals:
+    - `output/fetch-page-review.md` exists and is a review report.
+    - The report discusses Fetch API material and references the async function background material.
+    - The report contains actionable improvement suggestions.
+    - The report points out the Fetch HTTP error trap: 404/500 will not cause `fetch()`'s Promise to reject, and teaching material needs to explicitly explain `response.ok`.
+  skill_following_signals:
+    - The review report clearly distinguishes between "MDN technical material is accurate" and "it still needs to be rewritten into a beginner-oriented JavaScript concept page".
+    - The report points out from a beginner empathy perspective that prerequisite concepts like Promise, async/await, Response, and JSON need to be explained, without assuming the reader already has experience.
+    - The report requires the future final draft to adopt conversational but authoritative, encouraging, practical, concise, question-driven expression.
+    - The report identifies the gap between MDN reference-style prose and the project concept page voice.
+    - The report mentions the need to avoid the AI-sounding phrases and repeated emphasis patterns listed in the skill, and to control em dash usage.

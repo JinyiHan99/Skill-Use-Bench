@@ -1,0 +1,52 @@
+task_id: SF101_t2_find_bad_change
+level: L3
+skill_id: skill_101_git-workflows
+description: |
+  A release gate suddenly turned red in this small repository. The on-site note is at `assets/SF101_t2_find_bad_change/input/incident_note.txt`; the repository is at `assets/SF101_t2_find_bad_change/input/repo/`; next to it is a checker script left by the maintainers at `assets/SF101_t2_find_bad_change/input/check_release_gate.sh`.
+
+  Please find the earliest commit in history that caused the gate to fail, write the commit, the reason, and how you verified the gate state before and after that commit in `output/regression_report.md`, and restore the repository to the branch where you started processing.
+
+initial_state:
+  assets:
+    - path: assets/SF101_t2_find_bad_change/input/repo/
+      source: "https://github.com/octocat/Hello-World.git"
+      real_state: "A real public Git repository cloned locally, with a short local commit sequence that turns a release_status marker from green to red and later adds unrelated changes."
+      preparation: |
+        Clone octocat/Hello-World without tags; configure local author; add commit "Record green release status"; add unrelated formatting commit; change release_status from green to red in commit "Update release status wording"; add later maintainer and checker commits.
+    - path: assets/SF101_t2_find_bad_change/input/check_release_gate.sh
+      source: "Prepared from the repository's release_status marker derived from the local Git history transformation."
+      real_state: "Executable shell checker that exits successfully unless README contains release_status=red."
+      preparation: |
+        Store outside the repository so it remains available while historical commits are inspected.
+    - path: assets/SF101_t2_find_bad_change/input/incident_note.txt
+      source: "Prepared incident note based on the local repository state derived from https://github.com/octocat/Hello-World.git"
+      real_state: "Text note naming the known-good commit by title but not exposing the first bad commit hash."
+      preparation: |
+        Written after preparing the local history.
+  tools_available: [bash, read, edit, grep, git]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: automated_bisect_with_checker
+    description: "Use the provided checker to validate historical repository states when identifying the first commit that made the release gate fail."
+    exclusive: "This task currently has weak exclusivity because the local history is short and the regression is visible in a simple diff. Treat this as a checker-driven history-validation signal, not as proof that bisect is required."
+  - id: bisect_reset_to_starting_branch
+    description: "If the investigation enters a temporary history-search state such as bisect or detached HEAD, cleanly return the repository to the starting branch before finishing."
+    exclusive: "This signal is only meaningful when the model uses bisect or checks out historical commits; models that inspect commits without leaving the starting branch may satisfy the final-state requirement without exercising this workflow."
+
+notes: |
+  Core test point: use the ready-made checker to validate historical states, locate the earliest change that made the release gate fail, and after finishing restore the repository to the branch where processing started.
+
+  baseline_correctness_signals:
+    - output/regression_report.md exists.
+    - The report contains the identifier of the earliest commit that caused the gate to fail, and explains that release_status in README changing from green to red is the failure reason.
+    - The repository finally returns to the branch where processing started, with a clean working tree.
+
+  skill_following_signals:
+    - Uses the provided checker script to validate candidate historical states, rather than only inferring from the current README, commit titles, or the commit that introduced the script.
+    - If it enters bisect, detached HEAD, or other temporary history-inspection states, cleans up that state and returns to the starting branch before finishing.
+
+  evaluation_caveat:
+    - The current asset history is short and the bad change is fairly intuitive, so skill-exclusive discriminative power is weak; a correct result alone cannot prove the model used the bisect workflow from git-workflows.
+    - If the model never left the starting branch throughout and only reached a conclusion by looking at historical snapshots, the restore-branch signal cannot serve as bisect-reset skill-following evidence.

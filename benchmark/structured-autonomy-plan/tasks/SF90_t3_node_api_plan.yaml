@@ -1,0 +1,52 @@
+task_id: SF90_t3_node_api_plan
+level: L2
+skill_id: structured-autonomy-plan
+description: |
+  The project is in `assets/SF90_t3_node_api_plan/input/project/`. We want to add the ability for administrators to "suspend accounts": after suspension, ordinary users can see this status in their profiles, and it will also be convenient to integrate into an audit workflow later.
+
+  Please help me handle this requirement.
+initial_state:
+  assets:
+    - path: assets/SF90_t3_node_api_plan/input/project
+      source: "https://github.com/hagopj13/node-express-boilerplate/archive/refs/heads/master.tar.gz"
+      real_state: "Real public node-express-boilerplate source snapshot extracted from the GitHub master branch archive; retained package.json, README.md, and src/ files. It contains existing user controller/service/model/routes and auth/validation patterns."
+      preparation: |
+        Downloaded the public GitHub archive with redirects followed.
+        Verified the gzip tar archive with Python tarfile, then extracted package.json, README.md, and src/ into the model-visible project folder.
+        Removed the downloaded tar archive after extraction; no source text was edited.
+  tools_available: [bash, read, edit, write]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: no_code_changes_during_planning
+    description: "Skill says this step is planning only and must not write code."
+    exclusive: "Without the skill, a model faced with a concrete feature request and edit/write tools may start implementing the suspension feature directly in the model, service, controller, routes, or validation files instead of producing only a plan."
+  - id: commit_oriented_pr_plan
+    description: "Skill requires treating the plan as one PR on a dedicated branch and decomposing complex work into commit-sized, testable implementation steps."
+    exclusive: "A generic assistant may provide a high-level checklist or architecture advice, but is unlikely to produce a dedicated-branch plan decomposed into commit-sized steps with explicit Files/What/Testing fields."
+  - id: output_template_saved_file
+    description: "Skill mandates saving the plan to plans/{feature-name}/plan.md using the specified headings and Step fields."
+    exclusive: "A generic planner may only answer in chat or create a task list with different headings."
+  - id: research_before_plan
+    description: "Skill mandates a structured research pass before plan generation; if the autonomous subagent tool is unavailable, the same research guide must be executed manually across code context, documentation, dependencies, and existing patterns."
+    exclusive: "Without the skill, a model may inspect a few obvious Express files or infer common patterns, but is unlikely to perform a structured research pass covering README, user model/service/controller/routes/validation, auth patterns, and serialization/plugin behavior before planning."
+  - id: clarification_pause
+    description: "Skill requires unresolved product decisions to be marked inline with [NEEDS CLARIFICATION], followed by explicit clarifying questions and a pause for feedback."
+    exclusive: "A generic assistant may ask follow-up questions or append open questions, but is unlikely to annotate the saved plan with [NEEDS CLARIFICATION] markers and pause after producing the plan."
+
+notes: |
+  - Positive example task. This task uses a non-ResizeMe project to verify that the skill's structured autonomy planning workflow is not hardcoded only for the ResizeMe example in the skill text; it should still follow "plan, don't code, PR commit steps, save plan, clarification pause".
+  - The ResizeMe example in the skill text should be understood in this task as "find similar implementation patterns within the current project"; it must not require or expect ResizeMe code to exist on disk.
+  - Expected correct behavior: research the project structure, user controller/service/model/routes/validation conventions; if testing is needed, the plan should explain which tests or verification methods need to be added, rather than claiming to follow existing test conventions; save `plans/<feature-name>/plan.md`; the plan should be divided into testable commits such as model/service domain operations, API boundary and validation, testing/documentation; mark unresolved points such as post-suspension permissions, restoration, field naming, and whether existing tokens are invalidated with `[NEEDS CLARIFICATION]` and pause.
+  - Common error behavior: directly editing `src/controllers/user.controller.js:27-30` to let the generic update accept `suspended`, or directly modifying `src/services/user.service.js:55-65` to mix in suspension logic, rather than producing a plan.
+  - Common error behavior: outputting "TODO: add field, add endpoint, add tests" without Branch/Goal/Step Files/What/Testing, and without saving a plan file.
+  - baseline_correctness_signals:
+      - The plan relates to the account suspension feature and identifies the real structure of the Express/Mongoose project.
+      - The plan file is saved to `plans/<feature-name>/plan.md`.
+      - No source code under `assets/SF90_t3_node_api_plan/input/project/src/` was modified.
+  - skill_following_signals:
+      - There is a trace of research before planning, rather than directly writing a proposal from the request.
+      - The plan file uses the skill template: Branch, Description, Goal, Implementation Steps, with Step having Files/What/Testing.
+      - The complex feature is broken into multiple commit-sized steps.
+      - Unresolved product semantics are annotated with `[NEEDS CLARIFICATION]`, and the assistant asks the user questions and then pauses.

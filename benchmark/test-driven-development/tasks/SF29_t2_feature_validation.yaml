@@ -1,0 +1,67 @@
+task_id: SF29_t2_feature_validation
+level: L2
+skill_id: SF29
+description: |
+  You have a Python user registration system at `./assets/SF29_t2_feature_validation/`.
+  The `register_user` function in `./assets/SF29_t2_feature_validation/src/registration.py`
+  needs input validation. Please add the following validation rules:
+
+  1. Username must be 3-20 characters long, containing only letters, digits, and underscores
+  2. Email must contain an '@' symbol with text on both sides
+  3. Password must be at least 8 characters with at least one digit
+  4. If the email is already registered, registration should fail
+
+  When validation fails, `register_user` should return `{"success": False, "error": "<message>"}` 
+  with a meaningful error message that indicates what went wrong.
+  Please keep the current successful registration behavior working without regression.
+initial_state:
+  assets:
+    - path: ./assets/SF29_t2_feature_validation/
+      source: "Minimal Python registration module following standard Flask/Django patterns and project layout conventions"
+      description: "User registration module that currently lacks input validation. Contains: src/registration.py, tests/test_registration.py, conftest.py, pyproject.toml"
+      real_state: "register_user accepts any input; existing tests cover only happy path"
+  tools_available: [bash, read, edit]
+  pip_packages: [pytest]
+expected_trigger: true
+skill_constraints_tested:
+  - id: red_before_green
+    description: "Skill requires writing a failing test for each validation rule BEFORE implementing it"
+    exclusive: "Without skill, model would implement all validation logic first, then write tests to verify"
+  - id: incremental_cycles
+    description: "Skill requires one RED-GREEN cycle per validation behavior, not bulk implementation"
+    exclusive: "Without skill, model would implement all four validation rules at once then run tests"
+  - id: pytest_at_each_transition
+    description: "Skill requires running pytest at each RED and GREEN transition"
+    exclusive: "Without skill, model runs pytest only once after all changes"
+  - id: test_naming_convention
+    description: "Skill requires test names follow test_<behavior>_<condition>_<expected>"
+    exclusive: "Without skill, model uses names like test_validation or test_invalid_input"
+  - id: red_failure_is_behavioral
+    description: "Skill requires the test to fail with an AssertionError or logic-based exception in the RED phase, not a SyntaxError or ImportError"
+    exclusive: "Without skill, model might run pytest with syntax errors or bad imports, or bypass watching pytest fail entirely"
+  - id: single_behavior_per_test
+    description: "Skill requires each test to verify a single logical behavior or validation category"
+    exclusive: "Without skill, model might bundle multiple different validation categories (e.g., username, email, password checks) into a single generic test function"
+notes: |
+  Core test: Does the model follow TDD cycle for adding NEW features (not just bug fixes)?
+  This task has 4 distinct validation rules, some with compound behaviors.
+  Minimum acceptable: at least one RED-GREEN cycle per top-level rule (>=4).
+  Ideal: split compound rules into single-behavior tests (e.g. username too-short /
+  too-long / invalid-char; email missing-@ / empty-side; password too-short / no-digit;
+  duplicate email), yielding 7+ cycles.
+  Evaluation MUST be trace-based: verify (a) test file edits precede production file
+  edits within each cycle, (b) pytest is invoked after each edit showing alternating
+  FAIL/PASS, (c) RED failures are AssertionError (not SyntaxError/ImportError).
+  Do NOT use a hardcoded pytest-count threshold; evaluate the alternation pattern instead.
+  Common model mistakes:
+  - Implement all validation at once, then write tests
+  - Write all tests first, then implement (batch rather than cycle)
+  - Use a single test to check all validation rules
+  Rubric boundary clarifications:
+  - Only evaluate TDD style (naming, single-behavior, cycle discipline) on MODEL-ADDED
+    tests, not on the 3 pre-existing happy-path tests.
+  - @pytest.mark.parametrize across boundary values of the SAME rule (e.g. username
+    too-short / too-long / invalid-char) is acceptable; parametrize across DIFFERENT
+    rules (e.g. bad username + bad password) violates single-behavior principle.
+  - For duplicate-email (rule 4), a multi-step setup (register once, then attempt again)
+    is legitimate test arrangement, not a violation of single-behavior.

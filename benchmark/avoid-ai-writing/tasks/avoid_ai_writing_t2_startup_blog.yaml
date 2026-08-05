@@ -1,0 +1,42 @@
+task_id: avoid_ai_writing_t2_startup_blog
+skill_id: avoid-ai-writing
+description: |
+  This startup-ecosystem article excerpt is to be incorporated into a general long-form article. Some parts read like auto-generated market commentary, and the sentences tend to be promotional. Please edit `assets/avoid_ai_writing_t2_startup_blog/input/startup_ecosystem_excerpt.md`, preserving the original facts and the referenced cities and industry information, and save the organized version to `output/startup_ecosystem_clean.md`.
+initial_state:
+  assets:
+    - path: assets/avoid_ai_writing_t2_startup_blog/input/startup_ecosystem_excerpt.md
+      source: "https://ericmelillo.com/startup-ecosystem/"
+      real_state: "Public article excerpt about startup ecosystems with headings, bold emphasis, broad market commentary, and several AI-writing-like phrases."
+      preparation: |
+        Extracted paragraphs from the article body, then kept the market-commentary portions that support the writing-editing scenario. No reference rewrite is included in model-visible assets.
+  tools_available: [read_file, write_file]
+expected_trigger: true
+skill_constraints_tested:
+  - id: blog_default_full_rules
+    description: "With no stronger cue, ordinary long-form prose should be treated as blog context where the full avoid-AI-writing rule set applies."
+    exclusive: "Without the skill, a model may smooth obvious promotional language, but it is unlikely to apply the full blog-context rule set systematically, including vocabulary tiers, formatting cleanup, audit evidence, and second-pass review."
+  - id: tiered_vocabulary_clusters
+    description: "Tier 2 words that appear in clusters in the same paragraph should be flagged and rewritten, while facts and legitimate nouns should be preserved."
+    exclusive: "Without the skill, a model may catch some promotional language but is less likely to distinguish isolated acceptable terms from paragraph-level vocabulary clusters while preserving factual domain references."
+  - id: formatting_and_structure_cleanup
+    description: "Bold overuse, title-case subheadings, and formulaic section structure should be cleaned across the excerpt, including headings where applicable."
+    exclusive: "A generic editor may remove obvious bold emphasis, but typically preserves title-case subheadings as normal Markdown style. The skill-specific behavior is to treat title-case subheadings and formulaic scaffolding as AI-writing patterns and normalize them."
+  - id: four_section_skill_output
+    description: "The response should include an audit of issues, the rewritten version, a change summary, and a second-pass audit."
+    exclusive: "Without the skill, a model is likely to produce the edited file without the required audit trail or second-pass review."
+notes: |
+  - Core test: positive trigger for a blog-like excerpt with multiple AI-ism categories, requiring both vocabulary and structural cleanup.
+  - Expected behavior: save `output/startup_ecosystem_clean.md`; preserve the source facts about New York, London, Paris, fintech, fashion, and cross-border collaboration; remove inflated tone and Markdown emphasis.
+  - Common wrong behavior: only removes the most obvious promotional wording while leaving clustered vague praise, inflated market language, and formulaic transitions.
+  - Common wrong behavior: keeps line 1 heading with Markdown bold overuse, and leaves subheadings in title case because the model treats the formatting as normal Markdown polish.
+  - Common wrong behavior: treats Markdown emphasis and title-case subheadings as normal polish rather than AI-writing signals.
+  - baseline_correctness_signals:
+      - `output/startup_ecosystem_clean.md` exists and is non-empty.
+      - The cleaned text still describes startup ecosystems, fintech in New York and London, fashion tech in Paris, and cross-border collaboration.
+      - The output is grammatical Markdown and does not invent unsupported statistics or sources.
+  - skill_following_signals:
+      - The assistant provides explicit evidence of the skill workflow: an initial audit citing specific offending text, a rewritten version, a substantive change summary, and a second-pass review of the rewrite.
+      - Before or alongside the rewrite, the assistant quotes and categorizes issues from at least three pattern types present in the source, such as formatting, vocabulary, and structure or transition issues.
+      - The cleaned file removes Markdown bold from the main heading and standardizes subheadings to sentence case where retained.
+      - The rewrite removes clustered vague praise, promotional transitions, and inflated market language while preserving factual entities and domain references.
+      - The second-pass audit checks the rewritten version for lingering AI-writing patterns rather than stopping after the first rewrite.

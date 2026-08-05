@@ -1,0 +1,64 @@
+task_id: SF27_t2_celery_notification_tests
+level: L3
+skill_id: SF27
+description: |
+  Our notification service has an async task send_notification that sends email/SMS/push via Celery. There is also a DRF ViewSet that receives requests and triggers async sending. There are currently no tests at all.
+
+  Please review the code under apps/notifications/ (models.py, tasks.py, views.py, serializers.py), and write complete tests for the send_notification task and NotificationViewSet. You need to ensure that async tasks actually execute in tests and verify their side effects.
+
+  The project's tests/ directory is empty; you need to build the complete test infrastructure from scratch.
+
+initial_state:
+  assets_dir: assets/SF27_t2_celery_tests
+  key_files:
+    - path: apps/notifications/models.py
+      description: "Notification model with mark_sent/mark_failed methods"
+    - path: apps/notifications/tasks.py
+      description: "Celery tasks: send_notification, send_bulk_notifications"
+    - path: apps/notifications/views.py
+      description: "DRF NotificationViewSet with bulk_send action"
+    - path: apps/notifications/serializers.py
+      description: "DRF serializers for Notification"
+    - path: apps/notifications/providers.py
+      description: "SMS and push notification provider functions (stub implementations)"
+    - path: config/settings/test.py
+      description: "Test settings without CELERY_TASK_ALWAYS_EAGER"
+    - path: config/urls.py
+      description: "URL configuration with DRF router registering NotificationViewSet"
+    - path: pytest.ini
+      description: "pytest configuration"
+    - path: tests/__init__.py
+      description: "Empty tests package"
+  tools_available: [bash, read, edit, write]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: celery_always_eager
+    description: "Test settings must include CELERY_TASK_ALWAYS_EAGER = True and CELERY_TASK_EAGER_PROPAGATES = True for synchronous task execution with proper exception propagation in tests"
+    exclusive: "Model mocks the task, calls task function directly without .delay(), uses @override_settings inline, or omits CELERY_TASK_EAGER_PROPAGATES"
+  - id: factory_boy_required
+    description: "Test data (Users, Notifications) must be created via factory_boy, not Model.objects.create()"
+    exclusive: "Model creates test users and notifications with direct ORM calls"
+  - id: pytest_fixtures_in_conftest
+    description: "Shared fixtures (api_client, authenticated user, etc.) defined in conftest.py with @pytest.fixture"
+    exclusive: "Model defines setup in TestCase.setUp or repeats client creation in each test"
+  - id: pytest_django_runner
+    description: "Must use pytest-django, not unittest.TestCase"
+    exclusive: "Model uses django.test.TestCase or rest_framework.test.APITestCase base classes"
+
+notes: |
+  Positive task. Core test points:
+  - Whether CELERY_TASK_ALWAYS_EAGER = True and CELERY_TASK_EAGER_PROPAGATES = True are added to test settings
+  - Whether factory_boy is used to create Notification and User instances
+  - Whether conftest.py uses @pytest.fixture to define shared fixtures
+  - Whether pytest-django functional style is used rather than unittest.TestCase or APITestCase
+  - Whether Celery task tests directly call .delay() and assert side effects (leveraging eager mode)
+
+  Expected correct behavior: add CELERY_TASK_ALWAYS_EAGER=True and CELERY_TASK_EAGER_PROPAGATES=True in test.py,
+  create NotificationFactory/UserFactory, tests directly send_notification.delay(id) then check database state changes.
+
+  Expected incorrect behavior: mock the entire task, do not set eager mode, use TestCase/APITestCase classes, directly create test data via ORM.
+
+  Note: the user field in the serializer is not read_only but perform_create will overwrite it;
+  if the model slightly adjusts the serializer to set user as read_only, this is reasonable behavior and should not be penalized.

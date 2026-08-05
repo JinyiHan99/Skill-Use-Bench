@@ -1,0 +1,160 @@
+task_id: SF83_t2_weather_table_profile
+skill_id: profiling-tables
+rubric_version: v2
+rules:
+  - id: g1_observable_output_write
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trajectory contains an observable write or edit attempt to the target report file; only records evaluability, does not judge report quality."
+    signal:
+      pattern: >-
+        (?is)(?:(?:tool|name)["']?\s*:\s*["']?(?:Write|Edit)["']?.{0,5000}(?:file_path|path)["']?\s*:\s*["'][^"']*output/SF83_t2_weather_table_profile\.md["']|(?:file_path|path)["']?\s*:\s*["'][^"']*output/SF83_t2_weather_table_profile\.md["'].{0,5000}(?:tool|name)["']?\s*:\s*["']?(?:Write|Edit)["']?)
+
+  - id: r1_schema_metadata_is_first_profile_step
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The first substantive profiling step in the report should be schema/column metadata, covering column names, data types, and descriptions/comments; row counts, samples, and column statistics should come after.
+      Skill-exclusive rationale: without reading the skill, strong models often first query row counts, samples, or directly do EDA, then mix schema into the report; the skill's Step 1 explicitly queries field metadata first. The conflict point is that the profiling order must be metadata-first, not sample/statistics-first.
+    signal:
+      file: output/SF83_t2_weather_table_profile.md
+      judge_question: |
+        Based strictly on the final contents of output/SF83_t2_weather_table_profile.md, answer YES iff, after the title and at most 1-2 overview sentences, the first substantive profiling section is schema/column metadata and that section includes column names, data types, and descriptions/comments.
+        Answer NO if substantive analysis starts with row count, samples, charts, date/numeric/categorical statistics, or data quality before a standalone schema metadata section. Also answer NO if schema appears first but lacks column names/types/descriptions.
+        Acceptable: "## Schema / Column Metadata" with Column, Type, Description before "## Size and Shape".
+        Unacceptable: "## Overview\nRows: 1,461...\n## Sample Rows...\n## Schema".
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_date_column_has_date_profile_and_freshness
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Date columns should use date/time-specific statistics: earliest, latest, date_range_days, null_count, and discuss freshness based on latest.
+      Skill-exclusive rationale: without reading the skill, strong models may treat `date` as a string or only write min/max; the skill requires date columns to specifically compute range days, missing, and freshness. The conflict point is that `date` cannot be only a generic field summary; it must have time-span and freshness assessment.
+    signal:
+      file: output/SF83_t2_weather_table_profile.md
+      file_must_contain:
+        - '(?is)\bdate\b.{0,500}(earliest|latest|2012-01-01|2015-12-31|最早|最晚|日期范围)'
+        - '(?is)\bdate\b.{0,600}(1460|1,?461|about 4 years|four years|4 年|四年|跨度|date_range_days|range days)'
+        - '(?is)\bdate\b.{0,600}(null_count|null count|missing|缺失|空值)'
+        - '(?is)(freshness|新鲜度|last updated|latest date|最大日期|历史|static|not current)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc2_numeric_weather_columns_have_type_specific_stats
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Statistics-quality record for weather numeric columns: numeric columns include range/mean/median/missing and other profile metrics. This behavior can be naturally derived from the complete data profiling task and is not counted as skill-following.
+    signal:
+      file: output/SF83_t2_weather_table_profile.md
+      file_must_contain:
+        - '(?is)\b(precipitation|temp_max|temp_min|wind)\b.{0,500}(min|max|avg|average|median|最小|最大|平均|中位数)'
+        - '(?is)\b(precipitation|temp_max|temp_min|wind)\b.{0,500}(null_count|null count|missing|distinct_count|distinct count|缺失|空值|唯一|基数)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc3_weather_categorical_distribution_has_counts_and_percentages
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Weather categorical column distribution record: includes category count/frequency and percentage. This behavior belongs to general EDA/task-completion quality and is not counted as skill-following.
+    signal:
+      file: output/SF83_t2_weather_table_profile.md
+      file_must_contain:
+        - '(?is)\bweather\b.{0,600}(rain|sun|fog|drizzle|snow).{0,300}(count|frequency|freq|数量|频次|频数).{0,300}(%|percent|percentage|占比|百分比)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_quality_dimensions_explicitly_covered
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The data quality assessment should explicitly cover the five dimensions of completeness, uniqueness, freshness, validity, and consistency, and give a concrete judgment or evidence for each.
+      Skill-exclusive rationale: without reading the skill, strong models usually write free-text "main quality risks/caveats"; the skill explicitly requires summarizing by five quality dimensions. The conflict point is that the quality assessment must be systematic by dimension, not generic caveats.
+    signal:
+      file: output/SF83_t2_weather_table_profile.md
+      judge_question: |
+        Based strictly on the final contents of output/SF83_t2_weather_table_profile.md, answer YES iff the data quality assessment explicitly covers all five dimensions—completeness, uniqueness, freshness, validity, and consistency—and each dimension has a concrete judgment or evidence, not just a bare keyword.
+        Answer NO if any one of the five dimensions is missing, only listed as a heading with no substantive assessment, or collapsed into generic data quality prose.
+        Acceptable: sections or bullets for Completeness, Uniqueness, Freshness, Validity, and Consistency, each with observed evidence such as null counts, duplicate/key assessment, latest date, range/format checks, or logical consistency notes.
+        Unacceptable: "Quality checks: completeness, uniqueness, freshness, validity, consistency" with no per-dimension evidence.
+      judge_expected: "YES"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_data_quality_score_present
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The output summary should include an explicit Data Quality Score/quality score, preferably quantifying overall quality in X/10 form.
+      Skill-exclusive rationale: without reading the skill, strong models may write quality risks and usage suggestions but not necessarily a quantitative quality score; the skill's Step 7 explicitly requires a Data Quality Score. The conflict point is that the report must give a quantitative score, not just text caveats.
+    signal:
+      file: output/SF83_t2_weather_table_profile.md
+      file_must_contain:
+        - '(?i)(data quality score|质量评分|质量得分|overall|总体).{0,80}\d+(?:\.\d+)?\s*/\s*10'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc4_recommended_queries
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The task requires giving the newcomer recommended queries for further analysis; this item checks that actual SQL/SELECT content exists near the recommended-queries section.
+    signal:
+      file: output/SF83_t2_weather_table_profile.md
+      file_must_contain:
+        - '(?is)(recommended (sql )?queries|常见上手查询|推荐查询).{0,1500}\bSELECT\b'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] The target report file exists and the core artifact is correct: corresponds to analytics.seattle_weather/seattle_weather, includes the real row count and date span."
+    signal:
+      file: output/SF83_t2_weather_table_profile.md
+      file_must_contain:
+        - '(?i)analytics\.seattle_weather|seattle_weather'
+        - '\b1,?461\b'
+        - '2012-01-01'
+        - '2015-12-31'
+        - '(?i)146[01]\s*(days|天)|4\s*(years|年)|四年'

@@ -1,0 +1,197 @@
+rubric_id: skill_98_soul_memory_t2_cantonese_priority
+objective: Evaluate whether the model follows the soul-memory skill's [C]/[I]/[N] long-term memory priority semantics and the independent analysis requirement for the Cantonese tone branch; task completion is only recorded with weight=0.
+rules:
+  - id: g1_observable_module_or_output_write
+    type: required-tool
+    provenance: gate
+    locus: trace
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace should contain a real Write/Edit tool call that writes to the relevant modules or output directory.
+      The gate only checks whether there is an evaluable attempt, not whether the judgment logic is correct; paths or Write/Edit text in natural language self-reports must not be treated as real tool calls.
+    signal:
+      pattern: >-
+        (?s)(?:"(?:tool_name|recipient_name)"\s*:\s*"(?:Write|Edit)"|\btool(?:_name)?\s*[:=]\s*["']?(?:Write|Edit)["']?)[\s\S]{0,800}(?:"file_path"\s*:\s*"|\bfile_path\s*[:=]\s*["']?)(?:[^"'\n]*assets/soul_memory_t2_cantonese_priority/(?:input/soul-memory-snapshot/(?:modules/(?:priority_parser|dynamic_classifier|cantonese_syntax)\.py|core\.py)|output)[^"'\n]*)
+
+  - id: r1_priority_uses_memory_value_not_emotion
+    type: lesson
+    provenance: skill
+    locus: output-file
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] [C]/[I]/[N] must represent long-term memory priority: [C] critical definitions/configuration/decisions must be remembered, [I] important material/preferences/projects should be noted, [N] daily chatter may decay; emotional intensity, admiration, or imperative tone must not be directly treated as high priority.
+      Skill-exclusive reason: without reading the skill, a strong model fixing "unstable judgment" often tunes by emotional intensity or language intensity; the skill requires judging by long-term retention value. The conflict is "emotion/tone intensity classification" vs "long-term memory value priority".
+    signal:
+      files:
+        - assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/priority_parser.py
+        - assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/dynamic_classifier.py
+        - assets/soul_memory_t2_cantonese_priority/output/**
+      query: |
+        Based on the final modified assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/priority_parser.py, modules/dynamic_classifier.py, and actual sample records in output/, ignoring the agent's self-report, plan, or trace text:
+        Does the product clearly reflect that [C]/[I]/[N] are long-term memory value priorities, and is there at least actual code or sample evidence showing that high-emotion chatter is not elevated to [C]/[I] solely due to strong emotion?
+        Answer YES if implementation or sample outputs show emotional praise/exclamation/chatter classified as Normal or low memory priority unless it contains durable user/config/project facts.
+        Answer NO if high emotion, praise, imperatives, or exclamation marks are used as the main reason for Critical/Important priority.
+      acceptable: |
+        A sample like "太犀利啦！！！哈哈" is classified [N]/normal while "API key rotation policy is X" or "我的固定配置是 X" is [C]/[I].
+      unacceptable: |
+        Any text with "!!!", "犀利", or strong sentiment becomes Critical regardless of durable content.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_durable_plain_fact_can_be_high_priority
+    type: lesson
+    provenance: skill
+    locus: output-file
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Content with bland tone but containing definitions, configuration, decisions, search references, or project facts should be able to receive [C] or [I], proving that priority is based on long-term retention value rather than expression intensity.
+      Skill-exclusive reason: without reading the skill, the model may treat "bland/emotionless" as ordinary text; the skill's Priority System explicitly states that key definitions, configuration, and important material should be retained long-term. The conflict is "by tone saliency" vs "by durable information value".
+    signal:
+      files:
+        - assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/priority_parser.py
+        - assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/dynamic_classifier.py
+        - assets/soul_memory_t2_cantonese_priority/output/**
+      query: |
+        Based on the final modified priority_parser.py, dynamic_classifier.py, and output/ sample records, ignoring the agent's self-report, plan, or trace text:
+        Is there at least one sample without an explicit [C]/[I] tag, with bland tone but containing definitions, configuration, decisions, search references, or project facts, that is actually classified as [C] or [I]?
+        Answer YES if such untagged bland durable information is elevated to Critical/Important by implementation or actual sample outputs.
+        Answer NO if all plain factual/config/reference samples remain Normal, or the only high-priority examples rely on explicit [C]/[I] tags.
+      acceptable: |
+        "默认检索阈值是 3.0" without emotional wording and without an explicit [C]/[I] tag is classified as [C] or [I] because it is configuration/project information.
+      unacceptable: |
+        Only "[C] remember this" examples are high priority; untagged config/definition facts are Normal.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3a_cantonese_analysis_outputs_tone_context
+    type: lesson
+    provenance: skill
+    locus: output-file
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Cantonese detection, tone intensity, and context mapping should be output as independent analysis dimensions.
+      Skill-exclusive reason: without reading the skill, the model tends to only tune memory priority or make a flat is_cantonese judgment; the skill explicitly has a Cantonese Branch with particle grading and context mapping. The conflict is "single language/priority label" vs "independent tone/context analysis".
+    signal:
+      files:
+        - assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/cantonese_syntax.py
+        - assets/soul_memory_t2_cantonese_priority/output/**
+      query: |
+        Based on the final modified cantonese_syntax.py and output/ sample records, ignoring the agent's self-report, plan, or trace text:
+        Do obvious Cantonese samples output independent Cantonese detection, intensity grading, and context/context analysis, rather than only a flat boolean or only memory priority?
+        Answer YES if at least one Cantonese sample includes detected Cantonese signal plus intensity and context fields or equivalent analysis.
+        Answer NO if sample outputs lack independent tone/context analysis or implementation only returns a flat is_cantonese boolean.
+      acceptable: |
+        "好啦好啦，搞掂晒啦！" includes Cantonese detection plus medium/strong tone and concession/casual context.
+      unacceptable: |
+        The only Cantonese output is is_cantonese=true or priority=[I] with no tone/context dimension.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3b_cantonese_not_priority_boost
+    type: lesson
+    provenance: skill
+    locus: output-file
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Detecting Cantonese tone itself must not automatically elevate the [C]/[I]/[N] memory priority; priority should still be determined by long-term memory value.
+      Skill-exclusive reason: without reading the skill, the model tends to conflate "obvious Cantonese/strong tone" with "important memory"; the skill explicitly states that the Cantonese Branch is independent of the Priority System. The conflict is "language style triggers high priority" vs "Cantonese tone analysis independent of memory priority".
+    signal:
+      files:
+        - assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/cantonese_syntax.py
+        - assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/priority_parser.py
+        - assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/dynamic_classifier.py
+        - assets/soul_memory_t2_cantonese_priority/output/**
+      query: |
+        Based on the final modified cantonese_syntax.py, priority_parser.py, dynamic_classifier.py, and output/ sample records, ignoring the agent's self-report, plan, or trace text:
+        Is there evidence showing that Cantonese or strong Cantonese tone is not automatically elevated to [C]/[I] solely due to language style, and priority is still determined by the content's long-term retention value?
+        Answer YES if at least one Cantonese/high-tone sample remains Normal or its high priority is justified by durable content rather than Cantonese style.
+        Answer NO if Cantonese detection directly maps to Critical/Important.
+      acceptable: |
+        "好啦好啦，搞掂晒啦！" is Cantonese with tone/context analysis, but priority [N] unless it contains durable facts.
+      unacceptable: |
+        Every detected Cantonese sentence is classified [I] or [C] simply because is_cantonese=true.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_cantonese_detection_has_strength_and_boundary
+    type: lesson
+    provenance: skill
+    locus: output-file
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The Cantonese branch should reflect particle grading, context mapping, and detection boundaries: plain Chinese or text containing only a few weak particles/strong-emotion punctuation should not be uniformly generalized as strong Cantonese tone.
+      Skill-exclusive reason: without reading the skill, the model may only expand the word list or make coarse judgments based on exclamation marks or a single particle; the skill requires particle grading, context mapping, and CJK scenario support. The conflict is "keyword hit means strong Cantonese" vs "graded, with context, with boundaries".
+    signal:
+      files:
+        - assets/soul_memory_t2_cantonese_priority/input/soul-memory-snapshot/modules/cantonese_syntax.py
+        - assets/soul_memory_t2_cantonese_priority/output/**
+      query: |
+        Based on the final modified cantonese_syntax.py and output/ sample records, ignoring the agent's self-report, plan, or trace text:
+        Can you see the Cantonese analysis distinguishing intensity levels and context types, and are plain Chinese, exclamation marks, or a single weak particle not individually judged as strong Cantonese?
+        Answer YES if samples or implementation show graded intensity/context using light/medium/strong, low/moderate/high, 弱/中/强, score bands, or equivalent names, and a boundary case is not overclassified as strong Cantonese.
+        Answer NO if detection is a flat boolean only, or ordinary Chinese/exclamation marks/one weak "啦" occurrence alone becomes strong Cantonese.
+      acceptable: |
+        Ordinary Mandarin is non-Cantonese or low confidence; a weak "好嘅/知道啦" is light/medium, while "犀利到爆" is strong with humor/emphasis context.
+      unacceptable: |
+        "今天不错啦！" and "太好了！！！" are both strong Cantonese solely due to 啦 or exclamation marks.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1a_output_coverage
+    type: task-completion
+    provenance: task
+    locus: output-file
+    judge_context_window: [final_answer]
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The task requires compiling no fewer than 6 representative sample actual outputs in output/, covering scenarios such as high-emotion chatter, definitions/configuration, search/reference, plain Chinese, obvious Cantonese, and occasional Cantonese particles.
+    signal:
+      query: |
+        Looking only at the final products under assets/soul_memory_t2_cantonese_priority/output/, ignoring the agent's self-report, plan, or trace text:
+        Does output/ contain no fewer than 6 representative samples, each with original text and actual classification/analysis results, covering the main scenarios listed in the task?
+        Answer YES only if samples are concrete actual outputs, not just planned cases.
+        Answer NO if samples are fewer than six, lack actual outputs, or do not cover both priority and Cantonese-analysis results.
+      acceptable: |
+        A validation markdown/json lists 6+ inputs with priority, category, Cantonese confidence/intensity/context fields and notes the command/script used.
+      unacceptable: |
+        Only "tested several examples" without per-sample outputs, or fewer than six examples.
+
+  - id: tc1b_import_smoke
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The relevant Python modules should maintain a basic form that can be locally imported/run; this item only records smoke test evidence and is not counted toward skill-following.
+    signal:
+      file: assets/soul_memory_t2_cantonese_priority/output/import_smoke.txt
+      file_must_contain: >-
+        (?is)python(?:3)?\s+-c[\s\S]{0,500}(?:priority_parser|dynamic_classifier|cantonese_syntax)[\s\S]{0,500}(?:ok|pass|success|succeeded|0\s*$)

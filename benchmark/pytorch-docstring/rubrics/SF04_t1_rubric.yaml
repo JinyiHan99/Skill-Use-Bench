@@ -1,0 +1,393 @@
+# Compact scoring rubric for skill_04_pytorch_docstring — SF04_t1_add_docstring_conv_module
+# V4: three-layer structure rewrite (fix_recommendations_20260703.md#B)
+#
+# Change overview (relative to V3):
+#   - Split MD1 (was: raw string + description + section order 3 items mixed, all high weight)
+#     -> MD1a raw string        (mid)
+#     -> MD1b section-order     (high)
+#     -> MD1c description-prose (low)
+#   - MD2 keeps high (headline skill-exclusive: PyTorch Args/Returns format)
+#   - Split MD3 (was: math shape + underscore + plaintext formula 3 items mixed, all high)
+#     -> MD3a math-shape        (mid)
+#     -> MD3b underscore-escape (low)
+#     -> MD3c formula-in-mathblock (low)
+#   - MD4 keeps mid (Examples structure)
+#   - MD5 keeps low (Sphinx roles, N/A allowed)
+#   - MN1 downgraded from "whole-block mid + one-strike-fatal" to 3 independent low-weight alarm items
+#
+# 3-layer structure statistics:
+#   - Gate: 1 item (g1)
+#   - Hard requirement (high, <=40%): 2 items (MD1b, MD2)  -> ratio 2/9 ~= 22%
+#   - Medium (mid): 2 items (MD1a, MD3a)
+#   - Soft bonus (low): 5 items (MD1c, MD3b, MD3c, MD4[was MD4->keep mid], MD5, MN1a, MN1b, MN1c)
+#
+# skill_exclusive_reason fields are all retained and made explicit.
+
+version: 4
+task_id: SF04_t1_add_docstring_conv_module
+skill_id: skill_04_pytorch_docstring
+expected_trigger: true
+artifact_main: src/nn/modules/separable.py
+artifact_anchor: 'class\s+DepthwiseSeparableConv2d\b'
+weight_scale: {high: 3, mid: 2, low: 1, zero: 0}
+scoring_policy:
+  trigger_gate: "If g1 fails, following checks are reported as null. Do not use final docstring style as a trigger gate."
+  adherence: "Weighted: max(0, Σw(MD passed) - Σw(MN violated)) / Σw(MD applicable)."
+  scope: "All MD/MN checks operate only on the DepthwiseSeparableConv2d class docstring source/text."
+  verifier_priority: "Use deterministic AST/regex state checks. No llm-judge is required."
+  weight_layers: |
+    V4 three-layer structure (rubric_design_principles.md#5.1):
+    - Gate: evaluability gate, not in denominator.
+    - Hard requirement (high): the true headline skill-exclusive points, at most 2 items.
+    - Medium (mid): important but non-fatal skill features.
+    - Soft bonus (low): details and style; absence only deducts itself, does not cascade-deduct other items.
+
+rules:
+
+# ─────────────────── Gate ───────────────────
+
+- id: g1_target_docstring_evaluable
+  type: required-tool
+  provenance: gate
+  signal_dimension: trigger
+  verifier: state-check
+  exclusive: false
+  weight: 0
+  outcome_field: process
+  spec: |
+    [GATE] The exact target file exists, parses as Python, contains class
+    DepthwiseSeparableConv2d, and that class has a syntactic docstring attempt.
+    This is only an evaluability gate.
+  signal:
+    file: src/nn/modules/separable.py
+    method: ast_python
+    checks:
+      - ast.parse succeeds
+      - locate ClassDef named DepthwiseSeparableConv2d
+      - first statement in the class body is ast.Expr whose value is a string literal
+    passed_condition: all checks pass
+
+# ─────────────────── Hard requirement (high): only the strongest skill-exclusive signals ───
+
+- id: MD1b_section_order_preserved
+  type: order
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: high
+  outcome_field: must_do
+  skill_exclusive_reason: |
+    Models that have not read the skill tend to write docstrings in Google/NumPy style, or put Examples before
+    Args; the skill explicitly specifies the fixed order of PyTorch reST sections (description ->
+    .. math:: -> Args -> Returns -> Examples::), and disorder will cause the Sphinx build to fail.
+    This is the strongest skill-exclusive signal of this skill.
+  spec: |
+    [SKILL] Present block-level markers must appear in this order:
+    description prose, .. math::, Args:, Returns:, Examples::.
+    Absent markers are allowed to skip; only the relative order of *present*
+    markers is checked.
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: ast_source_and_regex
+    section_markers:
+      - name: math
+        pattern: '(?m)^\s*\.\.\s+math::\s*$'
+      - name: args
+        pattern: '(?m)^\s*Args:\s*$'
+      - name: returns
+        pattern: '(?m)^\s*Returns:\s*$'
+      - name: examples
+        pattern: '(?m)^\s*Examples::\s*$'
+    passed_condition: offsets of present section_markers are monotonically increasing
+
+- id: MD2_args_and_returns_are_pytorch_style
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: high
+  outcome_field: must_do
+  skill_exclusive_reason: |
+    Default strong models will write Google-style "Args: name: description" (missing type parentheses) or NumPy-style
+    block lists; the skill explicitly requires "name (Type):" syntax + optional parameters with "optional, Default:
+    ``value``", and the Returns section uses a "Tensor:" header + `:math:` to describe shape.
+    This is the most rigid divergence point from general docstring conventions.
+  spec: |
+    [SKILL] Args must document all public __init__ parameters (extracted from
+    signature) using PyTorch "name (Type):" entries. Optional parameters must
+    include the phrase "optional" and "Default: ``...``". Returns must contain
+    "Tensor:" and describe output shape via :math:`...` or word "shape".
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: ast_signature_and_section_regex
+    required_args_source: public parameters from DepthwiseSeparableConv2d.__init__, excluding self
+    args_section: "text between block-level Args: and the next block-level Returns: or Examples:: marker"
+    arg_entry_pattern: '(?m)^\s{4}{name}\s*\([^)]*\):'
+    optional_default_pattern: '(?s){name}\s*\([^)]*optional[^)]*\):.*?Default:\s*``[^`]+``'
+    returns_section: "text between block-level Returns: and the next block-level Examples:: marker"
+    returns_required_patterns:
+      - '(?m)^\s{4}Tensor\s*:'
+      - ':math:`[^`]+`|\bshape\b'
+    passed_condition: every required __init__ parameter has an Args entry, default-bearing parameters match optional_default_pattern, and returns_required_patterns match in Returns section
+
+# ─────────────────── Medium (mid): important but fault-tolerant skill features ───
+
+- id: MD1a_raw_string_literal
+  type: format
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: mid
+  outcome_field: must_do
+  skill_exclusive_reason: |
+    Default writes `"""..."""` (ordinary triple quote); the skill mandates `r"""..."""` (raw literal) to
+    avoid LaTeX backslashes being interpreted by Python. A model that has not read the skill will not proactively add the r prefix.
+  spec: |
+    [SKILL] The class docstring must be a raw string literal — the opening
+    literal token starts with r or R triple quote.
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: ast_source_and_regex
+    passed_condition: opening literal token for the class docstring starts with r/R triple quote
+
+- id: MD3a_tensor_shape_uses_math_role
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: mid
+  outcome_field: must_do
+  skill_exclusive_reason: |
+    Default writes "shape (N, C, H, W)" (plaintext parentheses); the skill requires using `:math:`(N, C, H, W)``
+    so that Sphinx renders it in a proper math environment. This is a salient feature of official PyTorch docstrings.
+  spec: |
+    [SKILL] Tensor shapes must appear inside :math:`...` roles.
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: section_scoped_regex
+    shape_required_pattern: ':math:`[^`]*\([^`]*\)[^`]*`'
+    passed_condition: shape_required_pattern matches at least once
+
+- id: MD4_examples_block_is_pytorch_doctest
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: mid
+  outcome_field: must_do
+  skill_exclusive_reason: |
+    Default will write markdown ```python code blocks or "Example:" in Chinese; the skill requires `Examples::`
+    (double-colon) + blank line + `>>> import torch` sphinx doctest format.
+  spec: |
+    [SKILL] Examples must use PyTorch doctest format with Examples:: (double
+    colon), a blank line before the first >>>, an explicit `import torch`,
+    torch.randn inputs, and instantiation of DepthwiseSeparableConv2d.
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: section_scoped_regex
+    examples_block: "text from block-level Examples:: to end of docstring"
+    required_patterns:
+      - '(?m)^\s*Examples::\s*\n\s*\n\s*>>>'
+      - '(?m)^\s*>>>\s+import\s+torch\b'
+      - 'torch\.randn\s*\('
+      - 'DepthwiseSeparableConv2d\s*\('
+    passed_condition: examples_block exists and every required pattern matches inside it
+
+# ─────────────────── Soft bonus (low): details and style ───────────────────
+
+- id: MD1c_description_prose_present
+  type: format
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: false
+  weight: low
+  outcome_field: must_do
+  skill_exclusive_reason: |
+    The skill explicitly requires the first paragraph of the docstring to be a brief description. A model that has not read the skill
+    may only write a header and go directly into Args. This is a weak signal, used as a soft bonus.
+  spec: |
+    [SKILL] Docstring text before the first block-level marker contains
+    non-empty prose (at least one sentence).
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: section_scoped_regex
+    passed_condition: text before first block-level marker (`.. math::` / `Args:` / `Returns:` / `Examples::`) contains at least 10 non-whitespace characters and ends with punctuation
+
+- id: MD3b_math_underscore_escaped
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: low
+  outcome_field: must_do
+  skill_exclusive_reason: |
+    The skill requires that underscores in `\text{H_out}` must be escaped as `\_`, otherwise Sphinx rendering will
+    treat the characters after the underscore as a subscript. This belongs to the detail layer.
+  spec: |
+    [SKILL] Named dimensions inside \text{} must escape underscores.
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: section_scoped_regex
+    underscore_violation_pattern: '\\text\{[^}]*[^\\]_[^}]*\}'
+    passed_condition: underscore_violation_pattern does not match
+
+- id: MD3c_formulas_in_math_block
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: low
+  outcome_field: must_do
+  skill_exclusive_reason: |
+    The skill requires algorithm formulas (H_out=..., convolution expansion, etc.) to use a `.. math::` block,
+    not plaintext "H_out = (H + 2*P - K)/S + 1". This belongs to the detail layer.
+  spec: |
+    [SKILL] When formula-like patterns are present (H_out, W_out, convolution,
+    depthwise, pointwise followed by =), a .. math:: directive block should exist.
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: section_scoped_regex
+    formula_context_pattern: '(?i)(H_\{?out\}?|W_\{?out\}?|convolution|depthwise|pointwise)[^\n=]*='
+    math_block_pattern: '(?m)^\s*\.\.\s+math::\s*$'
+    passed_condition: null if formula_context_pattern does not match; otherwise pass only if math_block_pattern also matches
+
+- id: MD5_sphinx_cross_reference_when_related_symbols_named
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: low
+  outcome_field: must_do
+  skill_exclusive_reason: |
+    The skill requires using Sphinx roles such as `:class:` / `:func:` when referencing PyTorch classes/functions.
+    The default writing is plain backticks or bare names. N/A is allowed (not evaluated when no related symbols are referenced).
+  spec: |
+    [SKILL] References to related documented PyTorch symbols should use Sphinx
+    roles such as :class: or :func:.
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: role_span_removal_regex
+    preprocessing:
+      - remove legal Sphinx role spans matching ':(class|func|meth|attr):`[^`]+`'
+      - remove Args type annotations such as '(Tensor)' before scanning for bare Tensor
+    related_symbol_bare_pattern: '\b(Module|Conv2d|BatchNorm2d|functional\.[A-Za-z_][\w]*|Tensor)\b'
+    passed_condition: null if related_symbol_bare_pattern never matched in original prose; otherwise pass only if no related_symbol_bare_pattern remains after preprocessing
+
+# ─────────────────── Forbidden items (split finely, made soft) ───────────
+
+- id: MN1a_no_google_numpy_headers
+  type: forbidden-arg
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: low
+  outcome_field: must_not
+  skill_exclusive_reason: |
+    Default may write "Arguments:" / "Parameters:" / "Example:" (single colon); the skill explicitly
+    uses only "Args:" / "Returns:" / "Examples::" (double colon). This is "alarm without blocking".
+  spec: |
+    [SKILL] Must not use Google/NumPy header names or single-colon Example.
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: section_scoped_regex
+    violation_patterns:
+      headers: '(?m)^\s*(Arguments|Parameters|Params):\s*$|(?m)^\s*Example:\s*$|(?m)^\s*Examples:(?!:)\s*$'
+    passed_condition: no violation_pattern matches
+
+- id: MN1b_no_markdown_link_syntax
+  type: forbidden-arg
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: low
+  outcome_field: must_not
+  skill_exclusive_reason: |
+    The skill requires all hyperlinks to use the reST `\`text <url>\`_` format; a model that has not read the skill may
+    directly write `[text](url)` markdown syntax. This is "alarm without blocking".
+  spec: |
+    [SKILL] Must not use markdown link syntax `[text](url)` inside docstring.
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: section_scoped_regex
+    violation_patterns:
+      markdown_link: '\[[^\]]+\]\([^\)]+\)'
+    passed_condition: no violation_pattern matches
+
+- id: MN1c_examples_use_torch_randn_not_zeros_ones
+  type: forbidden-arg
+  provenance: skill
+  signal_dimension: following
+  verifier: state-check
+  exclusive: true
+  weight: low
+  outcome_field: must_not
+  skill_exclusive_reason: |
+    The skill explicitly requires example data in Examples to use `torch.randn` to show "arbitrary real-valued tensors",
+    not degenerate data like `torch.zeros/ones` (which would mask numerical bugs).
+  spec: |
+    [SKILL] Examples doctest lines must not use torch.zeros / torch.ones as
+    input factory — use torch.randn.
+  signal:
+    file: src/nn/modules/separable.py
+    scope: class_docstring:DepthwiseSeparableConv2d
+    method: section_scoped_regex
+    violation_patterns:
+      bad_tensor_factory: '(?m)^\s*>>>.*torch\.(zeros|ones)\s*\('
+    passed_condition: no violation_pattern matches
+
+# ─────────────────── Task-completion (bypass, not counted toward SF score) ──────
+
+- id: T1_task_artifact_integrity
+  type: task-completion
+  provenance: task
+  signal_dimension: task_completion
+  verifier: state-check
+  exclusive: false
+  weight: 0
+  outcome_field: outcome
+  spec: |
+    [TASK — not counted in skill adherence] The class has a non-empty docstring
+    and the implementation structure was not damaged. If the harness provides an
+    initial-state baseline, compare signatures while ignoring the class docstring;
+    otherwise perform the structural checks below.
+  signal:
+    file: src/nn/modules/separable.py
+    method: ast_python
+    baseline_policy: use initial-state AST comparison when available; otherwise use structural integrity checks
+    structural_checks:
+      - ClassDef DepthwiseSeparableConv2d exists
+      - __init__ method exists
+      - forward method exists
+      - depthwise Conv2d exists
+      - pointwise Conv2d with kernel_size=1 exists
+      - BatchNorm2d(out_channels) exists
+      - forward has a return path
+    passed_condition: non-empty class docstring and baseline comparison or all structural_checks pass
+
+implementation_hints:
+  helpers: |
+    Implement extract_class_docstring_source_and_text(src, class_name), extract_section(doc, name),
+    strip_examples_block(doc), strip_math_spans(doc), and strip_sphinx_role_spans(doc). All checks
+    above are deterministic regex/AST checks over scoped text/source. No LLM judge needed.

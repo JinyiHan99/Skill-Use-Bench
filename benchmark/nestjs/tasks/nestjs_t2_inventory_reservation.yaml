@@ -1,0 +1,60 @@
+task_id: nestjs_t2_inventory_reservation
+skill_id: nestjs
+description: |
+  This inventory service is used to reserve items for an internal demo environment. The business now wants to keep an independent audit record for each reservation: in addition to the normal stock deduction and reservation-record creation, each reservation must also persist a separately trackable audit remark record, and must not just reuse the existing `note` field on the reservation record.
+
+  Please ensure that stock deduction, reservation creation, and the independent audit remark write all succeed together or fail together, with no partial persistence. Callers have recently been sending malformed requests with missing fields, empty SKUs, or invalid quantities; these invalid requests should return a clear 400 response before entering business logic.
+
+  The input project is at `assets/nestjs_t2_inventory_reservation/input/inventory-service`.
+
+initial_state:
+  assets:
+    - path: assets/nestjs_t2_inventory_reservation/input/inventory-service
+      source: "https://github.com/nest-native/drizzle/tree/main/sample/06-manual-transaction"
+      real_state: "A real NestJS sample service with inventory and reservations tables, a controller accepting reservation bodies through a TypeScript interface, and repository methods already demonstrating injected transactional database access for stock deduction plus reservation insertion. The reservations table already has a `note` column that is currently populated by service-side hardcoded text, but there is no independent audit trail/history resource, no caller-provided audit remark flow, no validated DTO for reservation requests, and no runtime validation pipe active in main.ts."
+      files:
+        - README.md
+        - package.json
+        - tsconfig.json
+        - scripts/smoke.ts
+        - src/app.module.ts
+        - src/database.ts
+        - src/main.ts
+        - src/schema.ts
+        - src/transaction.types.ts
+        - src/inventory/inventory.controller.ts
+        - src/inventory/inventory.module.ts
+        - src/inventory/inventory.repository.ts
+        - src/inventory/inventory.service.ts
+      preparation: |
+        Cloned https://github.com/nest-native/drizzle at task construction time and copied sample/06-manual-transaction unchanged into this asset directory.
+  tools_available: [Read, Write, Edit, Glob, Grep, Bash]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: atomic_independent_audit_write_under_existing_transaction
+    description: "The skill requires transaction-backed database operations for related multi-table writes. This task checks whether the model keeps stock deduction, reservation creation, and an independent audit record in one concise atomic persistence path while respecting the existing NestJS/Drizzle transaction structure."
+    exclusive: "Without the skill, a model may treat the audit remark as just the existing `reservations.note` field, or add an independent audit write outside the transaction-scoped repository path. The corrected task description forces an independent audit resource so the transaction requirement is observable."
+  - id: runtime_request_validation_before_business_logic
+    description: "The skill requires DTOs with class-validator and a Nest validation pipe rather than accepting raw request objects. This task checks runtime rejection of malformed reservation requests before service/repository writes run."
+    exclusive: "Without the skill, a model may only extend the existing `ReservationBody` TypeScript interface or add ad-hoc checks after entering service logic, leaving runtime request validation incomplete or inconsistent."
+
+notes: |
+  - Core test point: the change must combine runtime request validation with one concise atomic persistence path for stock deduction, reservation creation, and an independent audit record.
+  - Existing asset nuance: the reservations table already has a `note` column populated by hardcoded service text. The requested audit remark is a separate audit/history record and should not be satisfied by only passing caller input into `reservations.note`.
+  - Expected correct behavior: introduce a validated request DTO for reservation input, make invalid request bodies fail with 400 before business writes run, and persist stock deduction, reservation creation, and independent audit-note creation under the same existing transaction boundary.
+  - Transaction expectation: extend the current repository/transaction-scoped write path; do not add an audit insert after the transactional reservation call using a normal non-transactional client, and do not wrap an already `@Transactional()` flow in a nested transaction.
+  - Common incorrect behavior: model only adds `note` to the existing controller interface and stores it in the existing `reservations.note` column, leaving no independent audit/history record.
+  - Common incorrect behavior: model adds `await this.db.insert(auditRows)...` after `reserveWithInjectedTransaction()` in `src/inventory/inventory.service.ts:34`, leaving the audit row outside the transactional work that changes inventory.
+  - Common incorrect behavior: model edits `src/inventory/inventory.controller.ts:4` to add `note?: string` to the existing interface instead of creating a validated DTO class and wiring runtime validation.
+  - Common incorrect behavior: model nests a new transaction inside `commitReservation()` at `src/inventory/inventory.service.ts:26` while `@Transactional()` already controls that method.
+  - baseline_correctness_signals:
+      - Successful reservation decreases inventory, creates a reservation record, and creates one independent audit/history record.
+      - Failed reservation paths do not leave partial stock, reservation, or independent audit data behind.
+      - Invalid request bodies such as missing sku, empty sku, non-numeric quantity, or non-positive quantity return 400 before persistence logic runs.
+  - skill_following_signals:
+      - The controller body type is a class-validator DTO, not only a TypeScript interface.
+      - Runtime validation is wired with a Nest validation pipe rather than relying solely on compile-time types or service-layer ad-hoc checks.
+      - Independent audit persistence shares the same transaction-scoped Drizzle client/path as stock deduction and reservation creation.
+      - No nested transaction is introduced around an existing `@Transactional()` method.

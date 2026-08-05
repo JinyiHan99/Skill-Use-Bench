@@ -1,0 +1,123 @@
+rubric_id: rubric_SF90_t1_resize_presets_plan
+skill_id: structured-autonomy-plan
+task_id: SF90_t1_resize_presets_plan
+description: >
+  Evaluates whether the model followed the structured-autonomy-plan workflow for
+  planning a ResizeMe preset-management feature without implementing code.
+
+rules:
+  - id: g1_observable_plan_write
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] Trace contains an observable Write/Edit attempt whose structured file_path/path argument targets a plans/<feature-name>/plan.md artifact."
+    signal:
+      pattern: "(?i)(Write|Edit)[\\s\\S]{0,240}\\\"?(file_path|path)\\\"?\\s*[:=]\\s*\\\"[^\\\"]*(?:assets/SF90_t1_resize_presets_plan/input/project/)?plans/[^\\\"'\\s]+/plan\\.md\\\""
+
+  - id: r1_research_required_context_before_plan
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Before drafting/saving the plan, the model must cover the research guide's key local context categories itself because the autonomous subagent is unavailable: preset data/storage, settings UI, main UI/button rendering, and existing planning/documentation patterns.
+      skill-exclusive reason: without reading the skill, a strong model typically reads one or two obvious files and then directly gives an implementation plan; the skill requires first doing research covering code context, documentation, and patterns. The conflict is "quick local research then plan" vs "cover key context per research_guide before planning".
+    signal:
+      query: >
+        Based only on actual tool-call evidence in serialized_steps before the first successful plan.md write, did the model inspect content covering all four required context categories: (1) preset data/storage, using files such as PresetSize.cs, PresetStorage.cs, or equivalent files covering preset persistence/data shape; (2) settings UI, using SettingsWindow.xaml/.cs or equivalent settings-management UI files; (3) main UI/button rendering, using MainViewModel.cs, PresetButtonFactory.cs, or equivalent main-window preset button files; and (4) an existing plan or project documentation pattern under plans/ or .github/pr-plans/? Count Read calls and file-targeted Bash commands that display file contents; count equivalent files covering the same concern. Do not count mere path mentions, Glob/Grep filename-only search, or the agent's prose claims. Answer YES only if all four categories were inspected before the first plan write; answer NO otherwise.
+      acceptable: "Read PresetStorage.cs, SettingsWindow.xaml.cs, MainViewModel.cs, and plans/center-on-resize/plan.md before Write plans/manage-presets/plan.md."
+      unacceptable: "Reads only PresetSize.cs and PresetButtonFactory.cs, then writes a plan; or writes the plan before reading existing plan docs."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_planning_only_no_source_edits
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] This step must not write code; it may research, analyze, and save plan artifacts under plans/, but must not modify ResizeMe source/project files or non-plan project/config files.
+      skill-exclusive reason: the task description says "advance the implementation of this requirement", so without the skill a coding assistant may edit ResizeMe source files immediately. The skill instead forbids implementation during planning. The conflict is "start modifying PresetStorage/MainViewModel/SettingsWindow" vs "only write plans/<feature>/plan.md".
+    signal:
+      query: >
+        Based only on observable Write/Edit tool calls and final-state evidence in the trace, did the model avoid modifying ResizeMe source/project/config files and limit any file creation or modification to plan artifacts under plans/**/plan.md? Answer YES if no Write/Edit targets files under ResizeMe/, *.sln, *.csproj, *.cs, *.xaml, *.json, or *.config except a plans/**/plan.md artifact; answer NO if any implementation/source/project/config file was created or modified.
+      acceptable: "Only writes assets/SF90_t1_resize_presets_plan/input/project/plans/manage-presets/plan.md."
+      unacceptable: "Edits ResizeMe/Features/Settings/PresetStorage.cs, ResizeMe/ViewModels/MainViewModel.cs, SettingsWindow.xaml.cs, ResizeMe.csproj, or appsettings/config JSON."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_plan_saved_with_required_template
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The final saved plan artifact must be under plans/{feature-name}/plan.md and contain the skill template fields Branch, Description, Goal, Implementation Steps, plus Files, What, and Testing in the step structure.
+      skill-exclusive reason: without reading the skill, a strong model may only give a checklist in chat or create an arbitrary TODO/README; the skill mandates a specific file path and fixed template fields. The conflict is "free-form suggestions" vs "PR plan template saved to plans/{feature-name}/plan.md".
+    signal:
+      query: >
+        Based on the final saved plan artifact content and the Write/Edit path in the trace, did the model save a plan under plans/{feature-name}/plan.md and include all required template fields: Branch, Description, Goal, Implementation Steps, and per-step Files, What, and Testing? Answer YES only if the saved artifact path and all template fields are evidenced; answer NO for chat-only plans, other filenames, or missing fields.
+      acceptable: "Write to plans/manage-presets/plan.md containing Branch, Description, Goal, Implementation Steps, and steps with Files/What/Testing."
+      unacceptable: "Only replies in chat, writes TODO.md, or saves a plan missing Branch or Testing fields."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_commit_sized_pr_breakdown
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The model must assume one PR on a dedicated branch and break this complex feature into multiple testable commit-sized steps.
+      skill-exclusive reason: without reading the skill, a strong model often gives a high-level implementation paragraph or lists TODOs by component; the skill requires each Step to correspond to a single testable commit within the PR. The conflict is "loose task list" vs "single PR, dedicated branch, multiple commit-sized testable steps".
+    signal:
+      query: >
+        Inspect only the final saved plan file content, not the agent's prose. Does the plan name a dedicated branch or equivalent single-PR branch, and decompose the preset-management-and-refresh feature into at least two non-placeholder, non-duplicate implementation steps with distinct scopes? Each step must have its own Files, What, and Testing or equivalent verification method, so the steps could plausibly be separate commits. Answer YES if these conditions are met; answer NO otherwise.
+      acceptable: "Branch preset-management-refresh; separate steps for data/storage model, settings management UI, main view refresh/binding, each with Files/What/Testing."
+      unacceptable: "One step saying 'implement preset management and refresh UI'; repeated placeholder steps; or steps with no Testing boundaries."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_clarification_markers_and_pause
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] Where the plan depends on unresolved user input, the draft plan must mark those decisions with [NEEDS CLARIFICATION], ask corresponding clarifying questions, and pause for feedback.
+      skill-exclusive reason: without reading the skill, a strong model tends to assume duplicate-name handling, default presets, and immediate-refresh semantics on its own, then continue; the skill requires marking unresolved points inline in the plan and stopping. The conflict is "defaulting to user decisions and continuing" vs "marking [NEEDS CLARIFICATION], asking, pausing when there are unresolved points".
+    signal:
+      query: >
+        Based on the final saved plan and final response, apply this conditional check: if the plan introduces or relies on unresolved preset-management UX/product decisions (such as duplicate names, default presets, ordering, or refresh semantics), did it mark those spots with [NEEDS CLARIFICATION], ask corresponding questions, and wait for feedback? If there are no unresolved decisions and the plan does not silently assume key product behavior, answer YES even without a marker. Answer NO if unresolved decisions were silently assumed or if markers/questions are missing when needed.
+      acceptable: "Plan marks duplicate preset names [NEEDS CLARIFICATION]; final response asks how duplicates/default presets should work and waits; or the plan has no unresolved product decision to clarify."
+      unacceptable: "Plan silently chooses duplicate handling/default presets without a marker; or marks a clarification but continues into code implementation."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] A relevant plan for managing common sizes and refreshing the main UI exists and contains actionable implementation content."
+    signal:
+      query: >
+        Based on the final saved plan file content, not on skill compliance, is there a substantive plan for the ResizeMe request that covers both settings-side preset management/storage and main UI size-button refresh/rebinding so the displayed buttons reflect changes? Answer YES if both chains are covered with actionable content; answer NO if no relevant plan was produced, it is empty/unrelated, or it covers only one side.
+      acceptable: "A plan.md discusses preset storage/settings management and refreshing/rebinding main window preset buttons."
+      unacceptable: "No plan file; a plan about unrelated hotkeys/system tray work; or a plan that only stores presets without updating main UI buttons."

@@ -1,0 +1,83 @@
+task_id: SF20_t1_earthquake_calc
+level: L2
+skill_id: skill_20_geospatial
+description: |
+  You are a geospatial analyst with expertise in plate tectonics and earthquake analysis.
+
+  Find the **top-5 earthquakes** that occurred furthest from the Pacific plate boundary,
+  among all earthquakes located within the Pacific plate itself. Rank them by distance
+  (largest first).
+
+  Output the result to `./output/answer.json` as a JSON file with:
+  - top5: An array of 5 objects (rank 1 to 5), each containing:
+    - rank: Integer (1-5)
+    - id: The earthquake ID
+    - place: The earthquake location description
+    - magnitude: The earthquake magnitude
+    - distance_km: Distance to the nearest Pacific plate boundary in kilometers (rounded to 2 decimal places)
+  - method: A short string describing the distance calculation method used (e.g., "projected coordinates", "geodesic", etc.)
+  - total_in_plate: Total number of earthquakes found within the Pacific plate
+
+  The earthquake data is provided in `./assets/SF20_t1_earthquake_calc/earthquakes_2024.json`. The plate boundary
+  data is given in `./assets/SF20_t1_earthquake_calc/PB2002_boundaries.json` and `./assets/SF20_t1_earthquake_calc/PB2002_plates.json`.
+initial_state:
+  assets:
+    - path: assets/SF20_t1_earthquake_calc/earthquakes_2024.json
+      source: "SkillLearnBench/tasks/earthquake-plate-calculation/earthquake-plate-calculation-1/environment/earthquakes_2024.json"
+      description: "USGS earthquake catalog for 2024 (GeoJSON, ~1.07 MB)"
+    - path: assets/SF20_t1_earthquake_calc/PB2002_boundaries.json
+      source: "SkillLearnBench/tasks/earthquake-plate-calculation/earthquake-plate-calculation-1/environment/PB2002_boundaries.json"
+      description: "PB2002 plate boundary segments (GeoJSON, ~221 KB)"
+    - path: assets/SF20_t1_earthquake_calc/PB2002_plates.json
+      source: "SkillLearnBench/tasks/earthquake-plate-calculation/earthquake-plate-calculation-1/environment/PB2002_plates.json"
+      description: "PB2002 plate polygons (GeoJSON, ~320 KB)"
+  tools_available: [bash, python3, read, edit]
+  environment:
+    pip_packages: "pandas geopandas shapely pyproj"
+expected_trigger: true
+skill_constraints_tested:
+  - id: never_calculate_in_epsg4326
+    description: "Must not calculate distances directly in geographic coordinates (EPSG:4326)"
+    exclusive: "Model uses shapely .distance() on unprojected geometries, returning degrees not meters"
+  - id: always_project_to_metric
+    description: "Must project to an equidistant metric CRS suitable for global point-to-line distance before computing distances"
+    exclusive: "Model uses a non-equidistant projection (e.g., Web Mercator) or skips projection, producing distances that diverge from the reference"
+  - id: use_geopandas_not_haversine
+    description: "Must use geopandas spatial operations (.within(), .distance(), .to_crs()) not manual Haversine"
+    exclusive: "Model implements Haversine manually which ignores boundary geometry"
+  - id: filter_before_project
+    description: "Should spatially filter earthquakes to Pacific plate before projecting (efficiency/style, not correctness)"
+    exclusive: "Model projects entire global dataset before filtering; result may still be correct but workflow violates skill guidance"
+expected_answer:
+  top5:
+    - rank: 1
+      id: "hv74103036"
+      place: "2 km SW of Pāhala, Hawaii"
+      distance_km: 3878.27
+    - rank: 2
+      id: "us6000m30y"
+      place: "South Pacific Ocean"
+      distance_km: 2761.37
+    - rank: 3
+      id: "us6000n9yc"
+      place: "North Pacific Ocean"
+      distance_km: 369.02
+    - rank: 4
+      id: "us6000n00g"
+      place: "199 km N of Sola, Vanuatu"
+      distance_km: 167.06
+    - rank: 5
+      id: "us6000ml0l"
+      place: "off the east coast of the Kamchatka Peninsula, Russia"
+      distance_km: 138.94
+  total_in_plate: 107
+  note: "Haversine method gives different rank #5 (us7000lwqn instead of us6000ml0l)"
+notes: |
+  Core test points:
+  1. Must not compute distances in geographic CRS (degrees).
+  2. Must use a metric/equidistant projection appropriate for global point-to-line distance.
+  3. Must use geopandas spatial ops (.within(), .distance(), .to_crs()) over manual great-circle math.
+  4. Performance: spatially filter to the Pacific plate before projecting.
+  Reference answer is computed under an equidistant metric projection; methods that approximate
+  point-to-line distance via vertex-only Haversine will diverge at the lower ranks.
+  Source: SkillLearnBench/tasks/earthquake-plate-calculation

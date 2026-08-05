@@ -1,0 +1,83 @@
+task_id: nestjs_t3_admin_ledger_auth
+skill_id: nestjs
+description: |
+  This ledger demo service is about to be opened for an internal admin console trial. The admin console needs to access the ledger list with a logged-in session, and only the admin role can view the full transaction history. Please complete this access-control transformation within the existing project, while preserving the existing API documentation entry and module structure, and make the ledger endpoint's auth description consistent with the new login-state access method. The input project is at `./assets/nestjs_t3_admin_ledger_auth/input/ledger-service`.
+
+initial_state:
+  assets:
+    - path: ./assets/nestjs_t3_admin_ledger_auth/input/ledger-service
+      source: "https://github.com/nest-native/drizzle/tree/main/sample/00-showcase"
+      real_state: "A real full Nest-native Drizzle showcase application with accounts, projects, ledger, transfers, OpenAPI decorators, global validation, and an existing API-key style guard on all controllers including the ledger controller. The OpenAPI setup currently documents API-key authentication, and scripts/smoke.ts still calls /ledger with x-api-key: showcase-secret. It has no JWT-based request user attachment, no roles guard, no login/token issuance flow, and no existing @nestjs/jwt dependency."
+      files:
+        - package.json
+        - README.md
+        - tsconfig.json
+        - scripts/smoke.ts
+        - src/main.ts
+        - src/main.fastify.ts
+        - src/schema.ts
+        - src/app.module.ts
+        - src/transaction.types.ts
+        - src/database.ts
+        - src/openapi.ts
+        - src/database-seed.service.ts
+        - src/projects/projects.controller.ts
+        - src/projects/projects.module.ts
+        - src/projects/create-project.dto.ts
+        - src/projects/project.dto.ts
+        - src/projects/projects.repository.ts
+        - src/projects/projects.service.ts
+        - src/ledger/ledger.service.ts
+        - src/ledger/ledger.module.ts
+        - src/ledger/ledger.repository.ts
+        - src/ledger/ledger.controller.ts
+        - src/ledger/ledger-entry.dto.ts
+        - src/transfers/transfer.validation.ts
+        - src/transfers/transfer.dto.ts
+        - src/transfers/transfers.module.ts
+        - src/transfers/transfers.service.ts
+        - src/transfers/transfers.controller.ts
+        - src/common/zod-validation.pipe.ts
+        - src/common/domain-error.filter.ts
+        - src/common/request-audit.interceptor.ts
+        - src/common/request-context.service.ts
+        - src/common/api-key.guard.ts
+        - src/accounts/account.dto.ts
+        - src/accounts/accounts.module.ts
+        - src/accounts/accounts.repository.ts
+        - src/accounts/accounts.controller.ts
+        - src/accounts/create-account.dto.ts
+        - src/accounts/accounts.service.ts
+      preparation: |
+        Cloned https://github.com/nest-native/drizzle at task construction time and copied sample/00-showcase unchanged into this asset directory.
+  tools_available: [Read, Write, Edit, Glob, Grep, Bash]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: guard_based_route_protection
+    description: "The skill emphasizes implementing route protection with Nest guards, including JWT-style authentication and role-aware authorization."
+    exclusive: "Without the skill, a model may keep extending the existing API-key header pattern, put authorization logic directly in LedgerService.list(), or combine authentication and role checks in ad hoc controller/service conditionals instead of using Nest guards."
+  - id: authenticated_request_state_for_roles
+    description: "The skill's JWT guard pattern verifies the request token and attaches authenticated user state for downstream authorization."
+    exclusive: "Without the skill, a model may check role information directly from raw headers or token strings, or run role authorization before authenticated request state is available."
+
+notes: |
+  - Core test point: converting a superficially protected ledger endpoint to authenticated and role-aware access while following Nest guard-based route protection patterns.
+  - Scope: the task is about protecting the ledger listing endpoint for authenticated admin users. It should not require building a complete login API, user module, or token issuance flow unless the implementation chooses to add minimal support for testing.
+  - Existing state: the project currently uses an API-key guard and OpenAPI API-key documentation; scripts/smoke.ts also calls /ledger with the legacy x-api-key header.
+  - Expected correct behavior: authentication establishes trusted user state for the request, role authorization consumes that authenticated state, and the ledger route is restricted to admin users. The existing ledger module/controller should remain recognizable, and the OpenAPI documentation entry should remain usable with auth documentation updated to match the new login-state protection.
+  - baseline_correctness_signals:
+      - Ledger access is restricted to admin users represented by authenticated request state.
+      - Existing ledger controller and module structure remain in place without broad unrelated rewrites.
+      - Swagger/OpenAPI documentation remains available and the ledger auth scheme description matches the new protection model.
+  - skill_following_signals:
+      - Authentication executes before role authorization for the ledger endpoint, whether by decorator order or equivalent global/controller/method guard composition.
+      - The authentication layer populates authenticated user state on the request, either directly in a guard or through a standard Nest strategy/guard flow.
+      - Role authorization reads authenticated request state rather than raw headers.
+      - Authorization is implemented with Nest guard-level route protection, not ad hoc checks inside LedgerService.list().
+  - security_quality_signals:
+      - Newly added secret/config values are read through an environment/configuration boundary rather than hardcoded in source.
+  - legacy_asset_notes:
+      - scripts/smoke.ts is legacy sample verification. Its existing x-api-key call to /ledger should not be used as an unmodified correctness requirement after the ledger endpoint is migrated.
+      - Other controllers may continue to use the existing API-key guard unless the solution has a minimal, consistent reason to touch them.

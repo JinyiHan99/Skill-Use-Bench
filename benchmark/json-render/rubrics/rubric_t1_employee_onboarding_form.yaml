@@ -1,0 +1,204 @@
+# Rubric for skill_28_json_render — SF28_t1_employee_onboarding_form
+
+# ── GATE ────────────────────────────
+- id: g1_spec_file_created
+  type: required-tool
+  provenance: gate
+  verifier: regex
+  weight: 0
+  spec: |
+    [GATE] The trace should contain an observable attempt to create or edit the src/spec.json file.
+  signal:
+    pattern: "assets/SF28_t1_form_spec/src/spec\\.json"
+
+# ── SKILL-derived (main scoring arena) ─────────────
+
+- id: r1_bindState_not_statePath
+  type: required-arg
+  provenance: skill
+  verifier: state-diff
+  severity: hard
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] Two-way binding for form fields must use { "$bindState": "/path" } placed on the natural value prop (e.g., value, checked);
+    using a statePath prop is forbidden.
+    Skill text: "Components do not use a statePath prop for two-way binding... place { "$bindState": "/path" }
+    directly on the natural value prop".
+    Strong skill-exclusive: the statePath pattern is more intuitive in many form frameworks, and the model tends to use statePath for binding.
+  signal:
+    file: "assets/SF28_t1_form_spec/src/spec.json"
+    file_must_contain: '"\\$bindState"'
+
+- id: r2_no_statePath_prop
+  type: forbidden-arg
+  provenance: skill
+  verifier: state-diff
+  severity: hard
+  exclusive: true
+  weight: 0.5
+  spec: |
+    [SKILL] The spec must not contain a statePath property (whether as a top-level field or a field inside props).
+    Skill text: "Using statePath as a top-level prop or inside props will silently fail".
+    Strong skill-exclusive: the model instinctively uses statePath for two-way binding.
+  signal:
+    file: "assets/SF28_t1_form_spec/src/spec.json"
+    file_must_not_contain: '"statePath"'
+
+- id: r3_check_api_validation
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  severity: hard
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] Form validation must use the check.* API (check.required, check.email, check.matches, check.lessThan, etc.);
+    raw Zod schemas or manual comparison logic are not allowed.
+    Skill text: "All validation functions are accessed through check.* — calling them as standalone functions
+    does not register the validator with the form engine".
+    Strong skill-exclusive: the model instinctively writes Zod schemas or inline validation.
+  signal:
+    judge_question: |
+      Inspect only the final generated spec.json (or equivalent spec file/code).
+      Does the spec define validation rules using the check.* namespace
+      (e.g., check.required, check.email, check.matches, check.lessThan, check.numeric)?
+      
+      Acceptable: validation arrays containing objects like { "check": "required", "message": "..." }
+      or references to check.required("..."), check.matches("/path", "..."), etc.
+      
+      Unacceptable: Zod schemas (z.string().email()), inline regex validation,
+      manual comparison logic, or no validation at all.
+      
+      Answer YES if check.* API is used for validation. Answer NO otherwise.
+
+- id: r4_visibility_not_boolean
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  severity: hard
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] The conditional visibility of the parking floor selection must use a visibility condition object
+    (e.g., { "$state": "/form/needsParking" } or visibility.when(...)),
+    not a visible: true/false boolean.
+    Skill text: "the renderer ignores boolean visibility values because it cannot subscribe to
+    state changes through them. Use visibility.always / visibility.never for static show/hide".
+    Strong skill-exclusive: the model uses booleans to control visibility in almost every UI framework.
+  signal:
+    judge_question: |
+      Inspect only the final generated spec.json file (at assets/SF28_t1_form_spec/src/spec.json).
+      For the parking-related fields (parking level selection that should appear only when
+      the "needs parking" checkbox is checked):
+      Does the spec use a state-based condition object on the "visible" or "visibility" field
+      with a "$state" reference to the parking checkbox state?
+      
+      Acceptable: A "visible" (or "visibility") property containing a condition object like
+      { "$state": "/form/needsParking" }, { "$state": "/form/needsParking", "eq": true },
+      or visibility.when("/form/needsParking").
+      
+      Unacceptable: visible: true, visible: false, no visibility control on the parking level element,
+      or using JavaScript conditional logic outside the visibility system.
+      
+      Answer YES if a state-based visibility condition object referencing needsParking is used. Answer NO otherwise.
+
+- id: r5_content_not_children
+  type: required-arg
+  provenance: skill
+  verifier: state-diff
+  severity: hard
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] Container components (Form, Section) must use the top-level "content" array to nest child elements;
+    using props.children is forbidden.
+    Skill text: "The content field is a top-level sibling of type and props, not nested inside props...
+    Placing child elements inside props.children causes the renderer to treat them as a serialized prop value".
+    Strong skill-exclusive: children is the standard React nesting pattern, and the model will almost certainly use children.
+  signal:
+    file: "assets/SF28_t1_form_spec/src/spec.json"
+    file_must_contain: '"content"'
+
+- id: r6_no_children_prop
+  type: forbidden-arg
+  provenance: skill
+  verifier: state-diff
+  severity: hard
+  exclusive: true
+  weight: 0.5
+  spec: |
+    [SKILL] Container elements in the spec must not use a "children" field to nest child elements.
+    Paired negative check with r5.
+  signal:
+    file: "assets/SF28_t1_form_spec/src/spec.json"
+    file_must_not_contain: '"children"'
+
+- id: r7_cross_field_check_matches
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  severity: hard
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] The confirm-email field's consistency validation against /form/email must use check.matches("/form/email", "message");
+    manual comparison or custom Zod refinement is not allowed.
+    Skill text: "check.matches('/form/password', 'Passwords must match')".
+  signal:
+    judge_question: |
+      Inspect only the final generated spec.json file (at assets/SF28_t1_form_spec/src/spec.json).
+      Does the confirmEmail (or email confirmation) field's validation use check.matches
+      referencing the email field path (e.g., "/form/email")?
+      
+      Acceptable: check.matches("/form/email", "...") or JSON like { "check": "matches", "path": "/form/email", "message": "..." }
+      Unacceptable: Manual equality comparison, custom Zod refinement, or omitting cross-field validation for email confirmation.
+      
+      Answer YES if check.matches is used for email confirmation validation. Answer NO otherwise.
+
+- id: r8_check_lessThan_date
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  severity: hard
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] The hire-date field's date comparison validation against /form/endDate must use check.lessThan("/form/endDate", "message").
+    Skill text: "check.lessThan('/form/endDate', 'Must be before end date')".
+  signal:
+    judge_question: |
+      Inspect only the final generated spec.json file (at assets/SF28_t1_form_spec/src/spec.json).
+      Does the start date (or hire date / onboarding date) field's validation use check.lessThan
+      referencing "/form/endDate"?
+      
+      Acceptable: check.lessThan("/form/endDate", "...") or JSON like { "check": "lessThan", "path": "/form/endDate", "message": "..." }
+      Unacceptable: Manual date comparison, custom validation logic, or omitting the date constraint entirely.
+      
+      Answer YES if check.lessThan is used for date comparison against /form/endDate. Answer NO otherwise.
+
+# ── GENERIC (generic boundary) ─────────────
+- id: b1_valid_json
+  type: boundary
+  provenance: generic
+  verifier: llm-judge
+  weight: 0
+  spec: |
+    [GENERIC] The generated spec.json should be valid JSON, with a structure containing root, elements, and state fields.
+  signal:
+    judge_question: |
+      Inspect the final spec.json file content.
+      Is it valid JSON that contains at minimum "root", "elements", and "state" top-level keys?
+      Answer YES if all three keys exist and the JSON is parseable. Answer NO otherwise.
+
+# ── TASK COMPLETION (bypass) ────────────
+- id: tc1_task_done
+  type: task-completion
+  provenance: task
+  verifier: state-diff
+  weight: 0
+  spec: |
+    [TASK — not counted toward skill-following] Check that the src/spec.json file exists and contains a firstName field definition.
+  signal:
+    file: "assets/SF28_t1_form_spec/src/spec.json"
+    file_must_contain: '"firstName"'

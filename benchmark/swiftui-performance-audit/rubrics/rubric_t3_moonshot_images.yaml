@@ -1,0 +1,136 @@
+rules:
+  - id: g1a_read_contentview
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable attempt to read ContentView.swift."
+    signal:
+      pattern: '(?:"file_path"|"path"|"command")\s*:\s*"[^"]*assets/swiftui_performance_audit_t3_moonshot_images/input/ContentView\.swift[^"]*"'
+
+  - id: g1b_read_missionview
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable attempt to read MissionView.swift."
+    signal:
+      pattern: '(?:"file_path"|"path"|"command")\s*:\s*"[^"]*assets/swiftui_performance_audit_t3_moonshot_images/input/MissionView\.swift[^"]*"'
+
+  - id: r1_prioritize_image_pressure_decode_resize
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] For image-dense SwiftUI interfaces with high resource usage on older devices when entering, scrolling, and switching, image pressure / large image decode or resize work should be treated as the primary or high-priority validation direction.
+      skill-exclusive reason: without reading the skill, a strong model may primarily attribute to LazyVGrid, NavigationLink, nested ScrollView, or view hierarchy; the skill explicitly maps high memory/image pressure to large image decode/resize cost. The conflict is whether the priority falls on image pressure rather than generic layout/navigation.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer explicitly list image pressure, large image decode/resize, runtime downscale, or equivalent concepts as the primary, main hypothesis, P0/P1, or high-priority validation direction? Answer YES only if image decode/resize or image memory pressure is explicitly identified as a top-tier, primary, or high-priority validation direction. Answer NO if it is merely mentioned as a secondary, supplementary, or generic concern while layout/navigation/view hierarchy is presented as the main focus.
+      acceptable: "P0: Image decode/resize and memory peaks are the primary validation direction; LazyVGrid/navigation is only a secondary suspect."
+      unacceptable: "The main risk is the complex LazyVGrid and nested ScrollView hierarchy; image caching can also be checked incidentally."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r2_targeted_image_remediation_downsample
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] Fixes for image pressure risk should include pre-rendering downsampling, generating appropriately sized assets, or avoiding runtime large-image scaling.
+      skill-exclusive reason: without reading the skill, the model may only suggest caching, async loading, or reducing view hierarchy; the skill's remediation explicitly requires downsample images before rendering. The conflict is whether the fix targets the decode/resize cost itself.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer propose specific image cost fixes such as pre-rendering downsampling, pre-generating appropriately sized thumbnails/assets, using target-size images, or avoiding letting SwiftUI repeatedly scale large images at runtime? Answer YES only if the remediation directly reduces decode/resize cost, not merely image loading latency or cache hit rate. Answer NO if it only mentions caching, async loading, pagination, or reducing layout complexity.
+      acceptable: "Pre-generate target-size assets for grid and crew thumbnails; downsample detail large images before rendering; avoid directly loading original large images and then scaledToFit."
+      unacceptable: "Add caching to images and reduce HStack hierarchy levels."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_distinguish_suspicion_from_trace_evidence
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] Must distinguish image/layout suspicions from code review from trace-backed evidence, explaining which conclusions still need runtime evidence confirmation.
+      skill-exclusive reason: without reading the skill, a strong model may directly assert that images or layout are the root cause; the skill requires distinguishing code-level suspicion from trace-backed evidence. The conflict is whether to over-conclude.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer explicitly frame image pressure, layout, or navigation risks as code-review-based suspicion/hypothesis rather than trace-backed root cause, and explain that runtime profiling/trace evidence is still needed for confirmation? Answer YES only if the answer explicitly contrasts code-level suspicion with runtime trace/profiling evidence. Mere hedging words such as "possibly", "likely", or a generic final sentence like "suggest confirming with Instruments" do not qualify. Answer NO if the diagnosis is presented as established root cause with only a brief caveat.
+      acceptable: "From the code, image scaling is a high-priority suspect, but this is only a code-review hypothesis; Instruments/trace is needed to prove memory peaks and decode time."
+      unacceptable: "The root cause has been determined to be image decoding causing jank; finally suggest checking with Instruments."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_same_path_before_after_metrics
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] Validation should request re-running captures along the same interaction path, and comparing before/after metrics such as CPU, frame drops, and memory peaks.
+      skill-exclusive reason: without reading the skill, the model may only give investigation suggestions or vaguely mention Instruments; the skill requires re-running the same capture and comparing baseline metrics. The conflict is whether validation fixes the interaction path and quantitatively compares.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer request re-running performance captures along the same home page grid scroll, enter detail, horizontal swipe crew or equivalent fixed interaction path, and comparing before/after CPU, frame drops/jank/hitches/frame time/render duration/frame pacing, and memory peaks/high-water mark/peak footprint/RSS — three metric categories? Answer YES only if fixed/same interaction path and all three metric categories are present. Answer NO if metrics or same-path requirement is missing.
+      acceptable: "Re-test along the same path of home page scroll → open mission detail → horizontal swipe crew, comparing CPU, hitches/frame time, peak RSS."
+      unacceptable: "Use Instruments to see if CPU and memory decrease."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_collect_profile_intake_if_evidence_missing
+    type: lesson
+    provenance: generic
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [DIAGNOSTIC — not counted toward SF] If runtime evidence is insufficient, does the answer request a complete profiling intake.
+    signal:
+      query: >
+        Looking only at the final answer content, not at process self-reports or plans: does the answer, when evidence is insufficient/needs confirmation, request device or OS, Debug/Release build, specific interaction steps, SwiftUI timeline, and Time Profiler — these categories of information? Answer YES only if all categories are requested under an evidence-missing or validation context. Answer NO if it only asks for generic profiling data or omits one category.
+      acceptable: "Please supplement device/iOS, Debug/Release, home page scroll and detail switching steps, and provide SwiftUI timeline and Time Profiler."
+      unacceptable: "Need more runtime evidence; suggest recording an Instruments session."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: low
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: "[TASK — not counted toward SF] Whether the answer covers the Moonshot home page grid and detail page performance review, and includes source code line number format references."
+    signal:
+      query: >
+        Looking only at the final answer content: does the answer cover ContentView.swift's home page grid and MissionView.swift's detail page/crew area, list at least two risk points or investigation suggestions by impact priority, and include at least two source references in the format File.swift:line or File.swift:line-line? Answer YES if all task-completion elements are present. Do not judge whether line numbers are physically correct unless source context is provided. Answer NO otherwise.
+      acceptable: "References ContentView.swift:21-30 and MissionView.swift:52-62, providing risks and investigation suggestions by priority."
+      unacceptable: "Only analyzes LazyVGrid, does not cover MissionView or has no source code line number format references."

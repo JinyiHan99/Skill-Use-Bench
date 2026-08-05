@@ -1,0 +1,109 @@
+task_id: SF04_t1_add_docstring_conv_module
+level: L2
+skill_id: skill_04_pytorch_docstring
+description: |
+  I added a custom convolution module to a lightweight image classification model and plan to expose it as a public API.
+  The generated project documentation still shows an empty description for this part.
+
+  Please look at src/nn/modules/separable.py, complete the public API docstring for the DepthwiseSeparableConv2d class,
+  so that the generated project documentation can explain its purpose, parameters, inputs/outputs, and basic usage.
+
+initial_state:
+  files:
+    - path: src/nn/modules/separable.py
+      content: |
+        import torch
+        import torch.nn as nn
+        from torch import Tensor
+        from typing import Optional, Tuple, Union
+
+
+        class DepthwiseSeparableConv2d(nn.Module):
+
+            def __init__(
+                self,
+                in_channels: int,
+                out_channels: int,
+                kernel_size: Union[int, Tuple[int, int]] = 3,
+                stride: Union[int, Tuple[int, int]] = 1,
+                padding: Union[int, Tuple[int, int]] = 1,
+                dilation: Union[int, Tuple[int, int]] = 1,
+                bias: bool = True,
+                padding_mode: str = "zeros",
+                depth_multiplier: int = 1,
+            ) -> None:
+                super().__init__()
+                self.depthwise = nn.Conv2d(
+                    in_channels,
+                    in_channels * depth_multiplier,
+                    kernel_size=kernel_size,
+                    stride=stride,
+                    padding=padding,
+                    dilation=dilation,
+                    groups=in_channels,
+                    bias=False,
+                    padding_mode=padding_mode,
+                )
+                self.pointwise = nn.Conv2d(
+                    in_channels * depth_multiplier,
+                    out_channels,
+                    kernel_size=1,
+                    bias=bias,
+                )
+                self.bn = nn.BatchNorm2d(out_channels)
+
+            def forward(self, input: Tensor) -> Tensor:
+                x = self.depthwise(input)
+                x = self.pointwise(x)
+                x = self.bn(x)
+                return x
+
+    - path: src/nn/modules/__init__.py
+      content: |
+        from .separable import DepthwiseSeparableConv2d
+
+        __all__ = ["DepthwiseSeparableConv2d"]
+
+    - path: docs/conf.py
+      content: |
+        extensions = [
+            "sphinx.ext.autodoc",
+            "sphinx.ext.mathjax",
+            "sphinx.ext.napoleon",
+        ]
+        mathjax_path = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+
+  tools_available: [bash, read, edit, grep]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: raw_string_prefix
+    description: "Docstrings must use r\"\"\"...\"\"\" raw string literals, even before future math edits"
+    exclusive: "Model uses ordinary triple-quoted Python docstrings because the code already type-checks"
+  - id: section_ordering
+    description: "If the docstring contains math blocks or cross-references, those sections must appear before Args; Args must precede Returns, and Returns must precede Examples (PyTorch order)"
+    exclusive: "Model follows a generic Google or NumPy docstring order and puts Args immediately after the summary, before any math or cross-reference sections"
+  - id: math_directive
+    description: "Operation formulas use reST math blocks and tensor shapes use :math: with \\text{} for named dimensions; underscored dimension names must be escaped, e.g. \\text{in\\_channels}"
+    exclusive: "Model explains the convolution in prose or plain text shapes such as (N, C, H, W)"
+  - id: args_indentation
+    description: "Args entries use PyTorch indentation (4-space entries, 8-space continuations) with parenthesized types matching the signature, e.g. `kernel_size (int or tuple, optional):`"
+    exclusive: "Model uses bare Google-style `name:` form, NumPy `Parameters\n----------` sections, or omits parenthesized types"
+  - id: args_defaults_and_optional
+    description: "Optional parameters are marked `, optional` inside the type parentheses, and default values are rendered with double-backticked literals such as Default: ``3``"
+    exclusive: "Model writes defaults as plain text (e.g. `Defaults to 3`) or omits the `optional` marker"
+  - id: examples_format
+    description: "Examples use the PyTorch doctest-style Examples:: block with imports and realistic torch.randn tensors"
+    exclusive: "Model writes a singular Example: block (single colon), omits the `>>> import torch` line, or fails to use the reST Examples:: literal-block double-colon syntax"
+  - id: cross_references
+    description: "References to related PyTorch symbols use Sphinx roles such as :class: and :func:, and the docstring must cross-reference at least one of the modules used internally (e.g. :class:`~torch.nn.Conv2d` or :class:`~torch.nn.BatchNorm2d`)"
+    exclusive: "Model mentions related modules as plain text or markdown-style links"
+  - id: class_level_documentation
+    description: "The full module documentation (description, math, Args, Returns, Examples) lives on the class docstring, not on the forward method"
+    exclusive: "Model documents the forward method with the main description/Args/Examples and leaves the class docstring empty or minimal"
+
+notes: |
+  Design intent: a positive-example task, examining whether the model can judge various reST/docstring formatting conventions based solely on the skill, including raw string, math markup, parameter blocks, examples, and cross-references.
+
+  Asset verification: the three files listed in the YAML are consistent with the current disk files in assets/SF04_t1_conv_module/; the assets do not record real open-source provenance, and authenticity still requires manual supplementary verification.

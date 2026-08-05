@@ -1,0 +1,9 @@
+{
+  "destination": "local reading archive",
+  "source": "python/devguide README",
+  "text": "The CPython Developer's Guide\n=============================\n|ReadTheDocs| |Discourse| |Codestyle|\n.. |ReadTheDocs| image:: https://readthedocs.org/projects/cpython-devguide/badge/\n   :target: https://devguide.python.org\n   :alt: Documentation Status\n.. |Discourse| image:: https://img.shields.io/badge/discourse-join_chat-brightgreen.svg\n   :alt: Python Discourse chat\n   :target: https://discuss.python.org/\n.. |Codestyle| image:: https://img.shields.io/badge/code%20style-black-000000.svg",
+  "tags": [
+    "python",
+    "documentation"
+  ]
+}

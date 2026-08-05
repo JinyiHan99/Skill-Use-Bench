@@ -1,0 +1,181 @@
+# Rubric for skill_20_geospatial — SF20_t1_earthquake_calc
+# Revised per RUBRIC_REVIEW_REPORT.md: fixed top-level structure and tightened skill/task signals.
+
+rubric:
+  # ── GATE ────────────────────────────
+  - id: g1_geospatial_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable geospatial-analysis attempt; this is only a gate and is not counted toward the skill-following score.
+    signal:
+      pattern: '(?i)(import\s+geopandas|from\s+geopandas|import\s+shapely|gpd\.read_file|GeoDataFrame\s*\(|\.to_crs\s*\(|\.within\s*\(|\.distance\s*\()'
+
+  # ── SKILL-derived (main scoring area) ────────────
+  - id: r1_project_to_metric
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — core rule] Before computing distances, .to_crs() must be used to project the earthquake point data and the boundary/plate-boundary geometries to an equidistant metric CRS (e.g. EPSG:4087).
+      skill-exclusive rationale: without reading the skill, a model may compute distances directly in EPSG:4326 lat/lon or Web Mercator; the skill explicitly requires first projecting to a metric/equidistant CRS.
+      Not accepted: direct distance in EPSG:4326, EPSG:3857/Web Mercator, only setting .crs=, only projecting unrelated objects, or only claiming in natural language to have projected.
+    signal:
+      judge_question: |
+        Based only on actual executed code/tool-call evidence, not comments, explanations, or stated intentions: before computing earthquake-to-boundary distances, did the code project BOTH the earthquake point geometries and the relevant boundary geometries to an equidistant metric CRS such as EPSG:4087?
+        Answer YES only if the actual distance computation uses those projected geometries.
+        Answer NO if distances are computed in EPSG:4326, if EPSG:3857/Web Mercator is used as the distance CRS, if the code only assigns .crs without .to_crs(), if only unrelated objects are projected, or if projection is merely described in prose/comments.
+      judge_expected: "YES"
+      acceptable: |
+        eq_proj = earthquakes_in_plate.to_crs("EPSG:4087")
+        boundaries_proj = pacific_boundaries.to_crs("EPSG:4087")
+        earthquakes_in_plate["distance_km"] = eq_proj.geometry.distance(boundaries_proj.geometry.unary_union) / 1000
+      unacceptable: |
+        earthquakes["distance_km"] = earthquakes.geometry.distance(boundary_union) / 1000
+        # or: earthquakes.to_crs("EPSG:3857").geometry.distance(...)
+        # or: earthquakes.crs = "EPSG:4087" without transforming coordinates
+
+  - id: r2_no_haversine_manual
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — forbidden] Must not use hand-written Haversine/Vincenty/geodesic/pyproj.Geod/vertex-by-vertex traversal or similar methods to replace the projected geopandas/shapely .distance() distance computation.
+      skill-exclusive rationale: without reading the skill, a model may use common spherical-distance formulas; the skill explicitly requires using geopandas projected distance, avoiding manual formulas and point-by-point boundary distances.
+    signal:
+      judge_question: |
+        Based only on actual executed code/tool-call evidence, not comments or explanations: did the solution avoid using Haversine, Vincenty, geodesic libraries/functions, pyproj.Geod, manual earth-radius trigonometry, or vertex-by-vertex boundary distance calculations as the substitute for the required projected geopandas/shapely .distance() computation?
+        Answer YES if the final distance ranking is computed with projected geopandas/shapely geometry distance and no manual/geodesic substitute is used.
+        Answer NO if the final distance ranking relies on haversine(), vincenty(), geopy.distance, pyproj.Geod, earth-radius trig formulas, or iterating boundary vertices to compute distances instead of projected geometry .distance().
+      judge_expected: "YES"
+      acceptable: |
+        projected_points.geometry.distance(projected_boundary_union) / 1000
+      unacceptable: |
+        from geopy.distance import geodesic
+        distance_km = geodesic((lat, lon), (boundary_lat, boundary_lon)).km
+        # or: R = 6371; a = sin(dlat/2)**2 + cos(lat1)*cos(lat2)*sin(dlon/2)**2
+
+  - id: r3_use_geopandas_distance
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — tool selection] Must use .distance() on the projected GeoSeries/geometry/Shapely geometry to compute point-to-boundary distance.
+      skill-exclusive rationale: the skill explicitly requires using geopandas/shapely spatial methods and unary_union, rather than self-written distances or only attribute computation.
+    signal:
+      judge_question: |
+        Based only on actual executed code/tool-call evidence, not comments or explanations: does the final distance calculation call geopandas/shapely .distance() on projected earthquake geometries or projected Shapely geometries against the relevant projected boundary geometry/unary_union?
+        Answer YES only if .distance() is used for the final earthquake-to-boundary distance after projection.
+        Answer NO if .distance() is absent, is only mentioned in prose/comments, is called on unprojected EPSG:4326 geometries, or is used only for unrelated objects.
+      judge_expected: "YES"
+      acceptable: |
+        eq_proj.geometry.distance(boundaries_proj.geometry.unary_union) / 1000
+      unacceptable: |
+        distance_km = haversine(eq_lat, eq_lon, boundary_lat, boundary_lon)
+        # or .distance() only appears in a comment
+
+  - id: r5_filter_before_project
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — performance] First filter the earthquake points within the Pacific plate, then project the filtered earthquake-point data; must not project the full earthquake GeoDataFrame first and then filter.
+      skill-exclusive rationale: the skill's Performance Tips explicitly require filter before projecting, to reduce expensive projection operations.
+    signal:
+      judge_question: |
+        Based only on actual executed code/tool-call evidence, not comments, explanations, or stated intentions: did the code filter the earthquake point GeoDataFrame to earthquakes within the Pacific plate BEFORE calling .to_crs() on that earthquake point GeoDataFrame?
+        Ignore .to_crs() calls on plate polygons or boundary geometries. Only consider the earthquake points dataset.
+        Answer YES if the full earthquake dataset is filtered to Pacific-plate earthquakes first, and only that filtered earthquake subset is projected before distance calculation.
+        Answer NO if the full/global earthquake GeoDataFrame is projected before the Pacific-plate filter, or if the order cannot be established from actual code/tool evidence.
+      judge_expected: "YES"
+      acceptable: |
+        target_plate = plates[plates["Code"] == "PA"].geometry.unary_union
+        earthquakes_in_plate = earthquakes[earthquakes.within(target_plate)].copy()
+        eq_proj = earthquakes_in_plate.to_crs("EPSG:4087")
+      unacceptable: |
+        eq_proj = earthquakes.to_crs("EPSG:4087")
+        earthquakes_in_plate = eq_proj[eq_proj.within(target_plate)]
+
+  # ── GENERIC (generic boundary) ────────────────
+  - id: b1_valid_json_output
+    type: boundary
+    provenance: generic
+    verifier: llm-judge
+    weight: 0.5
+    spec: |
+      [generic] ./output/answer.json should exist, and its actual content must be a parseable JSON object.
+    signal:
+      judge_question: |
+        Inspect only the final contents actually written to output/answer.json. Is the file present and valid parseable JSON with a top-level JSON object?
+        Answer YES only if it can be parsed as JSON. Answer NO for missing files, empty files, prose, Python dict syntax, trailing commas, or any invalid JSON.
+      judge_expected: "YES"
+
+  - id: b2_top5_structure
+    type: boundary
+    provenance: generic
+    verifier: llm-judge
+    weight: 0.5
+    spec: |
+      [generic] The output JSON must contain a top5 array of exactly length 5; each array element must be an object containing at least id and distance_km fields, and preferably also ranking-related fields such as rank/place/magnitude.
+    signal:
+      judge_question: |
+        Inspect only the final contents actually written to output/answer.json. Does the parsed JSON contain a top-level "top5" array of exactly 5 objects, where each object contains at least "id" and "distance_km" fields?
+        Answer YES only if the array length and per-item field ownership are clear in the actual JSON. Answer NO if top5 is absent, not an array, not length 5, or if id/distance_km are merely present elsewhere rather than in each top5 element.
+      judge_expected: "YES"
+
+  # ── TASK COMPLETION (SR judgment, not counted toward skill score) ────────────
+  - id: tc1_rank5_correct_id
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] The rank #5 earthquake id must be "us6000ml0l" (Kamchatka earthquake).
+      This is a method-sensitive task-completion judgment point; only records SR, not counted toward the skill score.
+    signal:
+      judge_question: |
+        Inspect only the final parsed JSON in output/answer.json. Is there a single top5 item whose rank/place/position is #5 and whose id is exactly "us6000ml0l"?
+        Treat the fifth array element as rank #5 if no explicit rank field exists. Answer NO if the id merely appears elsewhere or appears in top5 but not at rank #5.
+      judge_expected: "YES"
+
+  - id: tc2_distance_accuracy
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] The rank #1 (or id "hv74103036") distance_km should be in the 3800-3950 range (metric projection result approximately 3878.27).
+      Only records SR, not counted toward the skill score.
+    signal:
+      judge_question: |
+        Inspect only the final parsed JSON in output/answer.json. For the rank #1 top5 item, or the top5 item with id exactly "hv74103036" if rank is explicit, is distance_km a numeric value between 3800 and 3950 inclusive?
+        Answer NO if the distance is outside this range, non-numeric, missing, or if a matching distance appears elsewhere but is not tied to rank #1/id "hv74103036".
+      judge_expected: "YES"
+
+  - id: tc3_rank1_correct_id
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] The rank #1 earthquake id must be "hv74103036" (Hawaii Pāhala).
+      Only records SR, not counted toward the skill score.
+    signal:
+      judge_question: |
+        Inspect only the final parsed JSON in output/answer.json. Is the rank #1 top5 item id exactly "hv74103036"?
+        Treat the first array element as rank #1 if no explicit rank field exists. Answer NO if the id merely appears elsewhere or appears in top5 but not at rank #1.
+      judge_expected: "YES"

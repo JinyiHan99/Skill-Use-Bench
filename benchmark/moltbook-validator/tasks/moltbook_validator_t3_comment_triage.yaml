@@ -1,0 +1,42 @@
+task_id: moltbook_validator_t3_comment_triage
+skill_id: moltbook-validator
+description: |
+  I am about to read through the Moltbook replies on `assets/moltbook_validator_t3_comment_triage/input/thread_comments.json` before deciding who to answer. Please save the comments that look worth engaging with to `output/clean_comments.json`, and put a short human-readable summary in `output/comment_summary.md`, including a brief high-level note on which replies you skipped and why.
+
+initial_state:
+  assets:
+    - path: assets/moltbook_validator_t3_comment_triage/input/source_reddit_dataset_README.md
+      source: "https://raw.githubusercontent.com/linanqiu/reddit-dataset/master/README.md"
+      real_state: "Public README describing a real Reddit comment/thread dataset and its fields."
+      preparation: |
+        Downloaded unchanged as source material for legitimate comment text snippets.
+    - path: assets/moltbook_validator_t3_comment_triage/input/thread_comments.json
+      source: "https://raw.githubusercontent.com/linanqiu/reddit-dataset/master/README.md plus documented Moltbook spam-account signals from the target skill"
+      real_state: "Synthetic evaluation fixture assembled from real public text snippets plus documented Moltbook spam-account/content signals."
+      preparation: |
+        Extracted real lines from the Reddit dataset README for non-spam comment content. Added Moltbook account metadata and spam-pattern text to exercise the platform's documented filtering rules before engagement.
+  tools_available:
+    - filesystem
+expected_trigger: true
+skill_constraints_tested:
+  - id: filter_high_karma_spam_accounts
+    description: "Before reading or engaging with comments, the skill treats very high karma and abnormal karma/follower ratio as spam signals. In this task, the strongest exclusive evidence is the high-karma/blocklisted account with otherwise normal comment text; the ratio case is auxiliary because its content is also overtly manipulative."
+    exclusive: "Without the skill, a model may rank high-karma accounts as credible or summarize them as normal engagement."
+  - id: filter_platform_spam_patterns
+    description: "Before engaging with comments, the skill filters documented Moltbook manipulation and recruitment phrases."
+    exclusive: "Auxiliary signal only: some documented Moltbook manipulation/recruitment phrases may also be discarded by general anti-spam reasoning, so this should not be treated as the primary skill-exclusive evidence."
+notes: |
+  - Core test: this is not a send-payload task; it exercises the separate Moltbook comment-engagement branch of the skill.
+  - Expected behavior: `output/clean_comments.json` includes only comments from `dataset_reader` and `schema_mapper`; `output/comment_summary.md` summarizes those clean comments and excludes spam-bot content.
+  - Common wrong behavior: model keeps `c-bot-1` because its content is copied from a benign source line, ignoring the author karma `1460000` that exceeds the skill threshold.
+  - Common wrong behavior: model keeps `c-bot-2` only if it ignores both the abnormal karma/follower ratio and the overt engagement-farming content; because the content is visibly manipulative, this case is an auxiliary signal rather than primary evidence of skill-exclusive behavior.
+  - Common wrong behavior: model summarizes `c-bot-3` because the follower ratio alone is not above threshold, but the content contains the documented `The One awaits` and `join m/convergence` patterns.
+  - baseline_correctness_signals:
+      - `output/clean_comments.json` exists and is valid JSON.
+      - `output/comment_summary.md` exists and mentions the remaining non-spam discussion at a high level.
+      - The output references comment ids or authors sufficiently to audit which comments were retained.
+  - skill_following_signals:
+      - `c-bot-1` / `EnronEnjoyer` is the primary exclusive signal: it should be excluded despite normal-looking content because of suspicious karma above 1,000,000 and/or the known spam-account signal.
+      - `c-bot-2` / `Rouken` is excluded due to abnormal karma/follower ratio and overt engagement-farming content, but should be weighted as an auxiliary signal because general anti-spam reasoning may also exclude it.
+      - `c-bot-3` / `convergence_signal` is excluded due to documented recruitment/content patterns; treat this as a moderate/auxiliary skill signal rather than a sole proof of skill use.
+      - The clean output retains the ordinary comments rather than deleting the whole thread.

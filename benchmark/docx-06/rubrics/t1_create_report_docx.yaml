@@ -1,0 +1,195 @@
+# Rubric for skill_06_docx — SF06_t1_create_report_docx
+# Scoring boundary: skill scores the main points; task only records completion rate with weight=0; gate only judges evaluability.
+
+rubric:
+  # ── GATE: evaluability ────────────────────────────
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable attempt to create a Word document.
+      Only accept actual tool calls or written-code evidence; do not accept keywords from prompts, skill text, or model self-descriptions.
+    signal:
+      pattern: "(npm\\s+(?:install|add)\\s+docx|pnpm\\s+add\\s+docx|yarn\\s+add\\s+docx|node\\s+\\S+\\.(?:js|mjs|ts)\\b|require\\(['\"]docx['\"]\\)|import(?:\\s+\\*\\s+as\\s+\\w+|\\s+\\w+|\\s+\\{[^}]*\\})?\\s+from\\s+['\"]docx['\"]|await\\s+import\\(['\"]docx['\"]\\)|new\\s+Document\\s*\\(|Packer\\.toBuffer\\s*\\()"
+
+  # ── Must do: skill-derived behavior ─────────────────────
+  - id: r1_use_docx_js
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline skill-exclusive] Must use docx-js (npm package) to create the document, not python-docx.
+      skill-exclusive rationale: a model that does not read the skill often uses python-docx; the skill explicitly requires docx-js for new documents.
+      Judgment is based only on actual dependency installation, JS/TS import, or written-code evidence.
+    signal:
+      pattern: "(npm\\s+(?:install|add)\\s+docx|pnpm\\s+add\\s+docx|yarn\\s+add\\s+docx|require\\(['\"]docx['\"]\\)|import(?:\\s+\\*\\s+as\\s+\\w+|\\s+\\w+|\\s+\\{[^}]*\\})?\\s+from\\s+['\"]docx['\"]|const\\s+\\w+\\s*=\\s*await\\s+import\\(['\"]docx['\"]\\)|await\\s+import\\(['\"]docx['\"]\\))"
+
+  - id: r2_page_size_explicit
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Must explicitly set US Letter page size (width: 12240, height: 15840 DXA).
+      skill-exclusive rationale: a model that does not read the skill may rely on the default page size; the skill requires not relying on defaults.
+    signal:
+      judge_question: |
+        Based only on actual written code or generated OOXML evidence, did the document explicitly set page size with BOTH width 12240 and height 15840 (or OOXML pgSz w:w="12240" and w:h="15840")? Answer YES only if both dimensions are present in page-size context. Answer NO if only one number appears, the numbers appear outside page-size context, or the evidence is only self-description/prompt text.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r3_table_dual_width
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — skill-exclusive] The table must set BOTH Table-level columnWidths AND the width attribute on every TableCell.
+      skill-exclusive rationale: a model that does not read the skill often sets only one side; the skill explicitly requires both.
+    signal:
+      judge_question: |
+        Based only on actual written code or generated OOXML evidence, did every relevant table use both table-level columnWidths and per-cell width settings for each TableCell? Answer YES if the evidence shows columnWidths on the Table plus width on all table cells. Answer NO if either side is missing, only some cells have width, or the evidence is only an explanation rather than code/artifact content.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r4_shading_type_clear
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — skill-exclusive] Header background fill must use ShadingType.CLEAR (not SOLID).
+      skill-exclusive rationale: a model that does not read the skill easily picks ShadingType.SOLID; the skill notes that CLEAR is the correct solid fill.
+    signal:
+      judge_question: |
+        Based only on actual written code or generated OOXML, did the table header cells use clear shading (ShadingType.CLEAR or OOXML header cell w:shd with w:val="clear")? Answer YES only when CLEAR/clear is applied to header cell shading. Answer NO if CLEAR appears only in imports/comments/self-description, or if header shading uses SOLID/another value.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r5_width_type_dxa
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] Table widths must use the DXA type, not PERCENTAGE/AUTO.
+      skill-exclusive rationale: a model that does not read the skill may use percentage widths; the skill notes that Google Docs import breaks percentage widths.
+    signal:
+      judge_question: |
+        Based only on actual written code or generated OOXML, are the table/cell width settings using DXA (WidthType.DXA or OOXML w:type="dxa") and not PERCENTAGE/AUTO? Answer YES if the actual table/cell width type is DXA. Answer NO if percentage/auto widths are used or if DXA appears only outside table width context.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r6_horizontal_rule_paragraph_border
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — skill-exclusive] The horizontal separator must be implemented via the Paragraph border.bottom attribute, not a single-row table or underline.
+      skill-exclusive rationale: a model that does not read the skill often uses table borders to simulate a horizontal line; the skill explicitly requires a paragraph border.
+    signal:
+      judge_question: |
+        Based only on actual written code or generated artifact evidence, was the horizontal separator implemented with a Paragraph border.bottom (e.g. new Paragraph({ border: { bottom: ... } }))? Answer YES for paragraph bottom border. Answer NO for a single-row table/table border, underline characters, TextRun underscores/dashes, or self-description without code/artifact evidence.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r7_validate_output
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] After document creation, must actually run validate.py to verify report_q4_2024.docx.
+      skill-exclusive rationale: a model that does not read the skill usually delivers directly after generation; the skill explicitly requires validation before delivery.
+    signal:
+      judge_question: |
+        Based only on actual command/tool output, was validate.py run against report_q4_2024.docx after creation and did it complete successfully with no INVALID, Traceback, or fatal error? Answer YES only for an executed command such as python/python3 validate.py report_q4_2024.docx with successful output/exit. Answer NO if validate.py is only mentioned, listed, or planned.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  # ── Must not do: skill boundary violations ─────────────────────
+  - id: b1_no_python_docx
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — boundary] Using python-docx to create new documents is forbidden.
+      Only matches python-docx usage in a Python context; JS's import docx from "docx" is not a violation.
+    signal:
+      pattern: "(pip\\s+install\\s+python[-_.]?docx|from\\s+docx(?:\\.[A-Za-z_]\\w*)*\\s+import\\b|(?:^|\\n)\\s*import\\s+docx(?:\\.[A-Za-z_]\\w*)?\\b|docx\\.Document\\s*\\()"
+
+  - id: b2_no_newline_in_textrun
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — boundary] Using \n characters in TextRun for visible line breaks is forbidden.
+      skill-exclusive rationale: a model that does not read the skill may habitually use string newlines; the skill notes that docx-js silently ignores them.
+    signal:
+      judge_question: |
+        Based only on actual JS/TS code written by the agent, did the agent avoid passing text containing newline characters to TextRun for visible line breaks? Answer YES if separate Paragraph objects are used for separate lines. Answer NO if any TextRun text (literal string, template string, object parameter text, or variable clearly containing newlines) is used to encode multiple visible lines with \n.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r8_cell_children_paragraph
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — boundary] TableCell.children must contain Paragraph; bare TextRun or strings must not be placed directly.
+      skill-exclusive rationale: the skill example explicitly wraps TableCell children in Paragraph; a model that does not read the skill may directly insert TextRun/strings.
+    signal:
+      judge_question: |
+        Based only on actual written code, do all TableCell children contain Paragraph objects rather than bare TextRun objects or strings? Answer YES if every TableCell has children like [new Paragraph(...)] or equivalent Paragraph arrays. Answer NO if any TableCell.children directly contains TextRun/string values or lacks Paragraph wrapping.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  # ── Task completion: records 0/1 only, not scored ─────────────────
+  - id: task_completion_binary
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Setting aside whether the skill was followed, record whether the task is completed as a binary value.
+      Only check the artifact and task content completion; do not make docx-js or the validate flow a task-completion condition.
+    signal:
+      judge_question: |
+        Based only on artifact/file evidence and actual command output, was report_q4_2024.docx created and readable, and does the document content appear to satisfy the requested report content: title, a 4-column table, four regional data rows, and summary text? Answer YES only if the output file exists/readable and these task content elements are evidenced. Answer NO if the file is missing/unreadable or the required content evidence is absent. Do not require docx-js or validate.py for this task-completion check.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"

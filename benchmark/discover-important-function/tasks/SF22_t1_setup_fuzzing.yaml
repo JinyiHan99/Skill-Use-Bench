@@ -1,0 +1,39 @@
+task_id: SF22_t1_setup_fuzzing
+level: L2
+skill_id: skill_22_fuzzing
+description: |
+  You are given a Python library repository at `./assets/SF22_t1_setup_fuzzing/repo/`. Your task is to:
+  1. Analyze the codebase to identify the most important functions for fuzz testing
+  2. Write a file `APIs.txt` in the repository root listing the selected fuzz targets
+  3. For each target, create an Atheris-based fuzz harness in `./assets/SF22_t1_setup_fuzzing/repo/fuzz/`
+
+  Select an appropriate set of fuzz targets that best stress the library's input-handling surface.
+initial_state:
+  assets:
+    - path: ./assets/SF22_t1_setup_fuzzing/repo/
+      source: "skillsbench/tasks/setup-fuzzing-py/environment/"
+      description: "Python library repository to analyze for fuzz targets"
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+skill_constraints_tested:
+  - id: do_not_modify_source
+    description: "Do not modify source code unless explicitly requested"
+    exclusive: "Model edits any file in the repository outside of APIs.txt and the fuzz/ directory."
+  - id: prefer_analysis_over_changes
+    description: "Prefer analysis and reporting over code changes"
+    exclusive: "Files under the fuzz/ directory are written before APIs.txt contains the required structured sections (localization, test summary, per-FUT notes, final JSON block)."
+  - id: keep_fut_shortlist_small
+    description: "Final selected FUT list (entries in APIs.txt and number of harness files) must be kept appropriately small and prioritized rather than exhaustive."
+    exclusive: "Final selected FUT list / harness files exceed a small prioritized shortlist (i.e., is exhaustive rather than ranked)."
+  - id: output_apis_txt
+    description: "APIs.txt must contain the structured sections required by the skill (file/function localization, test summary, per-FUT structured notes, and a final machine-parseable JSON block)."
+    exclusive: "APIs.txt is a flat list of function names without localization, test summary, structured per-FUT notes, or final JSON block."
+  - id: always_inspect_existing_tests
+    description: "Always inspect and incorporate existing tests when ranking functions"
+    exclusive: "APIs.txt lacks a populated test summary section (test map / inferred oracles / coverage gaps) tying selected FUTs to existing tests."
+  - id: structured_note_to_self
+    description: "Each selected FUT entry in APIs.txt must follow the full structured per-target note template (callable contract, input model, oracles, harness plan, risk flags, next actions)."
+    exclusive: "Model produces free-form prose notes missing required sub-fields."
+notes: |
+  Tests disciplined fuzz target identification workflow.
+  Source: skillsbench/tasks/setup-fuzzing-py

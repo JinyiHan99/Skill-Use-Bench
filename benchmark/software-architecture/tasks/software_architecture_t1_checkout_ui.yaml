@@ -1,0 +1,312 @@
+task_id: software_architecture_t1_checkout_ui
+skill_id: software-architecture
+description: |
+  The checkout team has been getting regressions whenever the shipping step changes. Please work from `./assets/software_architecture_t1_checkout_ui/input/` and make the shipping-address area easier to maintain while preserving the current customer-visible behavior. Keep the change focused and leave the result in the same project tree.
+initial_state:
+  assets:
+    - path: ./assets/software_architecture_t1_checkout_ui/input/package.json
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/package.json"
+      real_state: "Package manifest from the same real repository snapshot."
+      preparation: |
+        Copied `package.json` unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/api/appHook.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/api/appHook.js"
+      real_state: "Real source file `src/api/appHook.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/api/billingAddress.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/api/billingAddress.js"
+      real_state: "Real source file `src/api/billingAddress.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/api/customer.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/api/customer.js"
+      real_state: "Real source file `src/api/customer.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/api/discounts.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/api/discounts.js"
+      real_state: "Real source file `src/api/discounts.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/api/index.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/api/index.js"
+      real_state: "Real source file `src/api/index.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/api/lineItems.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/api/lineItems.js"
+      real_state: "Real source file `src/api/lineItems.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/api/orderMetadata.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/api/orderMetadata.js"
+      real_state: "Real source file `src/api/orderMetadata.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/api/processOrder.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/api/processOrder.js"
+      real_state: "Real source file `src/api/processOrder.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/api/shippingAddress.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/api/shippingAddress.js"
+      real_state: "Real source file `src/api/shippingAddress.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/api/shippingLines.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/api/shippingLines.js"
+      real_state: "Real source file `src/api/shippingLines.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/api/taxes.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/api/taxes.js"
+      real_state: "Real source file `src/api/taxes.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/components/index.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/components/index.js"
+      real_state: "Real source file `src/components/index.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/components/paymentIframe/PaymentIframe.jsx
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/components/paymentIframe/PaymentIframe.jsx"
+      real_state: "Real source file `src/components/paymentIframe/PaymentIframe.jsx` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/components/paymentIframe/index.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/components/paymentIframe/index.js"
+      real_state: "Real source file `src/components/paymentIframe/index.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/components/provider/Provider.jsx
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/components/provider/Provider.jsx"
+      real_state: "Real source file `src/components/provider/Provider.jsx` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/components/provider/index.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/components/provider/index.js"
+      real_state: "Real source file `src/components/provider/index.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/index.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/index.js"
+      real_state: "Real source file `src/hooks/index.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/shared/generateTaxes.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/shared/generateTaxes.js"
+      real_state: "Real source file `src/hooks/shared/generateTaxes.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/shared/getShippingLines.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/shared/getShippingLines.js"
+      real_state: "Real source file `src/hooks/shared/getShippingLines.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/shared/index.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/shared/index.js"
+      real_state: "Real source file `src/hooks/shared/index.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/shared/requiredAddressFieldValidation.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/shared/requiredAddressFieldValidation.js"
+      real_state: "Real source file `src/hooks/shared/requiredAddressFieldValidation.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useAppHook.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useAppHook.js"
+      real_state: "Real source file `src/hooks/useAppHook.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useApplicationState.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useApplicationState.js"
+      real_state: "Real source file `src/hooks/useApplicationState.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useBillingAddress.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useBillingAddress.js"
+      real_state: "Real source file `src/hooks/useBillingAddress.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useBillingSameAsShipping.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useBillingSameAsShipping.js"
+      real_state: "Real source file `src/hooks/useBillingSameAsShipping.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useBreakdown.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useBreakdown.js"
+      real_state: "Real source file `src/hooks/useBreakdown.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useCheckoutStore.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useCheckoutStore.js"
+      real_state: "Real source file `src/hooks/useCheckoutStore.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useCountryInfo.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useCountryInfo.js"
+      real_state: "Real source file `src/hooks/useCountryInfo.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useCustomer.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useCustomer.js"
+      real_state: "Real source file `src/hooks/useCustomer.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useDiscount.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useDiscount.js"
+      real_state: "Real source file `src/hooks/useDiscount.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useErrors.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useErrors.js"
+      real_state: "Real source file `src/hooks/useErrors.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useLineItems.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useLineItems.js"
+      real_state: "Real source file `src/hooks/useLineItems.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useLoadingStatus.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useLoadingStatus.js"
+      real_state: "Real source file `src/hooks/useLoadingStatus.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useOrderMetadata.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useOrderMetadata.js"
+      real_state: "Real source file `src/hooks/useOrderMetadata.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useOrderSummary.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useOrderSummary.js"
+      real_state: "Real source file `src/hooks/useOrderSummary.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/usePaymentIframe.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/usePaymentIframe.js"
+      real_state: "Real source file `src/hooks/usePaymentIframe.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useSavedAddresses.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useSavedAddresses.js"
+      real_state: "Real source file `src/hooks/useSavedAddresses.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useShippingAddress.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useShippingAddress.js"
+      real_state: "297-line hook containing the long shipping-address submission callback with validation, shipping line selection, billing sync, and tax generation responsibilities."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/hooks/useShippingLines.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/hooks/useShippingLines.js"
+      real_state: "Real source file `src/hooks/useShippingLines.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/index.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/index.js"
+      real_state: "Real source file `src/index.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/store/index.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/store/index.js"
+      real_state: "Real source file `src/store/index.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/store/reducers/errorsReducer.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/store/reducers/errorsReducer.js"
+      real_state: "Real source file `src/store/reducers/errorsReducer.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/store/reducers/index.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/store/reducers/index.js"
+      real_state: "Real source file `src/store/reducers/index.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/store/reducers/loadingStatusReducer.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/store/reducers/loadingStatusReducer.js"
+      real_state: "Real source file `src/store/reducers/loadingStatusReducer.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/store/reducers/orderInfoReducer.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/store/reducers/orderInfoReducer.js"
+      real_state: "Real source file `src/store/reducers/orderInfoReducer.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/store/reducers/orderTotalsReducer.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/store/reducers/orderTotalsReducer.js"
+      real_state: "Real source file `src/store/reducers/orderTotalsReducer.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/store/reducers/stateReducer.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/store/reducers/stateReducer.js"
+      real_state: "Real source file `src/store/reducers/stateReducer.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/store/store.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/store/store.js"
+      real_state: "Real source file `src/store/store.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/utils/fetchApi.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/utils/fetchApi.js"
+      real_state: "Real source file `src/utils/fetchApi.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/utils/fetchError.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/utils/fetchError.js"
+      real_state: "Real source file `src/utils/fetchError.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/utils/handleError.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/utils/handleError.js"
+      real_state: "Real source file `src/utils/handleError.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/utils/index.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/utils/index.js"
+      real_state: "Real source file `src/utils/index.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/utils/orderError.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/utils/orderError.js"
+      real_state: "Real source file `src/utils/orderError.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+    - path: ./assets/software_architecture_t1_checkout_ui/input/src/utils/promiseError.js
+      source: "https://github.com/bold-commerce/checkout-react-components/blob/master/src/utils/promiseError.js"
+      real_state: "Real source file `src/utils/promiseError.js` from the Bold Commerce checkout React component library snapshot."
+      preparation: |
+        Copied unchanged from the same depth-1 clone.
+  tools_available:
+    - filesystem
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: decompose_long_components_and_functions
+    description: "The skill requires long components/functions over 80 lines to be decomposed into smaller focused functions, and files over 200 lines to be split when the code cannot stay focused in one file."
+    exclusive: "Without the skill, a strong model may still perform some local extraction inside `src/hooks/useShippingAddress.js`, but it is unlikely to consistently satisfy the skill’s structural thresholds at the same time: reducing the primary edited callback below 80 lines, keeping the file focused below 200 lines or splitting it, and separating shipping-address responsibilities into bounded, domain-named modules. The skill makes those structural constraints explicit; generic refactoring habits do not."
+  - id: early_returns_and_nesting_limit
+    description: "The skill requires early returns where possible and avoiding deep nesting, with complex logic broken into focused pieces."
+    exclusive: "Early returns alone are not strongly skill-exclusive because many capable models already prefer guard-clause refactors. This signal should be evaluated only in combination with the skill’s stronger architecture requirements, such as focused module decomposition and domain-specific naming. A useful concrete observation point is whether the redundant nested `if (shippingAddressData.country_code)` flow around `src/hooks/useShippingAddress.js:192` is flattened or delegated, since `country_code` is already pre-validated earlier in the callback."
+  - id: domain_specific_module_names
+    description: "The skill prohibits generic module names such as utils/helpers/common/shared and calls for bounded-context names with one clear purpose."
+    exclusive: "The source tree already contains `src/hooks/shared/`, which creates a strong default path for non-skill-driven refactors. Without the skill, a capable model may reasonably continue that pattern by adding more shipping-related exports under `src/hooks/shared/` or creating a file such as `shippingHelpers.js`. The skill creates a different expectation: bounded, checkout-domain-specific modules whose names clearly express one responsibility."
+notes: |
+  - Core test point: this is a maintainability-oriented software development task where preserving behavior is not enough; the model should apply the skill's structural rules to the real checkout hook.
+  - Expected correct behavior: extract shipping address validation, default shipping-line selection, billing-address sync, and tax update work into small domain-named functions/modules; use early returns to reduce nesting; keep business behavior equivalent.
+  - Common wrong behavior: the model performs only local cleanup inside `useShippingAddress.js`—for example extracting a few inline helpers but keeping the file as the main dumping ground, or continuing to place newly extracted responsibilities under `src/hooks/shared/`. This preserves behavior but misses the architecture skill’s stronger decomposition and naming requirements.
+  - Common wrong behavior: the model creates `src/hooks/shared/shippingHelpers.js` or adds exports to `src/utils/index.js`, violating the skill's generic naming prohibition.
+  - baseline_correctness_signals:
+      - The project tree under `./assets/software_architecture_t1_checkout_ui/input/` still contains the checkout source and modified files are syntactically valid JavaScript/JSX.
+      - Shipping-address behavior remains represented: required fields, country/province/postal-code checks, shipping-line selection, billing-same-as-shipping, and tax generation are not removed.
+  - skill_following_signals:
+      - The primary shipping-address orchestration logic is no longer concentrated in a single >200-line file: either `src/hooks/useShippingAddress.js` is reduced below 200 lines, or at least one shipping-address-specific module is introduced and the main file delegates to it.
+      - The main shipping-address submission callback after editing is under 80 lines, and any newly introduced helper in modified files is also under 80 lines.
+      - Around shipping-line handling, the main flow no longer depends on adding deeper nested conditionals in the original callback; instead, it is either flattened with guard clauses or delegated into a focused helper/module.
+      - Newly created or newly edited extraction modules must use domain-specific names and must not add new responsibilities to generic `utils`, `helpers`, `common`, or `shared` dumping grounds. Existing upstream files under `src/hooks/shared/` are baseline assets and should not be penalized unless the model expands that generic pattern.
+  - partial_skill_following_signals:
+      - At least one distinct responsibility, such as validation, shipping-line selection, billing sync, or tax update, is extracted out of the main shipping-address callback into a focused function or domain-named module.
+      - The main callback becomes shorter even if the full decomposition is incomplete.
+      - Newly added modules do not use generic names such as `utils`, `helpers`, `common`, or `shared`.

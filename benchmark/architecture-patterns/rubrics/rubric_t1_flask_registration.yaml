@@ -1,0 +1,116 @@
+rules:
+  - id: g1_observable_implementation_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: '"(tool|name)"\s*:\s*"(Write|Edit)"|"recipient_name"\s*:\s*"functions\.(Write|Edit)"|<tool_use[^>]{0,200}\b(Write|Edit)\b'
+    spec: "[GATE] The trace contains real Write/Edit tool calls, indicating the model has an observable implementation modification attempt."
+
+  - id: r1_register_use_case_is_framework_free
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The core business rule of "register user" must be extracted into an inner use case/service/entity/value object, and that inner code must not depend on Flask request/flash/redirect/render_template/url_for, get_db, sqlite connections, or page response objects.
+      Skill-exclusive rationale: without reading the skill, a strong model usually moves registration logic to a helper/service but still reads Flask request, calls get_db, or returns redirect/render; the skill requires dependencies to point inward, with business logic independent of the web framework, database, and delivery mechanism, and the conflict point is whether the inner registration logic still knows about Flask/SQLite.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: is there an inner use case/service/domain code responsible for registering users, and does this inner code not import or call Flask request/flash/redirect/render_template/url_for, flaskr.db.get_db, sqlite connections/cursors, and not return HTTP/template response objects? The inner layer can be a class, function, or module; if the so-called inner use case is mixed in the same module as the Flask view, and that module's top-level import of Flask/get_db/sqlite makes the inner layer no longer framework-free, judge NO. Only judge this one thing. Answer YES if the register use case receives plain input such as username/password and returns a domain/application result while Flask-specific work stays in auth view/adapter. Answer NO if the extracted registration code imports Flask, calls get_db, accepts sqlite/db connection as its core dependency, executes SQL directly as the main business path, or returns redirect/render/flash responses.
+      acceptable: "A RegisterUserUseCase in use_cases/register_user.py accepts username/password and a user repository port; auth.py maps request.form to the use case and then redirects/flashes at the edge."
+      unacceptable: "A register_user helper in auth.py or services/auth_service.py calls request.form, get_db().execute(...), flash(...), redirect(...), or receives a sqlite connection and performs SQL directly."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_user_repository_port_and_sqlite_adapter
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When the registration flow crosses a persistence boundary, the inner layer must depend on an abstract user repository port; SQLite/get_db/SQL insert and query should be implemented in an outer adapter.
+      Skill-exclusive rationale: the default refactor will directly let the service execute SQL, accept db/session, or only wrap a repository but the use case still depends on concrete SQLite; the skill requires each layer boundary to be crossed via an abstract interface, and the conflict point is whether the use case depends on an abstract port or a concrete database implementation.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: does the registration use case express capabilities such as "find by username, save user" through an abstract user repository port, implemented by an outer SQLite/Flask adapter? Explicit abstract interfaces, Protocol/ABC, or stable duck-typed/callable ports are all acceptable; only judge YES when the core use case depends on an abstract port, and the core code does not import a concrete SQLite adapter, does not execute SQL, and does not depend on sqlite/get_db via same-module mixed-layer. Only judge this one thing. Answer YES if the core use case constructor/type depends on an abstract repository and a separate adapter maps SQLite rows/SQL statements to the core model. Answer NO if the use case imports the concrete SQLite repository, calls SQL directly, calls get_db directly, or the only repository is a concrete class with no abstract port used by the core.
+      acceptable: "domain/interfaces.py defines UserRepository; adapters/sqlite_user_repository.py implements it using get_db; RegisterUserUseCase depends on UserRepository."
+      unacceptable: "RegisterUserService.__init__(db) stores a sqlite connection and executes INSERT/SELECT inside the service; no abstract port is used."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_controller_is_only_delivery_adapter
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The Flask register view should become an interface adapter: only parse the form, call the use case, and map the result to flash/redirect/render_template, without carrying core business validity rules, duplicate username, password hashing, and other core rules; parsing request/form and constructing DTOs is allowed.
+      Skill-exclusive rationale: looking only at the task, a strong model may keep the if/SQL/exception handling in the view and add tests; the skill's troubleshooting explicitly states that the controller should only do three things, and business logic should go into the use case, and the conflict point is whether the controller still contains core registration rules.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: is the Flask register view mainly limited to parsing username/password, constructing DTO/request objects, calling the registration use case/service, and executing flash/redirect/render_template based on the use case result, without continuing to implement core business validity checks, duplicate username judgment, password hashing and saving, or SQL writes in the view? Only judge this one thing. Answer YES if these business decisions are made by inner use-case/domain code and the view only maps I/O. Answer NO if the view still contains the main validation branches, generate_password_hash+INSERT, IntegrityError handling, or database commit for registration.
+      acceptable: "register() builds RegisterUserRequest, calls use_case.execute(...), redirects on success and flashes response.error on failure."
+      unacceptable: "register() still checks if not username/password, catches db.IntegrityError, hashes the password, and executes INSERT itself."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_use_case_tests_use_in_memory_repository
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Core use-case tests for successful registration and duplicate username must directly drive the use case and inject a pure Python in-memory repository double; tests should not require a Flask app/request context, test client, SQLite :memory:, a real database, or patching get_db.
+      Skill-exclusive rationale: the default test uses a Flask test client, application context, or temporary SQLite to verify HTTP behavior; the skill's signature requirement is that use cases can be unit-tested with an in-memory adapter, without database/Docker/network, and the conflict point is whether the test boundary bypasses the framework and database.
+    signal:
+      query: >
+        Based on the test file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: is there a standalone test that directly instantiates the registration use case/service and injects a pure Python in-memory repository, covering successful registration and duplicate username? Flask client/SQLite integration tests may also exist; parameterized tests are allowed. Only judge this one thing. Answer YES if tests instantiate an InMemoryUserRepository and call the use case with plain data for both branches. Answer NO if no such direct in-memory use-case tests exist and the only tests exercise /auth/register through Flask client, use app.app_context, sqlite3/connect/create_engine, monkeypatch get_db, or depend on schema.sql.
+      acceptable: "test_register_success and test_duplicate_username create InMemoryUserRepository, RegisterUserUseCase(repo), and call execute/register with username/password; separate Flask client integration tests may also exist."
+      unacceptable: "The only registration tests post to client.post('/auth/register') after init_db, or use sqlite3.connect(':memory:') to check duplicate username."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_password_hashing_as_boundary_service_not_framework_leak
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Secure password storage should be a replaceable boundary dependency of the use case or a framework-free domain logic, rather than having the registration inner layer reverse-depend on Flask views, SQLite implementation, or HTTP flow.
+      Skill-exclusive rationale: the default practice directly calls generate_password_hash in the view or database code and ties it to INSERT; the skill requires separating business logic from outer mechanisms and crossing boundaries via interfaces, and the conflict point is whether password hashing is coupled to the controller/database flow and cannot be unit-test-replaced.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: is password hashing/secure storage performed in the registration use case or service layer, or via an injected hasher, and does not depend on the Flask view/SQLite INSERT flow? Only judge this one thing. Answer YES if password hashing is performed in the use case/service layer, either through an injected hasher or a framework-independent password hashing function, before saving through the repository. Answer NO if hashing remains only in the Flask register view or SQLite adapter as part of direct SQL insertion.
+      acceptable: "RegisterUserUseCase receives password_hasher or calls a framework-independent hasher before repo.save(User(...hashed_password...))."
+      unacceptable: "auth.register calls generate_password_hash inside the SQL INSERT and the extracted core code never sees or tests password hashing behavior."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the registration capability was extracted and covers successful registration, duplicate username, and preservation of original behavior as core task requirements."
+    signal:
+      query: >
+        Based on the final file content and actual Write/Edit tool calls, not the agent's self-description: is the task basically complete, i.e., the registration capability has been extracted from the original Flask view, still preserving non-empty username/password, non-duplicate username, secure password storage, and post-success redirect to the login page, and includes tests for successful registration and duplicate username? Answer YES only if code and tests are actually written; Answer NO if core code is missing, the two test branches are missing, or only a plan is described without landing.
+      acceptable: "Has a registration use case/service, auth.py calls it and preserves the success redirect, tests cover success and duplicate username."
+      unacceptable: "Only modified docs or only wrote Flask client tests without extracting the registration capability; or no duplicate username test."

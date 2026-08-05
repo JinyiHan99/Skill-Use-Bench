@@ -1,0 +1,140 @@
+rules:
+  - id: g1_observable_article_write_attempt
+    type: required-tool
+    provenance: gate
+    locus: trace
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable Write/Edit write attempt on the specified final-draft file. The gate only judges whether an attempt was made; it does not judge content quality or skill adherence.
+    signal:
+      pattern: '("recipient_name"\s*:\s*"functions\.(Write|Edit)"|"tool"\s*:\s*"(Write|Edit)"|"name"\s*:\s*"(Write|Edit)"|functions\.(Write|Edit)|\b(Write|Edit)\s*\()[\s\S]{0,1200}"?file_path"?\s*[:=]\s*"[^"\n]*output/wechat_tool_calling_article\.md"'
+
+  - id: r1_lock_business_goal_audience_channel_success_before_work
+    type: order
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Before content decomposition, content-production assignment, writing, or file writing, the four items business goal, audience, channel, and success criteria must be locked as an independent, consolidated checkpoint.
+      skill-exclusive rationale: without reading the skill, a strong model will start writing or outlining based on the reader and public-account requirements already in the task; the skill requires explicitly locking the four editor-in-chief control variables before content production. The conflict point is "write/decompose first" vs "lock four items first".
+    signal:
+      query: |
+        Based on actual tool calls, agent messages, and user-visible replies — not the agent's self-description of its intent — did the model, before any content decomposition, content-production TaskCreate/Agent assignment, title/outline/body writing, or file writing, first lock business goal, target audience, publishing channel, and success criteria together in the same reply or in consecutive adjacent steps? Answer only YES or NO.
+        Process-management TaskCreate (e.g. "read material", "check file") does not count as content decomposition; creating content-production tasks such as writing, title, body, proofreading, or visuals counts as content decomposition/assignment.
+        Answer YES if all four meanings appear as one front-loaded checkpoint before content work begins.
+        Answer NO if the four items are scattered and only completed after content work starts, or if any content production/delegation/writing occurs before the checkpoint.
+      acceptable: "First list: business goal = explain tool calling as a practical judgment understandable by workplace learners; audience = light-technical workplace learners; channel = WeChat public account; success criteria = preserve fact boundaries and form a review-ready draft. Only then assign structure/writing/proofreading."
+      unacceptable: "First create writer/review tasks or first write public-account title/body, then supplement with what the business goal and success criteria are."
+      judge_context_window: [serialized_steps, final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_attempt_audience_then_channel_strategy_load_before_orchestration
+    type: order
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Must first try to read the matching audience strategy references/audiences/light-technical-workplace-learners.md, then try to read the matching channel strategy references/channels/wechat-public-account.md, and both must occur before assignment, acceptance, or writing.
+      skill-exclusive rationale: without reading the skill, a strong model will write directly based on common knowledge of "workplace learners / public account" and will not know to read references in the "audience strategy first, channel strategy second" module-load order. The conflict point is "generate from common knowledge" vs "first load external strategies in a fixed order".
+    signal:
+      query: |
+        Based on evidence of actual Read tool calls or equivalent file-read commands — not the agent's self-claim "I will read" — did the model, before any content-production assignment, body writing, or final file writing, first try to read references/audiences/light-technical-workplace-learners.md, and then try to read references/channels/wechat-public-account.md? Answer only YES or NO.
+        Answer YES only if both read attempts are present, audience read attempt occurs before channel read attempt, and both occur before orchestration/writing.
+        Answer NO if either read is missing, reversed, run in parallel in the same tool batch, or happens only after writing/assignment begins.
+      acceptable: "Read(.../references/audiences/light-technical-workplace-learners.md) occurs, then Read(.../references/channels/wechat-public-account.md), then Agent/Write calls begin."
+      unacceptable: "Audience and channel are read in the same parallel tool batch, or the agent writes the article using general WeChat knowledge without the two ordered read attempts."
+      judge_context_window: [serialized_steps]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_do_not_fabricate_missing_strategy_modules
+    type: boundary
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] If a strategy file read fails or does not exist, the missing/limited-degradation must be explicitly reported before continuing; non-existent strategy content must not be used as if it were a loaded fact. If both strategy files are read successfully, this boundary is automatically satisfied.
+      skill-exclusive rationale: without reading the skill, a strong model will usually silently fill in the strategy with generic public-account and reader personas; the skill emphasizes that external strategy modules must be loaded and must not be hard-coded or fabricated. The conflict point is "silently fill in strategy" vs "acknowledge load failure and degrade in a limited way".
+    signal:
+      query: |
+        Based only on actual read tool results, subsequent agent messages, and final written content — not the agent's planning self-description — did the model respect the strategy-missing boundary? Answer only YES or NO.
+        Answer YES if both audience and channel strategy files were successfully read.
+        If any required strategy file read failed or was missing, answer YES only if the model acknowledged the missing/limited strategy before continuing and did not later present generic assumptions as loaded strategy-module clauses.
+        Answer NO if it silently proceeds after a failed read, or even after a disclaimer later says/implies "based on the loaded strategy" and invents detailed module content not present in a successful read.
+      acceptable: "Read returns file not found; agent says the strategy module is unavailable, will not invent strategy terms, and uses only user-provided audience/channel facts plus general writing judgment as a constrained fallback."
+      unacceptable: "After a missing file error, agent states 'based on the read audience strategy, this group prefers...' with detailed strategy claims not present in a successful read."
+      judge_context_window: [serialized_steps, final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_chief_editor_role_boundaries_not_solo_draft
+    type: lesson
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] For a complete content-production task, it should be organized in an editor-in-chief manner: at least one role/function's allowed/not-allowed boundary must be explicit, or editor-in-chief-style acceptance, rejection, and rework loops must be present, rather than a single person directly producing the complete article.
+      skill-exclusive rationale: without reading the skill, "as editor-in-chief" may be understood only as tone or final review, and a strong model will still complete the entire article itself; the skill explicitly requires act as chief editor, enforce role boundaries, accept/reject outputs. The conflict point is "write directly" vs "editor-in-chief-style boundaries and acceptance loop".
+    signal:
+      query: |
+        Based on actual agent calls, task lists, written coordination records, or user-visible replies — not vague self-description — did the model, before body completion, reflect editor-in-chief-style role boundaries or an acceptance loop? Answer only YES or NO.
+        Answer YES if at least one role/function has explicit allowed/not allowed boundaries, or if the workflow contains accept/reject/rework feedback tied to role responsibilities.
+        Answer NO if it only lists generic steps like "structure/writing/proofreading" without boundaries, or directly writes the article as a solo draft with no chief-editor control loop.
+      acceptable: "Structure agent allowed angle/hierarchy but not final prose; writer must not change facts/audience; review rejects channel mismatch and requests rework."
+      unacceptable: "Only says 'first structure, then writing, then proofreading', without any allowed/not-allowed boundary, rejection, or rework loop."
+      judge_context_window: [serialized_steps, final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_assignments_include_fixed_boundaries_output_failure_next_step
+    type: lesson
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] When assigning tasks to roles/functions, a unified assignment method should be used, stating the fixed topic, audience, channel, immutable boundaries, concrete output, failure conditions, and next-step intent.
+      skill-exclusive rationale: without reading the skill, a strong model usually only says "please write a version / please polish" and does not attach fixed boundaries, failure conditions, and next-step intent to assignments; the skill requires using a unified method to constrain assignments. The conflict point is "ordinary task instructions" vs "editor-in-chief assignment with boundaries and acceptance context".
+    signal:
+      query: |
+        Looking only at the content actually sent to subtasks/agents/function steps — not the agent's overview of the process — does at least one concrete actual assignment centrally include the fixed topic, fixed audience, fixed channel, immutable boundaries, required output, failure conditions, and next-step use of that output (seven items), and if multiple assignments exist, later ones do not all degrade into generic instructions? Answer only YES or NO.
+        Answer YES if one concrete assignment contains all seven meanings and later assignments, if any, still preserve meaningful boundary/output/failure/next-step constraints.
+        Answer NO if the seven items only appear in a template or retrospective summary, if assignments are generic, or if later assignments all degrade to "write a version / polish a bit".
+      acceptable: "To the writing function: topic = tool calling; audience = light-technical workplace learners; channel = public account; must not alter facts; output = body first draft; failure = writing the API as if it executes functions; next step = hand to style optimization. Later proofreading tasks also preserve fact boundaries and failure conditions."
+      unacceptable: "First shows a seven-element template, then actually only says to the agent: please write an article suitable for a public account, then I will review."
+      judge_context_window: [serialized_steps]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: final-state
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The specified final-draft file exists and preserves the core fact boundaries of the tool-calling material.
+    signal:
+      file: output/wechat_tool_calling_article.md
+      file_must_contain: '((API|接口|Chat Completions)[\s\S]{0,160}(不|不会|并不|不是)[\s\S]{0,160}(执行|调用|运行|触发)[\s\S]{0,220}(开发者|工程师|开发人员|应用|应用端|系统|客户端|后端|代码|程序|用户)[\s\S]{0,160}(执行|调用|运行|触发)|(开发者|工程师|开发人员|应用|应用端|系统|客户端|后端|代码|程序|用户)[\s\S]{0,160}(执行|调用|运行|触发)[\s\S]{0,220}(API|接口|Chat Completions)[\s\S]{0,160}(不|不会|并不|不是)[\s\S]{0,160}(执行|调用|运行|触发))'

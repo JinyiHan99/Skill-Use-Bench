@@ -1,0 +1,41 @@
+task_id: avoid_ai_writing_t1_investor_update
+skill_id: avoid-ai-writing
+description: |
+  I want to adapt this investor email template into a reusable internal version. The current draft has a hollow tone, as if copied from a public template, rather than something I would send directly to existing investors. Please edit `assets/avoid_ai_writing_t1_investor_update/input/investor_update_template.md`, preserving its purpose as an investor-update email template, its placeholders, and its basic email structure, and save the revised version to `output/investor_update_template_clean.md`.
+initial_state:
+  assets:
+    - path: assets/avoid_ai_writing_t1_investor_update/input/investor_update_template.md
+      source: "https://www.maestrolabs.com/email-templates/3-useful-investor-update-email-templates-examples"
+      real_state: "Public investor-update email template excerpt containing greetings, placeholders, fundraising/product/market update sections, and promotional phrases."
+      preparation: |
+        Extracted visible template sections from the public article text, then kept the salutation, subject lines, placeholders, and update sections as Markdown. No reference rewrite is included in model-visible assets.
+  tools_available: [read_file, write_file]
+expected_trigger: true
+skill_constraints_tested:
+  - id: investor_email_profile_strictness
+    description: "For investor-email context, promotional language and significance inflation must be treated extra strictly, even for borderline phrases."
+    exclusive: "Without the skill, a model may remove obvious hype but often only lightly smooths investor-update phrasing, leaving or softening significance inflation such as 'significant milestone' or 'key growth opportunity' instead of removing the inflated framing."
+  - id: chatbot_artifact_removal
+    description: "Canned email openers and chat-interface filler such as 'I hope this email finds you well', 'I hope this message finds you well', 'I hope you're doing well', and 'I hope all is well with you' must be removed entirely, not paraphrased."
+    exclusive: "Without the skill, a model may keep these as polite email etiquette or paraphrase them into shorter greetings; the skill requires removing the canned opener pattern entirely."
+  - id: four_section_skill_output
+    description: "The response should include an audit of issues, the rewritten version, a change summary, and a second-pass audit."
+    exclusive: "Without the skill, a model is likely to return only the cleaned file or a short prose summary, losing the audit and second-pass evidence."
+notes: |
+  - Core test: positive trigger for cleaning AI-like writing in an investor-email context while preserving the reusable template's intent.
+  - Expected behavior: save `output/investor_update_template_clean.md`; strip or neutralize promotional investor-risk phrases; remove chatbot artifacts; keep subject lines, placeholders, and section coverage useful for a template.
+  - Common wrong behavior: leaves canned opener variants such as line 7 `I hope this email finds you well.`, line 25 `I hope this message finds you well.`, line 43 `I hope you're doing well.`, or line 61 `I hope all is well with you.` intact or paraphrased because it treats them as harmless email etiquette rather than chatbot artifacts.
+  - Common wrong behavior: keeps line 49 `marks a significant milestone` and line 67 `key growth opportunity` because it edits only grammar and does not apply the investor-email stricter stance on significance inflation.
+  - Common wrong behavior: leaves Tier 1 AI-writing vocabulary such as line 27 `utilized` or line 67 `leverage` instead of replacing it with plain wording such as `used` or `use`.
+  - Common wrong behavior: changes placeholders like `[Your Company]` into invented company names, breaking the template's real use.
+  - baseline_correctness_signals:
+      - `output/investor_update_template_clean.md` exists and is non-empty.
+      - The output remains an investor update email template with subject lines, salutations, sign-offs, section coverage, and placeholder fields preserved where appropriate.
+      - The output preserves template placeholders such as `[Your Company]`, `[Investor's Name]`, `[Month, Year]`, and `[Your Name]` without replacing them with invented names or facts.
+  - skill_following_signals:
+      - The assistant response uses the skill's four-part audit/rewrite/change/second-pass structure without that structure being requested in the description.
+      - The audit quotes concrete offending text from the input, including at least one canned opener and at least one investor-risk promotional or significance-inflation phrase.
+      - The cleaned file removes canned opener patterns rather than paraphrasing them, including `I hope this email finds you well`, `I hope this message finds you well`, `I hope you're doing well`, and `I hope all is well with you`.
+      - The cleaned file removes or neutralizes investor-risk hype and significance inflation such as `Exciting News`, `thrilled`, `significant milestone`, and `key growth opportunity` without replacing them with equivalent inflation such as `important milestone`, `major milestone`, or `major opportunity`.
+      - The cleaned file replaces Tier 1 AI-writing vocabulary such as `utilized` and `leverage` with plainer wording.
+      - The second-pass audit either identifies and fixes remaining issues or explicitly states the rewrite is clean.

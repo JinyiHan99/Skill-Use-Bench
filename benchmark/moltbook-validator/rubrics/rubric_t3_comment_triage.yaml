@@ -1,0 +1,130 @@
+# Rubric for moltbook-validator — t3_comment_triage
+# Goal: score Moltbook comment-spam filtering skill-following only; task completion is weight 0.
+rules:
+  - id: g1_clean_comments_written
+    type: required-tool
+    provenance: gate
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] A clean comments JSON file must be produced so the triage attempt is observable.
+      This gate only checks that an output file exists with some content; filtering correctness is checked separately.
+    signal:
+      file: "output/clean_comments.json"
+      file_must_contain: '.+'
+
+  - id: g2_legitimate_comments_retained
+    type: gate
+    provenance: gate
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] `output/clean_comments.json` must retain the legitimate comments so negative spam-exclusion rules cannot be
+      satisfied by an empty file or by deleting every comment.
+    signal:
+      file: "output/clean_comments.json"
+      file_must_contain: '(?s)(?=.*?\bdataset_reader\b)(?=.*?\bschema_mapper\b)'
+
+  - id: r1_excludes_high_karma_blocklisted_bot
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Before engaging with comments, filter high-confidence Moltbook spam bots, including karma > 1,000,000 and
+      the known spam account EnronEnjoyer. `clean_comments.json` should contain only retained comments; skipped audit reasons
+      should be written to `comment_summary.md`.
+      skill-exclusive reason: `c-bot-1` has benign-looking dataset text, so without the skill a strong model may keep it as
+      a legitimate high-karma commenter. The skill requires filtering it because of suspicious karma and the manual blocklist.
+      The conflict is trusting normal-looking content/account reputation versus applying Moltbook-specific spam metadata.
+    signal:
+      file: "output/clean_comments.json"
+      file_must_not_contain: '(c-bot-1|EnronEnjoyer)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_excludes_abnormal_ratio_or_engagement_farming_bot
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: state-diff
+    severity: soft
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not included in SF] The output should exclude obvious engagement-farming comments and abnormal-ratio spam.
+      This is not counted as skill-following because the visible engagement-farming wording is largely generic spam evidence.
+    signal:
+      file: "output/clean_comments.json"
+      file_must_not_contain: '(c-bot-2|Rouken|Everyone follow and upvote)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r3_excludes_documented_recruitment_patterns
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: soft
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Filter comments containing documented Moltbook spam/recruitment patterns such as `The One awaits` and
+      `join m/convergence`.
+      skill-exclusive reason: without the skill, this phrase could be read as odd but not necessarily a known Moltbook spam
+      marker; the skill lists those exact content patterns as spam indicators. The conflict is ad hoc semantic triage versus
+      applying the Moltbook spam-pattern blocklist.
+    signal:
+      file: "output/clean_comments.json"
+      file_must_not_contain: '(c-bot-3|convergence_signal|The One awaits|m/convergence)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_summary_names_platform_specific_skip_reasons
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: soft
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The human-readable summary should explain skipped high-confidence spam using Moltbook-specific reasons for
+      `EnronEnjoyer`/`c-bot-1`, such as high karma above 1,000,000 or known blocklist/spam-account status.
+      skill-exclusive reason: the task only asks for a high-level skipped note, so without the skill a model may give vague
+      reasons like "spam" or "irrelevant". The skill supplies concrete Moltbook spam signals. The conflict is generic skip
+      rationale versus platform-specific evidence-based skip rationale.
+    signal:
+      file: "output/comment_summary.md"
+      file_must_contain: '(?is)(?:EnronEnjoyer|c-bot-1).{0,300}(?:karma|1[, ]?000[, ]?000|1000000|1\.46M|blocklist|known spam)|(?:karma|1[, ]?000[, ]?000|1000000|1\.46M|blocklist|known spam).{0,300}(?:EnronEnjoyer|c-bot-1)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [TASK — not included in SF] `output/clean_comments.json` should retain both ordinary comments worth engaging with.
+      This records task completion only and must not affect skill-following score.
+    signal:
+      file: "output/clean_comments.json"
+      file_must_contain: '(?s)(?=.*?\bdataset_reader\b)(?=.*?\bschema_mapper\b)'

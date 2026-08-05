@@ -1,0 +1,59 @@
+task_id: SF06_t2_edit_existing_docx
+level: L2
+skill_id: skill_06_docx
+description: |
+  I have a contract document assets/SF06_t2_edit/contract_draft.docx that needs a few edits:
+  1. Change all occurrences of "ACME Corporation" to "TechFlow Inc."
+  2. Change the effective date from "January 1, 2024" to "March 15, 2025"
+  3. After the "Payment Terms" section, add a new paragraph heading "Intellectual Property" 
+     and a descriptive text: "All intellectual property developed during the engagement 
+     shall remain the Client's exclusive property."
+     This newly added content should also be shown as a tracked revision, not inserted directly into the body text.
+  
+  Do not accept or hide any revisions; these edits must be presented as Word tracked changes so that legal can review them item by item.
+  Output as contract_revised.docx
+
+initial_state:
+  files:
+    - path: README.txt
+      content: |
+        Contract document for editing.
+        The .docx file is a real Word document with multiple sections,
+        formatting, and tracked changes support.
+    - path: unpack.py
+      content: "# Provided helper script for unpacking .docx (see skill docs)"
+    - path: pack.py
+      content: "# Provided helper script for packing .docx (see skill docs)"
+    - path: validate.py
+      content: "# Provided helper script for validating .docx structure (see skill docs)"
+  tools_available: [bash, read, edit, grep]
+  binary_assets:
+    - path: assets/SF06_t2_edit/contract_draft.docx
+      description: "A real Word document with contract content including headings, paragraphs, and boilerplate legal text. Contains sections: Parties, Effective Date, Scope, Payment Terms, Termination."
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: edit_workflow
+    description: "Must follow the skill-prescribed unpack/modify/repack workflow for editing existing .docx files, instead of high-level libraries that bypass OOXML structure"
+    exclusive: "Model tries to use python-docx to open and modify, or pandoc for round-trip editing"
+  - id: tracked_changes_markup
+    description: "Text changes must be recorded as tracked-change revisions (insertion + deletion markup) per OOXML revision schema, including deleted-text elements for removed text and paragraph-level insertion markup for newly added paragraphs"
+    exclusive: "Model just replaces text directly in XML without tracked changes markup"
+  - id: author_attribution
+    description: "w:author attribute must be present on all revision elements and must match the literal value specified in the skill documentation; w:date must also be set"
+    exclusive: "Model uses a generic author name, omits the attribute, or uses different attribution"
+  - id: xml_entities_quotes
+    description: "Smart quotes in edited XML use proper entities to ensure cross-processor compatibility"
+    exclusive: "Model uses raw Unicode quote characters which may not render correctly in all processors"
+  - id: validate_output
+    description: "Must run the skill-prescribed structural validation step on the final output document before delivery"
+    exclusive: "Model delivers the document without structural validation"
+
+notes: |
+  Evaluation points (for scoring only; not shown to the model under test):
+  1. Whether the editing flow follows the docx editing workflow prescribed by the skill (rather than using disallowed libraries)
+  2. Whether the three edits (company name replacement, date replacement, new paragraph) are all recorded as tracked changes,
+     including deletion marks and insertion marks, and the new paragraph itself is marked as insertion
+  3. Whether all revision elements carry the author literal value and date attribute prescribed by the skill
+  4. Whether the output file went through the structural validation step prescribed by the skill

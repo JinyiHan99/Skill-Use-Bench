@@ -1,0 +1,138 @@
+# Rubric for skill_77 mcp-create-adaptive-cards — t1_service_health_static
+
+rubric_id: skill_77_mcp_create_adaptive_cards_t1_service_health_static
+task_id: mcp_adaptive_cards_t1_service_health_static
+skill_id: mcp-create-adaptive-cards
+rules:
+  - id: g1_manifest_evaluable
+    type: required-tool
+    provenance: gate
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The plugin manifest must remain present so the response-template changes are evaluable.
+      This only gates evaluation and does not affect the skill-following score.
+    signal:
+      file: "assets/mcp_adaptive_cards_t1_service_health_static/input/service-health-plugin/ai-plugin.json"
+      file_must_contain:
+        - '"functions"\s*:\s*\['
+        - '"name"\s*:\s*"GetGitHubComponents"'
+
+  - id: r1_static_template_in_response_semantics
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] For same-type API results, add an Adaptive Card static response template under
+      functions[0].capabilities.response_semantics.static_template rather than changing OpenAPI behavior
+      or placing card JSON elsewhere.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to only change OpenAPI/manifest descriptions or place card JSON in a
+      top-level/custom field; the skill requires Y to define the card in the function's response_semantics.static_template; the conflict point Z is
+      "ordinary plugin metadata / interface changes" vs "Copilot response_semantics static template mount point."
+    signal:
+      judge_context_window:
+        - serialized_steps
+      query: >
+        Based on the final Write or Edit tool call in the trace that writes or modifies the ai-plugin.json file, is an Adaptive Card static template object actually added under the functions[0].capabilities.response_semantics.static_template property path? 
+        Answer YES if the static_template object is correctly nested inside response_semantics and contains an Adaptive Card structure (such as type: "AdaptiveCard"). 
+        Answer NO if the card is only added in openapi.yaml, is placed at the top-level of ai-plugin.json (outside response_semantics), or is only mentioned in the conversation.
+      acceptable: '"response_semantics": { "data_path": "$.components", "properties": {...}, "static_template": { "type": "AdaptiveCard", "version": "1.5" } }'
+      unacceptable: '"adaptive_card": {...} at manifest root, or only edited openapi.yaml descriptions.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_static_template_repeats_component_items
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The static template should bind/repeat over the returned component records, using the
+      existing $.components data_path/root item collection rather than rendering one non-repeating summary.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to write a single summary card or reference ${components.name}; the skill requires Y to
+      use Container/$data and other template bindings to render the list item by item; the conflict point Z is "single-object summary binding" vs "repeating over the record collection by data_path."
+    signal:
+      judge_context_window:
+        - serialized_steps
+      query: >
+        Based on the final content of ai-plugin.json written or edited in the trace, does the static_template use Adaptive Card data binding/templating to iterate over the returned component list? 
+        Answer YES if the template binds to the list of components (e.g., using "$data": "${$root}" or "$data": "${$data}" or "$data": "${components}" on a Container, ColumnSet, or another repeating element) so that each individual component record is rendered in its own repeating card block. 
+        Answer NO if the template does not iterate over the records, but instead displays only a single aggregate summary or accesses specific indices (like ${components[0]}) without repeating elements.
+      acceptable: '{ "type": "Container", "$data": "${$root}", "items": [ ... "${name}" ... ] }'
+      unacceptable: '{ "type": "TextBlock", "text": "${components.name} - ${components.status}" }'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_nullable_description_uses_conditional_fallback
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Displayed nullable/optional component fields, especially description, should use Adaptive
+      Card template conditional fallback expressions instead of raw ${description} bindings.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to output ${description} directly; the skill requires Y to
+      use a conditional fallback like ${if(description, description, 'N/A')}; the conflict point Z is "raw binding of null values" vs "template-language conditional fallback."
+    signal:
+      file: "assets/mcp_adaptive_cards_t1_service_health_static/input/service-health-plugin/ai-plugin.json"
+      file_must_contain: 'if\s*\(\s*description(?:\s*!=\s*null)?\s*,\s*description\s*,\s*[^)]+\)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_card_text_wraps_for_copilot_viewports
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: soft
+    exclusive: false
+    weight: 0.25
+    spec: |
+      [SKILL — soft] The card should include wrapping for displayed component text to support responsive Copilot hubs.
+      This is a weak auxiliary signal because wrap:true is also common Adaptive Card presentation practice.
+    signal:
+      file: "assets/mcp_adaptive_cards_t1_service_health_static/input/service-health-plugin/ai-plugin.json"
+      file_must_contain: '"wrap"\s*:\s*true'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: llm-judge
+    severity: info
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The service-health plugin is updated so Copilot can visually show each
+      component's name, description, current state, and most recent update while keeping the existing
+      data source and operation behavior.
+    signal:
+      judge_context_window:
+        - serialized_steps
+      query: >
+        Based on the final Write or Edit tool call in the trace that writes or modifies ai-plugin.json, are the function GetGitHubComponents and the data_path $.components preserved, and does the added Adaptive Card template display each component's name, description, state/status, and updated time?
+        Answer YES if all of these fields are included in the final written template and the existing operation behavior is unchanged.
+        Answer NO otherwise. Do not rely on conversational claims or earlier failed attempts.
+      acceptable: "Manifest still has GetGitHubComponents, $.components, and card content for name/description/status/updated_at."
+      unacceptable: "No card exists, operation/data_path is changed, or key requested fields are missing."

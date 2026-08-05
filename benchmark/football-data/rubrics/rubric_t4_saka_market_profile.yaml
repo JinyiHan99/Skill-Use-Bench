@@ -1,0 +1,64 @@
+# Rubric for skill_97_football-data — football_data_t4_saka_market_profile
+
+rules:
+  - id: g1_observable_football_data_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable football-data/sports-skills real CLI or Python SDK query attempt."
+    signal:
+      pattern: '(?i)(sports-skills\s+football\s+get_\w+\b|from\s+sports_skills(?:\.football)?\s+import\s+\w+|from\s+sports_skills\s+import\s+football|football\.get_\w+\s*\()'
+
+  - id: r1_use_player_profile_for_transfermarkt_market_data
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Current market value, market-value history, and transfer history should be obtained via football-data's get_player_profile(tm_player_id=...) to get Transfermarkt structured fields market_value, market_value_history, transfer_history; must not use get_player_season_stats, Wikidata-only, generic web/ESPN stats as a substitute for market-value/transfer sources.
+      skill-exclusive rationale: without reading the skill, a model may use the Wikidata external ID for web search/scraping, or treat ESPN season stats as a market-value source; the skill explicitly states that get_player_profile's Transfermarkt branch returns market value/history/transfer_history. The conflict point is "get market value via generic web / wrong interface" vs "player_profile's TM structured path".
+      Note: The Transfermarkt ceapi endpoint may return empty data or a 405 error due to upstream limits. This rule focuses on whether the model attempted the correct skill call path, not whether the API returned data successfully. If the model correctly called get_player_profile(tm_player_id=...) but the API returned empty/error and the model supplemented with other sources, it should still be judged YES.
+    signal:
+      query: |
+        Based only on actual tool-call evidence and outputs, did the agent attempt to call football-data get_player_profile with a Transfermarkt player id (tm_player_id) for Saka to obtain market value and transfer history?
+        Answer YES if get_player_profile(tm_player_id=...) or equivalent CLI call (e.g. sports-skills football get_player_profile --tm_player_id=433177) is present in the trace, regardless of whether the API returned data successfully. The key criterion is that the model chose the correct skill-specified API path.
+        Answer NO if the model never attempted get_player_profile with tm_player_id and obtained market value only from web scraping/search, Wikidata-only fields, get_player_season_stats, generic ESPN stats, or unsupported commands.
+      acceptable: "sports-skills football get_player_profile --tm_player_id=433177 is called (even if returns empty/error); or football.get_player_profile(tm_player_id='433177') is called"
+      unacceptable: "never calls get_player_profile with tm_player_id; uses get_player_season_stats, Wikidata text, or a web page as the only market value source without first attempting the skill path"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps, final_answer]
+
+  - id: r3_pl_fpl_enrichment_via_season_leaders_then_profile
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When supplementing Saka's recent Premier League status this season, first discover the FPL identifier via the current PL season and PL/FPL paths such as get_season_leaders, then use get_player_profile(fpl_id=...) or equivalent structured profile to merge status data; do not guess the FPL ID.
+      skill-exclusive rationale: without reading the skill, a model may use news / web summaries or directly guess a fantasy ID; the skill explicitly states that PL-only leaders/FPL data and get_player_profile(fpl_id) are the Premier League player-status entry. The conflict point is "external summaries / guess ID" vs "discover FPL identifier via PL season leaders then merge".
+      Note: get_season_leaders returns the goal-scoring leaderboard; Saka, as a midfielder, may not be on it. This rule focuses on whether the model attempted the skill-specified PL/FPL data discovery path, not whether Saka was found in the leaderboard. If the model explored via get_current_season → get_season_leaders and similar paths, and then found Saka's FPL data via FPL code/player_id, it should still be judged YES.
+    signal:
+      query: |
+        Based only on actual football-data tool calls and outputs, did the agent use skill-specified PL/FPL data paths to discover Saka's identity and obtain current Premier League status?
+        Answer YES if the agent used any combination of: (1) get_current_season for PL, (2) get_season_leaders or other PL-supported discovery paths, and (3) get_player_profile with fpl_id or player_id (ESPN code matching FPL code) to retrieve Saka's FPL data for current PL status. The key criterion is that the model used skill-specified structured data paths rather than only web search/news.
+        Answer NO if the status is only from web/news search, from a guessed fpl_id without any discovery attempt, or from non-skill data sources alone.
+      acceptable: "get_current_season premier-league; get_season_leaders or other PL path exploration; get_player_profile with discovered fpl_id/player_id for Saka's FPL data"
+      unacceptable: "final says Saka form is good based only on a web search, with no PL/FPL skill path attempts"
+      judge_expected: "YES"
+      judge_context_window: [serialized_steps]
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the final player-card update includes current market value, market-value changes, transfer records, and this season's Premier League status."
+    signal:
+      query: |
+        Based only on the final answer, did the response provide a fan-facing Bukayo Saka profile update that includes current market value, at least one market-value trend/history point, at least one transfer-history note or a clear no-fee/no-major-transfer explanation, and current Premier League season status/form information?
+        Answer YES only if all required content appears in a readable profile format, including paragraph, card, or structured section.
+      judge_expected: "YES"
+      judge_context_window: [final_answer]

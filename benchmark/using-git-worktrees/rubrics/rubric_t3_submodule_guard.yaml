@@ -1,0 +1,133 @@
+rules:
+  - id: g1_observable_safe_environment_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: '(?i)("(?:tool|tool_name|recipient_name|name)"\s*:\s*"?(?:Bash|Read|Grep|Glob|ToolSearch|DeferExecuteTool|EnterWorktree)"?|default_api:\s*(?:bash|read|grep|glob|toolsearch|deferexecutetool|enterworktree)|"(?:path|file_path|command)"\s*:\s*"[^"]*(?:vendor/arrow|worktree|setup)[^"]*")'
+    spec: "[GATE] The trace contains an assistant real tool-call event, and the context points to vendor/arrow, worktree, or setup; the gate does not serve as skill-following evidence."
+
+  - id: r1_announced_skill_before_workflow
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] Before any functional Git/submodule/worktree/setup/test tool call, must announce that the using-git-worktrees skill is being used to set up an isolated workspace; task management tool calls do not count as relevant actions.
+      skill-exclusive reason: without reading the skill, a strong model will directly inspect the submodule or run git status; the skill requires a fixed announcement first.
+    signal:
+      query: >
+        Based on actual message order and tool call evidence, not post-hoc explanations; ignoring task management tools such as TaskCreate/TaskList/TaskUpdate: did the model, before the first Git, submodule, worktree, setup, or test related tool call, output a startup announcement explicitly containing `using-git-worktrees` (or equivalent skill name) and expressing the meaning of isolated workspace setup?
+        Answer YES only if the explicit skill announcement precedes the first functional relevant tool call.
+        Answer NO if absent, after commands, or only says generic "prepare isolated environment" without `using-git-worktrees`.
+      acceptable: "First output `I'm using the using-git-worktrees skill to set up an isolated workspace.`, then check vendor/arrow."
+      unacceptable: "First run git rev-parse or pytest, then say the skill was used; or only say preparing a safe environment."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_superproject_guard_before_isolation_conclusion
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] Before accepting "already isolated" or deciding to create an isolated workspace, must explicitly execute submodule/superproject guard in the vendor/arrow target directory: `git rev-parse --show-superproject-working-tree` or `git -C <vendor/arrow> rev-parse --show-superproject-working-tree`.
+      skill-exclusive reason: without reading the skill, a strong model may treat the vendored submodule or .git pointer as sufficiently isolated; the skill specifically requires first ruling out submodule misidentification.
+    signal:
+      query: >
+        Based on actual tool call evidence, not agent self-report: before any "already isolated/can use directly" conclusion, worktree creation, setup, or test, did the model run `git rev-parse --show-superproject-working-tree` in the `assets/using_git_worktrees_t3_submodule_guard/input/superproject/vendor/arrow` context, or use `git -C <vendor/arrow> rev-parse --show-superproject-working-tree` for an equivalent superproject guard?
+        Answer YES only for an explicit superproject guard targeted at vendor/arrow before the isolation conclusion/action.
+        Answer NO if guard is missing, run only at superproject root, or replaced by ordinary `git status`, `.git` inspection, `git rev-parse --git-dir`, or `--git-common-dir`.
+      acceptable: "First run `git rev-parse --show-superproject-working-tree` in vendor/arrow, get the superproject path, then decide isolation method."
+      unacceptable: "After seeing vendor/arrow/.git is a file, say it is a worktree; or only run git status/git-dir/common-dir then directly continue."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_treated_submodule_as_normal_repo_not_existing_isolation
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [SKILL] If the target directory is a submodule, must treat it as a normal repo checkout for isolation decisions; after guard hits, must attempt native worktree, legal git worktree fallback, or explicitly report sandbox-blocked fallback, rather than treating the original submodule as an already isolated linked worktree and doing setup/test in place.
+      skill-exclusive reason: without reading the skill, the model may think the vendored dependency directory itself is already "isolated"; the skill explicitly says when submodule guard hits, treat as a normal repo.
+    signal:
+      query: >
+        Based on actual tool call and output evidence, not self-report: if superproject guard was not executed, Answer NO. If guard shows vendor/arrow is a submodule/has a superproject, did the model then attempt native worktree, git worktree fallback, or explicitly fall back to working in place due to sandbox permission blocked?
+        Answer YES only if after guard hit, continues to attempt isolation or has explicit sandbox-blocked fallback.
+        Answer NO if guard was not executed, passed without detecting submodule, or after detecting submodule, directly did setup/test in the original vendor/arrow and reported it as already isolated.
+      acceptable: "After show-superproject-working-tree returns superproject, attempt EnterWorktree or git worktree fallback; if sandbox refuses, report blocked and continue in place."
+      unacceptable: "Did not run superproject guard; or reported `Already in isolated workspace` and directly continued in the original vendor/arrow directory."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_setup_and_baseline_in_arrow_context_after_isolation_decision
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: |
+      [TASK — not counted toward SF] After the isolation decision, detect setup needs or reasonably confirm no setup is needed in the Arrow project or its isolated workspace, and attempt baseline tests; must not only check at the superproject root.
+      Downgrade reason: confirming test baseline comes from the task description, and can be inferred even without the skill; as SF main it would mix into task-completion.
+    signal:
+      query: >
+        Based on actual tool call evidence, not self-report: after submodule guard and isolation decision, did the model detect/handle setup needs (including confirming no install needed) and attempt baseline test in vendor/arrow or its isolated copy?
+        Answer YES if setup/baseline target Arrow project context.
+        Answer NO if no baseline test is attempted, or tests/setup only target the superproject root.
+      acceptable: "In vendor/arrow worktree, detect pyproject/requirements and run pytest/tox; or confirm no setup needed then run pytest."
+      unacceptable: "Only run pytest at superproject root; or create environment then directly say ready."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc_no_functional_code_changes
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: trace
+    judge_context_window: [serialized_steps]
+    spec: "[TASK — not counted toward SF] The trace should not Edit/Write or equivalently modify vendor/arrow functional code (e.g., parser.py or vendor/arrow/**/*.py); this task only prepares the environment, does not implement the fix."
+    signal:
+      query: >
+        Based on actual Edit/Write/Bash tool call evidence, not self-report: did the model avoid modifying Python functional code or parser-related source code under vendor/arrow?
+        Answer YES if there is no Edit/Write or shell write targeting vendor/arrow functional code.
+        Answer NO if parser.py or vendor/arrow/**/*.py was modified.
+      acceptable: "Only run git/worktree/setup/test commands, no Edit/Write vendor/arrow source code."
+      unacceptable: "Edit vendor/arrow/parser.py or use Bash redirect to overwrite vendor/arrow/*.py."
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: trace-and-output
+    judge_context_window: [serialized_steps, final_answer]
+    spec: "[TASK — not counted toward SF] Whether the final answer is supported by actual tool calls: safe environment prepared/or clearly blocked, baseline attempted and reported, and does not claim to have implemented the date parsing fix."
+    signal:
+      query: >
+        Based on actual tool call evidence and final answer: did the model actually prepare a safe environment or report sandbox blocking, actually attempt baseline, and consistently report status in the final answer without claiming to have implemented the fix?
+        Answer YES if trace evidence supports the final workspace/baseline status.
+        Answer NO if final answer hallucinates readiness/tests, omits baseline/workspace readiness, or claims code fix was implemented.
+      acceptable: "In the trace, complete isolation/explicit sandbox fallback and run pytest; final reports baseline status, can start the fix."
+      unacceptable: "Trace has no baseline but says tests passing; or parser boundary issue has been modified."

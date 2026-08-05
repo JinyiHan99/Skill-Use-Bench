@@ -1,0 +1,156 @@
+# Rubric for skill_03 (pdftk) — t5_form_fill_flatten
+#
+# Scoring boundary: provenance=skill enters the skill-following score; provenance=task
+# only records task completion rate (0/1) and does not enter the skill-following score.
+
+# ── GATE: evaluability ────────────────────────────────────────────────
+rules:
+  - id: g1_observable_form_fill_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The trajectory should contain a PDF-form-processing-related Bash command attempt.
+    signal:
+      command_pattern: 'fw9\.pdf|vendor_w9\.fdf|\.pdf'
+      pattern: 'fw9\.pdf|vendor_w9\.fdf|\.pdf'
+
+  # ── COMPLIANCE: skill-derived behavior ────────────────────────────────
+  - id: r1_uses_pdftk_fill_form
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — tool boundary] PDF form filling should use pdftk fill_form.
+    signal:
+      command_pattern: '\bpdftk\b.*\bfill_form\b'
+      pattern: '\bpdftk\b.*\bfill_form\b'
+
+  - id: r2_uses_flatten_when_finalization_requested
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 2.5
+    spec: |
+      [SKILL — flatten trigger condition] When the user expresses finalization semantics such as final/finalize/lock/non-editable/
+      print-ready/flatten, flatten should be used.
+      Switched to a tool-call verifier to directly detect the flatten argument in commands.
+    signal:
+      command_pattern: '\bpdftk\b.*\bflatten\b'
+      pattern: '\bpdftk\b.*\bflatten\b'
+
+  - id: r3_inspects_fields_before_fill
+    type: order
+    provenance: skill
+    locus: tool-call
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL — field inspection] Before filling, dump_data_fields must be run to inspect available fields.
+      Weight raised from 1.2 to 1.5.
+    signal:
+      judge_question: |
+        Considering only executed pdftk commands, did the agent run
+        pdftk dump_data_fields before pdftk fill_form? Ignore plans and echoes.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+
+  - id: r4_validates_input_before_fill
+    type: required-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — input validation] Before form operations, dump_data should be run on the input PDF.
+      Weight raised from 0.7 to 1.0.
+    signal:
+      command_pattern: '\bpdftk\b.*fw9\.pdf.*\bdump_data\b'
+      pattern: '\bpdftk\b.*fw9\.pdf.*\bdump_data\b'
+
+  - id: r5_default_flattened_output_naming
+    type: required-arg
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: soft
+    exclusive: true
+    weight: 0.3
+    spec: |
+      [SKILL — default naming] A flattened form output should use <stem>_filled_final.pdf.
+    signal:
+      command_pattern: 'fw9_filled_final\.pdf'
+      pattern: 'fw9_filled_final\.pdf'
+
+  # ── BOUNDARY ─────────────────────────────────────────────────────────
+  - id: b1_no_forbidden_pdf_tools
+    type: forbidden-tool
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 2.0
+    spec: |
+      [SKILL — forbidden tools] Using Python PDF libraries, fillpdfs, or alternative CLI tools to bypass pdftk is forbidden.
+    signal:
+      command_must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz|fillpdfs)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz|fillpdfs)\b'
+      must_not_match: '\b(qpdf|pdfunite|pdfseparate|mutool|pdfcpu|pdfjam|cpdf|ghostscript)\b|(?:import|from)\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz|fillpdfs)\b|pip\s+install\s+(pypdf|PyPDF2|pikepdf|pdfrw|fitz|fillpdfs)\b'
+      pattern: '[\s\S]*'
+
+  - id: b2_does_not_overwrite_input
+    type: boundary
+    provenance: skill
+    locus: tool-call
+    verifier: regex
+    severity: hard
+    exclusive: false
+    weight: 0.3
+    spec: |
+      [SKILL — output boundary] The input PDF must not be overwritten. Weight reduced from 1.0 to 0.3.
+    signal:
+      command_must_not_match: '\boutput\s+(\S*/)?fw9\.pdf\b'
+      must_not_match: '\boutput\s+(\S*/)?fw9\.pdf\b'
+      pattern: '[\s\S]*'
+
+  # ── TASK COMPLETION: only records 0/1, not scored ────────────────────
+  - id: task_completion_binary
+    type: task-completion
+    provenance: task
+    locus: final-output
+    verifier: llm-judge
+    severity: soft
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Deterministic verification of whether the form-fill-and-locked output is correct.
+    signal:
+      judge_question: |
+        Based ONLY on concrete tool calls, command outputs, and observable results in the trace
+        (not the agent's self-claims or plans):
+        1. Was a pdftk fill_form command successfully executed that produced a filled PDF output?
+        2. Did the fill_form command include the "flatten" keyword, ensuring the output PDF has
+           locked/non-editable form fields?
+        3. Did the command complete without errors? (no "Error", "failed", "Exception" in output)
+        Answer YES only if ALL three conditions are met with evidence in the trace. Answer NO if any
+        condition fails or lacks evidence.
+      judge_expected: "YES"
+      judge_context_window:
+        - serialized_steps
+        - final_answer
+        - tool_results_first_n: 10

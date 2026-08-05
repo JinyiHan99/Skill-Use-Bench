@@ -1,0 +1,93 @@
+rules:
+  - id: g1_observable_write_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable write attempt to the target deliverable output/release_draft_polished.md."
+    signal:
+      pattern: >-
+        (?ms)^(?:Write|Edit)\s*:\s*\{.{0,5000}?["'](?:file_path|path)["']\s*:\s*["'][^"'\n]*output/release_draft_polished\.md["']
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r1_preserve_facts_no_example_injection
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The rewrite must change only "how it is said," not "what is said." It must not concretize abstract marketing language into features, user feedback, data, sample sizes, or industry conclusions that are absent from the original.
+      Skill-exclusive rationale: Without reading the skill, strong models facing "make it more natural" often replace vague marketing language with specific features, user feedback, or data; the skill explicitly requires preserving creative intent and not adding content absent from the original. The conflict point is "whether concretization may invent facts."
+    signal:
+      file: "output/release_draft_polished.md"
+      source_file: "assets/release_draft.md"
+      query: >
+        Compare the source file assets/.../release_draft.md with the actually written output/release_draft_polished.md, and only judge whether the polished body does not add specific facts absent from the source. Do not judge based on the final answer, plan explanation, or the quality report's self-description. Answer only YES or NO.
+        Answer YES if the body keeps the source facts while making the wording more natural.
+        Answer NO if it invents product features, user testing results, percentages, expert quotes, sample sizes, or new medical-industry conclusions that are absent from the source.
+      acceptable: "This software update mainly clarifies the experience and efficiency; machine learning is useful in medical diagnosis, but this paragraph still needs more specific evidence."
+      unacceptable: "The software update added batch processing, keyboard shortcuts, and offline mode, and early test users reported a 30% improvement in task completion speed."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_l1_l4_delivery_structure
+    type: termination
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The deliverable file must follow the humanizer output format and include an AI-flavor detection report, edit statistics, the full polished text, and an L1-L4 quality inspection report.
+      Skill-exclusive rationale: Without reading the skill, strong models typically only save the rewritten draft and give a brief completion note; the skill requires a fixed four-part detection and quality inspection delivery structure. The conflict point is that ordinary polishing does not need this report artifact.
+    signal:
+      file: "output/release_draft_polished.md"
+      file_must_contain:
+        - "AI味检测报告"
+        - "修改统计"
+        - "润色后全文"
+        - "质检报告"
+        - "\\bL1\\b"
+        - "\\bL2\\b"
+        - "\\bL3\\b"
+        - "\\bL4\\b"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_remove_skill_banned_surface_patterns
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The polished body must clean up banned punctuation and AI high-frequency expressions explicitly listed in the skill's L1/Pass 1/Pass 2, including colons, em dashes, double quotes, as well as clichés like "此外" (moreover), "不仅仅是……而是……" (not only... but also...), "深入探讨" (in-depth exploration), "关键作用" (key role), "不断演变" (constantly evolving), "奠定坚实基础" (lay a solid foundation).
+      Skill-exclusive rationale: Without reading the skill, Chinese polishing often retains colons, em dashes, double quotes, and smooth connectors; the skill treats these as hard scan items requiring zero hits. The conflict point is that generally acceptable punctuation/clichés are banned by the skill.
+    signal:
+      file: "output/release_draft_polished.md"
+      file_must_not_contain: >-
+        (?s)##\s*润色后全文(?:(?!\n##\s*质检报告).)*(?:：|:|——|["“”]|此外|不仅仅是|而是我们思考|深入探讨|关键作用|不断演变|奠定坚实基础|无缝、直观和强大)
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] output/release_draft_polished.md exists and contains a Chinese polished draft revolving around the two original topics of software updates and ML-based medical diagnosis."
+    signal:
+      file: "output/release_draft_polished.md"
+      file_must_contain:
+        - "\\S"
+        - "软件更新|更新"
+        - "机器学习|医疗诊断|诊断"

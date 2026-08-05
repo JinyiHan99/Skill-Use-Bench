@@ -1,0 +1,38 @@
+task_id: app_builder_t3_mobile_task_app
+skill_id: app-builder
+description: |
+  Based on the public reference in `assets/app_builder_t3_mobile_task_app/input/source_brief.md`, we want to build a task-management app prototype for mobile use. Please build the project from scratch, complete the main task flows, and deliver the engineering structure and run instructions clearly so the team can continue development.
+initial_state:
+  assets:
+    - path: assets/app_builder_t3_mobile_task_app/input/source_brief.md
+      source: "https://github.com/mehmetsagir/todo-app; https://docs.expo.dev/; https://dev.to/luthfisauqi17/build-a-simple-to-do-list-app-with-react-native-expo-taskmate-o2a"
+      real_state: "A real-scenario summary compiled from public mobile task-app examples, Expo documentation, and a public tutorial."
+      preparation: |
+        2026-07-01 queried and compiled product-scenario descriptions from public mobile task apps and Expo documentation; only real-source summaries were kept, without reference implementations.
+  tools_available:
+    - filesystem
+    - shell
+    - package_manager
+    - web_access
+expected_trigger: true
+skill_constraints_tested:
+  - id: app_builder_mobile_positive_trigger
+    description: "This task is a positive example of a new mobile app project for app-builder; it should produce a mobile engineering scaffold rather than a web/extension scaffold."
+    exclusive: "Weak discrimination. The description and input assets already clearly imply a mobile direction; this item only verifies app-builder positive triggering and mobile engineering delivery, and is not a strong skill-exclusive indicator."
+  - id: zustand_default_stack_soft_signal
+    description: "The asset already hints at an Expo/React Native direction, so Expo itself is not a skill-exclusive signal; if the artifact uses Zustand in the mobile project, it can serve as a soft signal of the app-builder react-native-app default stack."
+    exclusive: "Medium-weak discrimination. Without reading the skill, a model may use useState, Context, Redux, or another state solution; Zustand can be a soft skill-following signal but cannot alone prove skill adherence."
+  - id: coordinated_agent_planning_conditional
+    description: "If the evaluation can observe process logs or the final deliverable explicitly contains the relevant agent roles from the skill, it can check whether the role boundaries of project-planner, frontend-specialist, backend-specialist, database-architect, and devops-engineer are reflected."
+    exclusive: "Conditional discrimination. Only holds when specific agent roles/orchestration traces are observable; if only a regular README or final code is available, it is not included as a hard rubric."
+notes: |
+  - Core test point: this is a positive example of a new mobile app project for app-builder, focusing on verifying whether the application-building flow is triggered and a mobile engineering scaffold is delivered.
+  - The current input assets already include Expo/React Native references, so "choosing Expo" can only be a baseline/background consistency signal and cannot alone serve as skill-exclusive evidence.
+  - baseline_correctness_signals:
+      - The output project has mobile-app project configuration and entry files.
+      - Key task-flow code such as task list, create, complete, edit, or delete is locatable.
+      - The run instructions target local mobile preview, simulator, or real-device debugging.
+  - skill_following_signals:
+      - [Artifact-observable/soft signal] Uses Zustand or an equivalent explicit state layer in the mobile project, reflecting a react-native-app default-stack inclination.
+      - [Process-or-document-observable/conditional signal] Explicitly shows app-builder-style project planning, template branch selection, or related agent role division.
+      - [No misjudgment] Do not judge strong skill-following solely because the artifact is an Expo project, the README is clear, or the directory structure is complete.

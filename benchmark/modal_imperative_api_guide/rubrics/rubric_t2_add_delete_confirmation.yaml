@@ -1,0 +1,96 @@
+# Rubric for skill_60_modal_imperative_api_guide — t2: add delete confirmation
+
+rules:
+  - id: g1_observable_output
+    type: required-tool
+    provenance: gate
+    verifier: state-diff
+    weight: 0
+    spec: "[GATE] The delete component output file is present for evaluation."
+    signal:
+      file: "assets/SF60_t2_add_delete_confirmation/output/src/features/LibraryModal/DeleteKnowledgeBase/index.tsx"
+      file_must_contain: "DeleteKnowledgeBase"
+
+  - id: r1_use_base_ui_confirm_modal
+    type: required-tool
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Confirm flows should use confirmModal from @lobehub/ui/base-ui.
+      Skill-exclusive rationale: Looking only at the task, a strong model may naturally choose window.confirm, a local stateful Modal, antd Modal.confirm, or a createModal custom confirmation; the skill specifies the dedicated base-ui confirmModal. The conflict point is the confirm-flow API choice.
+    signal:
+      file: "assets/SF60_t2_add_delete_confirmation/output/src/features/LibraryModal/DeleteKnowledgeBase/index.tsx"
+      file_must_contain: "import\\s+\\{[\\s\\S]*?\\bconfirmModal\\b[\\s\\S]*?\\}\\s+from\\s+['\"]@lobehub/ui/base-ui['\"]"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_open_confirm_instead_of_immediate_delete
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The button click should use confirmModal as the click-triggered imperative confirmation entry point; destructive work belongs in the positive confirm action.
+      Skill-exclusive rationale: Without reading the skill, the model may keep the original handleDelete that immediately awaits removeKnowledgeBase(id) and only add prompt text beside it; the skill requires the imperative confirm callback of confirmModal to control deletion. The conflict point is that the click handler must no longer delete directly.
+    signal:
+      query: >
+        In assets/SF60_t2_add_delete_confirmation/output/src/features/LibraryModal/DeleteKnowledgeBase/index.tsx, does the actual button onClick/handler use confirmModal as the imperative confirmation entry point rather than directly calling removeKnowledgeBase(id)? Judge only final file contents, not explanations. Answer YES if clicking delete only invokes confirmModal or a handler whose purpose is to call confirmModal. Answer NO if removeKnowledgeBase(id) is directly awaited/called before user confirmation in the click path.
+      acceptable: "const handleDelete = () => confirmModal({ ..., onOk: async () => { await removeKnowledgeBase(id); onDeleted?.(); } }); <Button onClick={handleDelete}>"
+      unacceptable: "const handleDelete = async () => { await removeKnowledgeBase(id); confirmModal(...); }"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_delete_only_inside_positive_confirm_callback
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] removeKnowledgeBase(id) and onDeleted?.() should run only from the confirmModal positive action callback (for example onOk).
+      Skill-exclusive rationale: Looking only at the task, the model may use a prompt but still execute deletion in the outer layer, or share deletion logic in the cancel path; the skill's confirmModal example puts async work in onOk. The conflict point is that the deletion side effect must be deferred to the positive callback.
+    signal:
+      query: >
+        In assets/SF60_t2_add_delete_confirmation/output/src/features/LibraryModal/DeleteKnowledgeBase/index.tsx, are removeKnowledgeBase(id) and onDeleted?.() executed only inside the positive confirmation callback passed to confirmModal (such as onOk), with no execution in cancel/default click paths? Judge only final file contents. Answer YES if both side effects are inside onOk or in a helper function that is exclusively triggered by the positive confirmModal callback. Answer NO if either side effect appears outside the positive confirm callback, is triggered before confirmation, or can run from a cancel path.
+      acceptable: "confirmModal({ onOk: async () => { await removeKnowledgeBase(id); onDeleted?.(); } })"
+      unacceptable: "confirmModal({ ... }); await removeKnowledgeBase(id); onDeleted?.();"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_avoid_non_skill_confirmation_mechanisms
+    type: forbidden-tool
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] For this confirm flow, do not use browser-native confirm, createModal, local inline Modal, antd Modal.confirm, or legacy/root confirmModal instead of base-ui confirmModal.
+      Skill-exclusive rationale: These alternatives all satisfy the task's confirmation need and are the default implementation paths; the skill requires base-ui confirmModal. The conflict point is that a generic confirmation mechanism must not replace the project modal stack's imperative confirm API.
+    signal:
+      file: "assets/SF60_t2_add_delete_confirmation/output/src/features/LibraryModal/DeleteKnowledgeBase/index.tsx"
+      file_must_not_contain: "window\\.confirm|\\bconfirm\\(|\\bcreateModal\\b|<Modal\\b|Modal\\.confirm|confirmModal[\\s\\S]{0,140}from ['\"]@lobehub/ui['\"]"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Deletion is confirmed before execution, cancel does not delete, and existing button/callback behavior is preserved."
+    signal:
+      query: >
+        Based only on assets/SF60_t2_add_delete_confirmation/output/src/features/LibraryModal/DeleteKnowledgeBase/index.tsx, is the task complete? Answer YES only if all are true: the delete button opens a confirmation prompt; confirmed action awaits removeKnowledgeBase(id); confirmed success calls onDeleted?.(); cancel does not delete; and the existing delete button label using t('detail.delete') and name is preserved. Answer NO if any condition is missing.
+      acceptable: "Button label remains {t('detail.delete')}: {name}; confirm onOk awaits removeKnowledgeBase(id) then onDeleted?.(); no cancel deletion."
+      unacceptable: "Deletion still happens immediately, cancel can delete, or onDeleted/button text behavior is lost."

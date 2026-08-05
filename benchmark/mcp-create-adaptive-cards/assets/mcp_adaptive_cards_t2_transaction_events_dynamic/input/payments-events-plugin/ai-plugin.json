@@ -1,0 +1,31 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/copilot/plugin/v2.2/schema.json",
+  "schema_version": "v2.2",
+  "name_for_human": "Stripe Balance Activity",
+  "namespace": "stripeBalanceActivity",
+  "description_for_human": "Inspect recent balance activity for finance operations.",
+  "description_for_model": "Use this plugin to retrieve recent balance transactions and help finance analysts understand charges, payouts, refunds, and adjustments.",
+  "functions": [
+    {
+      "name": "ListBalanceTransactions",
+      "description": "Returns recent Stripe balance transactions with type, amount, currency, status, and created time.",
+      "capabilities": {
+        "response_semantics": {
+          "data_path": "$.data",
+          "properties": {
+            "title": "$.description",
+            "subtitle": "$.type"
+          }
+        }
+      }
+    }
+  ],
+  "runtimes": [
+    {
+      "type": "OpenApi",
+      "auth": { "type": "ApiKeyPluginVault", "reference_id": "stripe_api_key" },
+      "spec": { "url": "./openapi.yaml" },
+      "run_for_functions": ["ListBalanceTransactions"]
+    }
+  ]
+}

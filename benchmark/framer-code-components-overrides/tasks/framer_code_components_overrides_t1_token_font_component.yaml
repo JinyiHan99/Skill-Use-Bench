@@ -1,0 +1,32 @@
+task_id: framer_code_components_overrides_t1_token_font_component
+level: L2
+skill_id: framer-code-components-overrides
+description: |
+  We are handing the circular-flow component from the brand page to design colleagues to continue styling in Framer. Please make a deliverable version based on `assets/framer_code_components_overrides_t1_token_font_component/input/components/CircularFlow.tsx`, preserving its current animation and editing experience, while making all colors, text styles, and default sizes stable and usable when the design system switches. Save the final file to `output/CircularFlow.brand.tsx`.
+initial_state:
+  assets:
+    - path: assets/framer_code_components_overrides_t1_token_font_component/input/components/CircularFlow.tsx
+      source: https://raw.githubusercontent.com/amrkamalrashed/Framer-Components/main/components/CircularFlow.tsx
+      real_state: Real TSX Framer code component adapted from the public Framer-Components repository, containing addPropertyControls, color controls, font controls, animation logic, browser API usage, direct color consumption, and intentionally manual font-field mapping in the input state.
+      preparation: |
+        Downloaded from the public amrkamalrashed/Framer-Components GitHub repository main branch.
+        The font application sites were adjusted from whole-object font spreading to manual field mapping to expose a realistic Framer font-control anti-pattern for this task.
+    - path: assets/framer_code_components_overrides_t1_token_font_component/input/README.md
+      source: https://raw.githubusercontent.com/amrkamalrashed/Framer-Components/main/README.md
+      real_state: Real repository README describing the component library standards and Framer authoring expectations.
+      preparation: |
+        Downloaded verbatim from the public amrkamalrashed/Framer-Components GitHub repository main branch.
+  tools_available: [read, grep, edit, write]
+expected_trigger: true
+skill_constraints_tested:
+  - id: color_token_unwrapping
+    description: Code components must treat token-bound color controls as object wrappers and unwrap them before using the value in CSS, parsing, gradients, or canvas styles.
+    exclusive: Without the skill, a model is likely to assume color controls are always plain strings and leave token-bound designs broken.
+  - id: font_control_spread
+    description: Font controls must be applied by spreading the full font object rather than manually reading individual font fields.
+    exclusive: A generic React implementation often maps fontFamily, fontSize, and fontWeight one by one, which misses Framer font metadata and causes styles not to apply correctly.
+notes: |
+  - Positive trigger: the user asks for a Framer code component deliverable based on a real component file that must remain stable when design-system-bound colors and fonts are changed in Framer.
+  - Baseline requirement: the output should remain a usable Framer code component with its existing editing surface, default export, display name, and property controls preserved.
+  - Observable skill signals: every consumed color control value is made safe for token-bound values before reaching CSS/SVG styles, and font controls are applied through whole-object spreading rather than manual field mapping.
+  - Common failure: visual-only edits, direct use of token-bound color values, manual font-field mapping, or accidentally degrading the component into a generic React component.

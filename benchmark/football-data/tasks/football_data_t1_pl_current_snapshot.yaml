@@ -1,0 +1,49 @@
+task_id: football_data_t1_pl_current_snapshot
+skill_id: football-data
+description: |
+  I am putting together a brief Premier League season report. Please refer to the locally provided Premier League schedule background `assets/football_data_t1_pl_current_snapshot/input/premier_league_schedule_background.txt`, first determine which Premier League season this schedule background corresponds to, then supplement the current verifiable top six of the standings (at least including rank, team name, matches played, goal difference, and points).
+  If the current season has not yet started or the standings data is all 0, please state this first, then use the most recent Premier League season with complete standings data as a reference to supplement the situation description.
+  Please use 3-4 sentences to describe the situation at the top, around 6th/7th place, and around 17th/18th place; when mentioning relevant teams, give the corresponding points or point differences. Do not simply restate or infer match results from the input file.
+initial_state:
+  assets:
+    - path: assets/football_data_t1_pl_current_snapshot/input/premier_league_schedule_background.txt
+      source: "https://raw.githubusercontent.com/openfootball/england/master/2025-26/1-premierleague.txt"
+      real_state: "OpenFootball England 2025-26 Premier League schedule text, downloaded and verified size 30299 bytes."
+      preparation: |
+        mkdir -p assets/football_data_t1_pl_current_snapshot/input
+        curl -L --fail https://raw.githubusercontent.com/openfootball/england/master/2025-26/1-premierleague.txt -o assets/football_data_t1_pl_current_snapshot/input/premier_league_schedule_background.txt
+  tools_available:
+    - shell
+    - python
+    - internet
+expected_trigger: true
+skill_constraints_tested:
+  - id: current_season_discovery
+    description: "When the user asks for current/present Premier League standings without explicitly giving a season_id, the model should first discover the currently active Premier League season, then query standings based on the discovery result; it must not hard-code the year directly from the date, file name, or schedule background."
+    exclusive: "A model that does not read the skill will usually directly web-search the current Premier League standings, or infer seasons such as 2025-26 or 2026-27 from the schedule background / system date; it will not naturally execute the current-season discovery flow specified by the football-data skill."
+  - id: standings_command_shape
+    description: "Standings queries should use football-data's season-level standings capability and the season_id obtained from the current-season discovery step, rather than inferring from schedule text or calling non-existent generic standings/results capabilities."
+    exclusive: "A model that does not read the skill, even if it can complete the final answer via the web, will not naturally know that football-data should use the season-level standings capability; if it tries to guess the tool, it is likely to call non-existent get_standings/get_league_table, or use an incorrect season_id form."
+notes: |
+  - Core test point: the same task contains both a real schedule background and a "currently verifiable" standings requirement; the model must know that the asset is not a current standings source, and must not infer standings from schedule text on its own.
+  - Expected correct behavior:
+      - First identify the Premier League season the schedule background corresponds to.
+      - For "current/present" standings requests, first execute the current-season discovery step, then query the corresponding season-level standings.
+      - If the discovered current season has not yet started or standings are all 0, explicitly state that the current season has no analyzable standings situation; then the most recent Premier League season with complete standings data can be added as a reference, but the model must not hard-code or skip current-season discovery from the start.
+      - Output the top six's rank, team name, matches played, goal difference, and points.
+      - The situation summary should explicitly mention the top, around 6th/7th place, and around 17th/18th place, and give relevant teams' points or point differences.
+  - Common model error behaviors:
+      - Directly inferring or excerpting the schedule round-by-round from `premier_league_schedule_background.txt`.
+      - Directly hard-coding season_id based on file name, system date, or schedule source.
+      - Trying non-existent standings/results capabilities.
+      - When current-season standings are all 0, still forcibly fabricating the top, European-competition zone, or relegation zone situation.
+  - baseline_correctness_signals:
+      - The answer includes the Premier League standings top six, with rank, team name, matches played, goal difference, and points.
+      - The summary explicitly mentions teams and points or point differences at the top, around 6th/7th place, and around 17th/18th place.
+      - Does not mistake the schedule file for a standings source.
+      - If the current season has not started or standings are all 0, the answer explicitly states this limitation rather than fabricating the situation.
+  - skill_following_signals:
+      - There is an observable current-season discovery step before querying standings.
+      - Uses the season_id obtained from discovery to query season-level standings.
+      - If it is necessary to fall back to the most recent season with complete standings, this must occur after discovering the current season is empty/not started.
+      - Does not call non-existent standings/results capabilities.

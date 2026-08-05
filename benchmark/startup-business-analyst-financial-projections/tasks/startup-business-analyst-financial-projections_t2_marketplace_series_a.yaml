@@ -1,0 +1,50 @@
+task_id: startup-business-analyst-financial-projections_t2_marketplace_series_a
+skill_id: startup-business-analyst-financial-projections
+description: |
+  I am advising a restaurant-commerce startup before a Series A process. The company has 410 active restaurant locations, keeps roughly 0.95% of gross payment volume as net revenue, has $18k of subscription revenue per month, 19 employees, and $2.4m of cash. The team wants a finance package that can support hiring and fundraising decisions, with Toast's public financial facts in `assets/startup-business-analyst-financial-projections_t2_marketplace_series_a/input/toast_companyfacts.json` used as one reality check for scale economics.
+
+  Please prepare the deliverable in `output/series_a_finance_package.md`. The audience is a founder and lead investor, so assumptions should be visible and the model should make clear when the company would need more capital.
+initial_state:
+  assets:
+    - path: assets/startup-business-analyst-financial-projections_t2_marketplace_series_a/input/toast_companyfacts.json
+      source: "https://data.sec.gov/api/xbrl/companyfacts/CIK0001650164.json"
+      real_state: "SEC companyfacts JSON for Toast, Inc., downloaded from the SEC data API; valid JSON, 1,222,969 bytes."
+      preparation: |
+        Downloaded directly with a SEC-compliant User-Agent and validated as JSON with python3 -m json.tool. No content was synthesized.
+  tools_available:
+    - file_read
+    - markdown_write
+    - spreadsheet_creation
+expected_trigger: true
+skill_constraints_tested:
+  - id: marketplace_gross_margin_ready_model
+    description: "The skill requires a transaction-model cost structure that explicitly separates GPV, net take-rate revenue, subscription revenue, and COGS needed to compute gross margin."
+    exclusive: "Without the skill, a strong model may still include broad expense categories, but is less likely to break COGS into transaction-model layers such as hosting, payment processing, variable support, and third-party services to support marketplace gross-margin validation."
+  - id: role_timed_hiring_plan
+    description: "The skill requires a role-by-role hiring plan with department, start timing, base salary, fully-loaded cost using a 1.3-1.4x multiplier, and equity context."
+    exclusive: "Without the skill, strong models often provide departmental headcount totals, average salary assumptions, or a single payroll line, but are less likely to include role-level timing, explicit loaded-cost calculation, and equity grant assumptions together."
+  - id: monthly_cash_bridge_with_raise
+    description: "The skill requires a monthly cash bridge with beginning cash, cash collected, operating cash outflows, CapEx if used, ending cash, burn, runway, and explicit financing-event impact."
+    exclusive: "Without the skill, models may discuss runway or financing timing qualitatively or at annual/quarterly granularity, but are less likely to produce a structured cash bridge with beginning cash, ending cash, burn, runway, and funding-event impact."
+  - id: marketplace_scenario_deltas
+    description: "The skill requires conservative/base/optimistic scenarios that adapt customer acquisition, churn, pricing or take-rate, and CAC deltas to restaurant-location growth and marketplace sales efficiency."
+    exclusive: "Without the skill, models often provide generic upside/base/downside cases, but are less likely to translate scenario sensitivities into explicit marketplace drivers such as location growth, churn, GPV per location, take rate, and CAC."
+notes: |
+  - Core test: this should exercise the skill on a transaction/marketplace-like revenue model rather than a pure subscription SaaS model.
+  - Expected correct behavior: create `output/series_a_finance_package.md` with a 3-5 year projection that connects restaurant locations, payment volume, net take rate, subscription revenue, operating costs, hiring, cash runway, and financing needs.
+  - Common incorrect behavior examples:
+      - The model calculates net revenue from restaurant count and payment volume but leaves COGS blank, making gross margin impossible to compare with public-company context.
+      - Payroll is shown as one row named `People` or `Salaries` without individual role start dates, departments, fully-loaded cost, or equity grant assumptions.
+      - Cash analysis starts with EBITDA or net income and never shows beginning cash, ending cash, monthly burn, runway, or the timing and amount of a Series A raise.
+      - The report ends after a projection table and does not include a validation section comparing assumptions to the Toast public facts and startup benchmark ranges.
+  - baseline_correctness_signals:
+      - `output/series_a_finance_package.md` exists and is non-empty.
+      - The output uses or references the declared Toast companyfacts asset.
+      - The output distinguishes gross payment volume, net take-rate revenue, and subscription revenue.
+      - The output makes an explicit judgment about whether current cash is sufficient and, if not, when additional capital is needed.
+  - skill_following_signals:
+      - The output separates revenue drivers from explicit COGS line items to compute gross margin, rather than only presenting net revenue.
+      - The hiring plan includes individual roles with start timing and explicit loaded-cost assumptions.
+      - The cash-flow section includes a monthly or quarterly bridge with beginning cash, ending cash, burn, and financing timing.
+      - The scenario analysis contains three quantitative cases tied to marketplace drivers such as location growth, churn, GPV per location, take rate, or CAC.
+      - The output uses Toast companyfacts as a validation reference rather than only mentioning Toast by name.

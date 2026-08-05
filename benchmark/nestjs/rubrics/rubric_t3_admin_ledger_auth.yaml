@@ -1,0 +1,157 @@
+rules:
+  - id: g1_observable_ledger_service_edit
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] Trace contains a real Write/Edit tool call against the ledger-service project."
+    signal:
+      pattern: '(?is)^(?:Write|Edit)\b[\s\S]{0,2000}?(?:ledger-service/)?(?:src/|package\.json|scripts/)'
+
+  - id: tc_auth_guard_establishes_request_user
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/CORRECTNESS — not SF] Login-state authentication verifies a token/session and establishes trusted authenticated user state.
+      This is not counted as skill-following because authenticated-admin access plus NestJS conventions can imply this without the skill.
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, does authentication for the ledger access model verify a login token/session and attach or return trusted authenticated user data for downstream guards or request handling? Answer YES or NO.
+      acceptable: "A JwtAuthGuard verifies Authorization Bearer token with JwtService and sets request.user, a Passport strategy returns a user object, or an equivalent session guard establishes authenticated request state."
+      unacceptable: "The guard only checks `x-api-key`, `x-role`, or raw Authorization header text without establishing trusted authenticated user state."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B"]
+      consensus: medium
+
+  - id: tc_roles_guard_reads_authenticated_request_state
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/CORRECTNESS — not SF] Admin authorization reads role/admin/permission/claim data from authenticated request state rather than caller-controlled raw inputs.
+      This is task-completion support, not an independent skill-following signal.
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, does role/admin authorization for the ledger endpoint read from authenticated request state or verified claims, such as user.role, user.roles, user.isAdmin, permissions, or claims, rather than directly from raw headers/query/body? Answer YES or NO.
+      acceptable: "RolesGuard obtains request.user or verified claims and checks role/roles/isAdmin/permissions for admin access."
+      unacceptable: "Ledger access is allowed when `request.headers['x-role'] === 'admin'` or the service checks a role string passed directly from the controller."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B"]
+      consensus: medium
+
+  - id: r3_auth_guard_runs_before_roles_guard
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Authentication must run before role authorization on the ledger route.
+      skill-exclusive reason: Without the skill, a model may combine checks arbitrarily or put a roles guard first; the skill explicitly warns that JWT guard must run before Roles guard, so the conflict is undefined/ad hoc order versus authenticated-then-authorized guard composition.
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, is the ledger route protected so the authentication guard/strategy runs before the roles/admin guard consumes authenticated user state? Answer YES or NO.
+      acceptable: "@UseGuards(JwtAuthGuard, RolesGuard), AuthGuard('jwt') before RolesGuard, or JwtAuthGuard registered as a global APP_GUARD while RolesGuard is applied at controller/method level."
+      unacceptable: "@UseGuards(RolesGuard, JwtAuthGuard), a RolesGuard that can execute before authenticated request.user exists, or only ad hoc role checks without an auth-before-roles guard order."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_authorization_is_guard_level_not_service_filter
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] Ledger admin protection should exist at Nest route guard/decorator level, not only as ad hoc authorization inside `LedgerService.list()`.
+      skill-exclusive reason: Without the skill, it is natural to add an `if role !== admin` check directly in the service; the skill says to implement guards for route protection, so the conflict is business-method authorization versus framework guard-level protection.
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, does the ledger route have guard/decorator-level admin protection? Answer YES if guard-level protection exists even with additional service defense-in-depth; answer NO if admin authorization exists only as controller/service handwritten checks without route guards. Answer YES or NO.
+      acceptable: "LedgerController or route uses @UseGuards with auth and roles/admin guards plus metadata such as @Roles('admin') or equivalent decorator-level protection."
+      unacceptable: "LedgerService.list(role) throws unless role is admin while the route has no guard-level role/admin protection."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A"]
+      consensus: low
+
+  - id: r5_jwt_secret_not_hardcoded
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] JWT secret/config values must not be hardcoded in source, including hardcoded fallback literals.
+      skill-exclusive reason: Without the skill, a demo service often gets a literal `'secret'` or `'showcase-secret'` JWT secret for speed; the skill explicitly warns never to hardcode JWT_SECRET, so the conflict is quick demo literals versus environment/configuration boundary.
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, did the solution avoid hardcoding a JWT secret literal, including fallback literals such as `process.env.JWT_SECRET || 'secret'`, `?? 'secret'`, or `ConfigService.get(..., 'secret')`, and instead require the secret from an environment/configuration boundary? Answer YES or NO.
+      acceptable: "JwtModule/register or JwtService.verify reads JWT_SECRET from process.env or a config provider without a source-code literal fallback."
+      unacceptable: "Source contains `secret: 'secret'`, `jwtConstants.secret = 'showcase-secret'`, JwtService.verify(token, { secret: '...' }), `process.env.JWT_SECRET || 'literal'`, `?? 'literal'`, or ConfigService.get with a literal default secret."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc_no_obvious_hardcoded_jwt_secret_literal
+    type: task-completion
+    provenance: task
+    verifier: regex
+    weight: 0
+    spec: "[TASK diagnostic — not SF] Trace/final writes do not contain obvious JWT secret literal or fallback patterns."
+    signal:
+      must_not_match: "(?is)(?:secret\\s*[:=]\\s*['\"][^'\"]*(?:secret|jwt|showcase)[^'\"]*['\"]|JWT_SECRET\\s*(?:\\|\\||\\?\\?)\\s*['\"][^'\"]+['\"]|ConfigService\\.get\\([^)]*,\\s*['\"][^'\"]+['\"]\\))"
+
+  - id: tc_endpoint_admin_auth
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not SF] The ledger list endpoint is accessible only to authenticated admin users."
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, is the ledger list endpoint restricted to authenticated users with admin authorization? Other controllers may continue using legacy x-api-key if the task scope allows. Answer YES or NO.
+      acceptable: "Ledger route requires login-token/session authentication plus admin role/permission restriction."
+      unacceptable: "Ledger remains accessible with only x-api-key, raw x-role, no authentication, or non-admin authenticated users."
+
+  - id: tc_openapi_auth_docs
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not SF] Swagger/OpenAPI documentation for ledger access matches the new login-state auth model."
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, does Swagger/OpenAPI documentation for the ledger endpoint describe the new login-state/bearer/session auth model rather than only the legacy x-api-key model? Answer YES or NO.
+      acceptable: "Ledger route or API docs use bearer/JWT/session auth decorators or descriptions matching the implemented login-state guard."
+      unacceptable: "Ledger documentation still only advertises x-api-key for ledger access after the implementation changed to login-state auth."
+
+  - id: tc_ledger_structure_preserved
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not SF] The ledger module/controller structure remains available after adding admin auth."
+    signal:
+      judge_expected: "YES"
+      query: >
+        Based only on the final state of files modified by the agent, is the ledger module/controller/list endpoint still present and wired after adding authenticated admin protection? Answer YES or NO.
+      acceptable: "LedgerModule/LedgerController or equivalent route remains registered and the list endpoint still delegates to ledger service behavior."
+      unacceptable: "The ledger endpoint or module was removed, renamed out of reach, or replaced by unrelated code."

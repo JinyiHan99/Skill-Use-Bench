@@ -1,0 +1,91 @@
+openapi: 3.0.3
+info:
+  title: GitHub Issue Triage
+  version: 1.0.0
+servers:
+  - url: https://api.github.com
+paths:
+  /repos/{owner}/{repo}/issues:
+    get:
+      operationId: ListRepositoryIssues
+      summary: List repository issues and pull requests
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [open, closed, all]
+            default: open
+      responses:
+        '200':
+          description: Repository issues and pull requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IssueItem'
+components:
+  schemas:
+    IssueItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        number:
+          type: integer
+        title:
+          type: string
+        state:
+          type: string
+        html_url:
+          type: string
+          format: uri
+        body:
+          type: string
+          nullable: true
+        draft:
+          type: boolean
+          nullable: true
+        pull_request:
+          type: object
+          nullable: true
+          properties:
+            url:
+              type: string
+            html_url:
+              type: string
+            diff_url:
+              type: string
+            patch_url:
+              type: string
+        user:
+          type: object
+          properties:
+            login:
+              type: string
+            avatar_url:
+              type: string
+              format: uri
+        labels:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              color:
+                type: string

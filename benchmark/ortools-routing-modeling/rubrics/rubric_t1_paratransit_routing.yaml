@@ -1,0 +1,299 @@
+rubric_id: rubric_SF46_t1_paratransit_routing
+task_id: SF46_t1_paratransit_routing
+skill_id: skill_46_ortools_routing_modeling
+# Instance: 40 passengers, 84 trips, 8 vehicles, matrix 170x170
+# Node layout: 0=depot_start, 1-84=pickups, 85-168=dropoffs, 169=depot_end
+
+rules:
+  # ── GATE ──
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    signal:
+      file: report.json
+      file_must_contain: "\\S"
+    spec: "[GATE] A non-empty report.json exists in the final workspace, indicating there is an evaluable artifact; regardless of whether the file was produced by Write, Edit, or Bash."
+
+  # ── Skill-Following rules (scored) ──
+
+  - id: r1_cloned_depots_matrix
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When the input has a shared start/end depot but the model needs per-vehicle independent start/end nodes,
+      you must create explicit per-vehicle internal depot copies and build an expanded internal travel-time matrix,
+      rather than directly reusing the shared depot nodes.
+      Skill-exclusive rationale: Without reading the skill, a strong model will directly point the RoutingIndexManager starts/ends arrays
+      at the same shared depot nodes (node 0 and node 2n+1), which is the most common approach in tutorials.
+      The skill requires explicitly cloning depots to create independent start and end nodes for each vehicle, and filling the corresponding travel times in the expanded matrix.
+    signal:
+      query: >
+        In the final effective code, did the model create independent internal start depot nodes and end depot nodes for each vehicle
+        (i.e., internal node count > external node count, and start_nodes and end_nodes each have num_vehicles distinct nodes),
+        build an expanded matrix that includes these cloned depot rows, and register that expanded matrix as the time/cost evaluator
+        and use it in the RoutingModel passed to SolveWithParameters?
+        Judgment basis: look only at the final effective code or final file state, regardless of whether produced by Write, Edit, or Bash;
+        ignore intermediate drafts, comments, failed attempts, or agent self-description.
+
+        Answer YES if: the code explicitly creates per-vehicle start node lists and end node lists
+        (e.g., start_nodes = list(range(num_jobs, num_jobs + num_vehicles))),
+        builds an internal matrix larger than the original matrix dimensions to hold these cloned nodes, and that matrix is finally used
+        in the RegisterTransitMatrix / RoutingIndexManager / SolveWithParameters model chain.
+
+        Answer NO if: the code points all vehicles at the same depot node (e.g., [0]*num_vehicles),
+        or does not build an expanded matrix, or only uses the original t_matrix dimensions, or builds an expanded matrix but does not use it for solving in the end.
+      acceptable: |
+        start_nodes = list(range(num_jobs, num_jobs + num_vehicles))
+        end_nodes = list(range(num_jobs + num_vehicles, num_jobs + 2 * num_vehicles))
+        manager = pywrapcp.RoutingIndexManager(total_nodes, num_vehicles, start_nodes, end_nodes)
+      unacceptable: |
+        manager = pywrapcp.RoutingIndexManager(num_nodes, num_vehicles, 0, 2*n+1)
+        # or
+        manager = pywrapcp.RoutingIndexManager(num_nodes, num_vehicles, [0]*num_vehicles, [2*n+1]*num_vehicles)
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_register_transit_matrix
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] For static integer data, you must use RegisterTransitMatrix / RegisterUnaryTransitVector
+      to register the transit matrix, not Python callback functions.
+      Skill-exclusive rationale: Without reading the skill, a strong model will use a Python callback function as the transit evaluator
+      (e.g., routing.RegisterTransitCallback(lambda from_idx, to_idx: ...)),
+      which is the standard approach in most OR-Tools tutorials and documentation examples.
+      The skill requires using RegisterTransitMatrix to avoid the frequent Python-call overhead during local search.
+    signal:
+      query: >
+        Based on the final effective code or final file state, regardless of whether produced by Write, Edit, or Bash,
+        do all main evaluators based on static integer data use routing.RegisterTransitMatrix()
+        or routing.RegisterUnaryTransitVector(), without using Python callback functions
+        (e.g., RegisterTransitCallback or RegisterUnaryTransitCallback) for these static time/cost/demand evaluators?
+        Ignore intermediate drafts, comments, failed attempts, or agent self-description.
+
+        Answer YES if: binary static-matrix evaluators like travel time and cost use RegisterTransitMatrix,
+        unary static-vector evaluators like demand/load use RegisterUnaryTransitVector, and no main static
+        time/cost/demand evaluator is registered via RegisterTransitCallback or RegisterUnaryTransitCallback.
+
+        Answer NO if: any main static time/cost/demand evaluator is still registered via RegisterTransitCallback
+        or RegisterUnaryTransitCallback using a Python lambda/function, even if another evaluator uses matrix/vector.
+      acceptable: |
+        time_cb = routing.RegisterTransitMatrix(time_matrix)
+        cost_cb = routing.RegisterTransitMatrix(cost_matrix)
+        demand_cb = routing.RegisterUnaryTransitVector(demands)
+      unacceptable: |
+        def time_callback(from_index, to_index):
+            from_node = manager.IndexToNode(from_index)
+            to_node = manager.IndexToNode(to_index)
+            return time_matrix[from_node][to_node]
+        time_cb = routing.RegisterTransitCallback(time_callback)
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_fix_start_cumul_false
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] In the AddDimension call, you must set fix_start_cumul_to_zero=False,
+      and control the start time via vehicle start time windows or allowed start values.
+      Skill-exclusive rationale: Without reading the skill, a strong model will use the default fix_start_cumul_to_zero=True
+      (shortest-path behavior), which is the default in most tutorials.
+      The skill requires explicitly setting it to False, because in this task vehicles have variable shift start times (once per hour from 300 to 840).
+    signal:
+      query: >
+        In the final effective AddDimension call for the Time Dimension (i.e., the code finally used for SolveWithParameters),
+        is the fix_start_cumul_to_zero parameter explicitly set to False?
+        Judgment basis: look only at the final effective code or final file state, regardless of whether produced by Write, Edit, or Bash;
+        ignore intermediate drafts, comments, failed attempts, or agent self-description.
+
+        Answer YES if: the AddDimension (for the time dimension) in the final effective code explicitly passes False as the
+        fix_start_cumul_to_zero parameter (usually the fourth positional parameter or a keyword argument).
+
+        Answer NO if: the code uses True, or does not explicitly set this parameter (defaults to True),
+        or does not create a time dimension at all.
+      acceptable: |
+        routing.AddDimension(time_cb, slack, horizon, False, "Time")
+      unacceptable: |
+        routing.AddDimension(time_cb, slack, horizon, True, "Time")
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_automatic_and_tabu_search
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Use AUTOMATIC as the first-solution strategy,
+      and GENERIC_TABU_SEARCH as the local-search metaheuristic.
+      Skill-exclusive rationale: Without reading the skill, a strong model is most likely to choose PATH_CHEAPEST_ARC
+      as the first-solution strategy (the best-known OR-Tools constructor),
+      and may use GUIDED_LOCAL_SEARCH as the metaheuristic (the most common choice in tutorials).
+      The skill explicitly requires the AUTOMATIC + GENERIC_TABU_SEARCH combination for heavily-constrained optional-service instances.
+    signal:
+      query: >
+        In the final search-parameters object passed to SolveWithParameters,
+        are FirstSolutionStrategy.AUTOMATIC (or an equivalent enum value) used as first_solution_strategy,
+        and LocalSearchMetaheuristic.GENERIC_TABU_SEARCH (or an equivalent enum value) used as local_search_metaheuristic,
+        at the same time?
+        Judgment basis: look only at the final effective code or final file state, regardless of whether produced by Write, Edit, or Bash;
+        ignore intermediate drafts, comments, failed attempts, or agent self-description.
+
+        Answer YES if: in the same parameter object finally passed to SolveWithParameters, first_solution_strategy is set to
+        AUTOMATIC (or an equivalent enum value), and local_search_metaheuristic is set to GENERIC_TABU_SEARCH (or an equivalent enum value).
+
+        Answer NO if: the final parameter object uses PATH_CHEAPEST_ARC or another first-solution strategy,
+        or uses GUIDED_LOCAL_SEARCH or another metaheuristic, or does not set these two parameters.
+      acceptable: |
+        params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.AUTOMATIC
+        params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GENERIC_TABU_SEARCH
+      unacceptable: |
+        params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+        params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_shift_start_allowed_values
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] For discrete shift start times (in this task, once per hour from 300 to 840),
+      you should apply the full legal discrete set to each vehicle's start cumul variable via SetValues or an equivalent method.
+      Skill-exclusive rationale: Without reading the skill, a strong model may only set a broad time-window range [300, 840]
+      and let the solver freely choose any start time. The skill requires using SetValues to restrict to a discrete on-the-hour menu,
+      ensuring only legal shift start times are used.
+    signal:
+      query: >
+        Based on the final effective code or final file state, regardless of whether produced by Write, Edit, or Bash,
+        is the full legal discrete set [300, 360, 420, 480, 540, 600, 660, 720, 780, 840]
+        or a strictly equivalent discrete constraint applied to the start cumul variable corresponding to routing.Start(v) for all vehicles,
+        rather than just giving a continuous range? Ignore intermediate drafts, comments, failed attempts, or agent self-description.
+
+        Answer YES if: the code uses SetValues (or a strictly equivalent discrete-constraint mechanism) for each vehicle
+        to restrict the vehicle start cumul to the full set [300, 360, 420, 480, 540, 600, 660, 720, 780, 840].
+
+        Answer NO if: only a continuous time-window range (e.g., SetRange(300, 840)) is set without further
+        discretization to the full on-the-hour set, or it is set only for some vehicles, or the set is missing/has illegal start values added.
+      acceptable: |
+        shift_starts = [m for m in range(0, 24*60+1, 60) if 300 <= m <= 840]
+        for v in range(num_vehicles):
+            time_dim.CumulVar(routing.Start(v)).SetValues(shift_starts)
+      unacceptable: |
+        for v in range(num_vehicles):
+            time_dim.CumulVar(routing.Start(v)).SetRange(300, 840)
+        # no SetValues call
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r7_invalid_arc_handling
+    type: lesson
+    provenance: task/auxiliary
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [AUX/TASK — not counted toward SF] Negative/missing travel times should be treated as invalid arcs. They can be handled by either of the following mechanisms:
+      (a) replace with a prohibitive-cost sentinel that is large enough but does not overflow, or
+      (b) explicitly forbid invalid arcs via the solver (e.g., NextVar(i).RemoveValues(), AddConstraint, etc.),
+      and the routes in the final report.json must not use invalid arcs corresponding to the original negative/missing travel times.
+      This item mainly records task-modeling correctness / final-route legality; it can also be derived from task data quality after skill masking,
+      so it is not counted as the main skill-following score.
+    signal:
+      query: >
+        Based on the final effective code and the final report.json file state, regardless of whether produced by Write, Edit, or Bash,
+        for negative/missing travel-time values in t_matrix.csv, does the final matrix/constraints used actually forbid these invalid arcs,
+        and do the final exported routes not use invalid arcs corresponding to the original negative/missing travel times?
+        Ignore intermediate drafts, comments, failed attempts, or agent self-description.
+
+        Answer YES if: the matrix/constraints finally used for solving handle negative or invalid travel times in one of the following ways,
+        and the final route audit does not use these invalid arcs:
+        (1) assign a large sentinel value (e.g., 99999, 10000, or another large enough but non-overflowing value) so these arcs cannot be selected by a feasible solution, or
+        (2) forbid invalid arcs via the solver's explicit arc-forbidding constraints (e.g., NextVar(i).RemoveValues([j]), AddConstraint, etc.).
+
+        Answer NO if: the original negative/missing values enter the final matrix directly, or the code replaces negative values with 0, takes the absolute value (abs), or uses max(0, x),
+        or ignores negative values without handling them, or the routes in the final report.json still use the original invalid arcs.
+      acceptable: |
+        # Method (a): sentinel replacement
+        INVALID_COST = 99999
+        if travel_time < 0:
+            matrix[i][j] = INVALID_COST
+        # Method (b): explicit arc-forbidding constraint
+        solver = routing.solver()
+        for i, j in invalid_arcs:
+            routing.NextVar(manager.NodeToIndex(i)).RemoveValues([manager.NodeToIndex(j)])
+      unacceptable: |
+        matrix[i][j] = abs(travel_time)
+        # or
+        matrix[i][j] = max(0, travel_time)
+        # or directly ignoring negative values
+    review:
+      proposed_by: ["drafter", "debate-agents"]
+      challenged_by: []
+      consensus: medium
+
+  # ── Auxiliary task record (not counted toward SF) ──
+  - id: r5_solver_time_limit
+    type: lesson
+    provenance: task/auxiliary
+    locus: tool-call
+    verifier: regex
+    exclusive: false
+    weight: 0
+    spec: |
+      [AUX/TASK — not counted toward SF] The task requires a bounded search. Record whether the final effective code sets an explicit internal time_limit for the OR-Tools solver
+      to avoid relying only on an outer timeout. This requirement can be derived from the task description and is not the main skill-following score;
+      this signal only checks the verifiable explicit solver time_limit setting,
+      and does not claim to verify whether it is strictly less than an unknown outer timeout or whether enough post-processing time is reserved.
+    signal:
+      pattern: >-
+        (?i)(?:search_)?parameters\.time_limit(?:\.seconds)?\s*=\s*[1-9][0-9]*|(?:search_)?parameters\.time_limit\.FromSeconds\s*\(\s*[1-9][0-9]*\s*\)
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: low
+
+  # ── Task completion record (not scored) ──
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether report.json was generated in the final workspace, contains a routes array, and all routes' node_sequence start with node 0 and end with node 169"
+    signal:
+      file: report.json
+      file_must_contain:
+        - '"routes"\s*:\s*\['
+        - '"node_sequence"\s*:\s*\[\s*0\b'
+        - '"node_sequence"\s*:\s*\[[^\]]{0,2000}\b169\s*\]'
+      file_must_not_contain:
+        - '"routes"\s*:\s*null'
+        - '"error"\s*:'
+        - '"node_sequence"\s*:\s*\[\s*(?!0\b)'
+        - '"node_sequence"\s*:\s*\[[^\]]{0,2000},\s*(?!169\s*\])[0-9]+\s*\]'

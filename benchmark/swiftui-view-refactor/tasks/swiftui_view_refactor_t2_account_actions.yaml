@@ -1,0 +1,28 @@
+task_id: swiftui_view_refactor_t2_account_actions
+skill_id: swiftui-view-refactor
+description: |
+  This account page has been in the product for a while, but now login, logout, restore purchases, and account status display are mixed together, reading like a controller. Please refactor `assets/swiftui_view_refactor_t2_account_actions/input/AccountView.swift` to make the page structure clearer, while keeping the existing login, sign-up, logout confirmation, restore purchases entry, and platform-specific behavior unchanged. Save the result to `output/AccountView.swift`.
+initial_state:
+  assets:
+    - path: assets/swiftui_view_refactor_t2_account_actions/input/AccountView.swift
+      source: "https://github.com/apple/sample-food-truck/blob/main/App/Account/AccountView.swift"
+      real_state: "Real account page from the Apple sample-food-truck project; includes account environment object, platform conditional branches, multiple button actions, sheets, and alerts."
+      preparation: |
+        Downloaded App/Account/AccountView.swift from the main branch of the public GitHub repository apple/sample-food-truck, without modifying file content; only placed into the task asset directory.
+  tools_available:
+    - file_editing
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: extract_inline_actions
+    description: "Simple state-assignment button closures may remain in body; but non-trivial side effects such as `Task {}`, `AppStore.sync()`, `accountStore.signOut()` should not appear directly in inline closures of body, Button, or Alert, but should be triggered through small private methods or subview callbacks."
+    exclusive: "Without referencing this skill, the model tends to keep short `Task(priority: .userInitiated) { try await AppStore.sync() }` in Button closures, or only do layout cleanup; this skill explicitly requires extracting such non-trivial side effects from inline closures of body / Button / Alert."
+  - id: dedicated_account_subviews
+    description: "Major semantic regions such as account status, purchase support, and authentication actions should be prioritized for extraction into dedicated `View` types; subviews should explicitly receive the minimal necessary values, Bindings, or callbacks. Simply splitting into multiple `private var ...: some View` fragments does not satisfy this constraint."
+    exclusive: "A common generic SwiftUI refactoring practice is to split body into multiple `private var ...: some View` computed property fragments; this skill clearly prefers dedicated View types, explicit inputs, and stable subview boundaries."
+notes: |
+  - Core test point: whether UI regions and action boundaries are clearly separated without changing account behavior.
+  - Main skill signal: major regions such as account status, purchase support, and authentication actions should be split using dedicated `View` types; merely using multiple `private var ...: some View` fragments does not fully satisfy.
+  - Action boundary signal: non-trivial side effects such as `AppStore.sync()`, `accountStore.signOut()` should not remain in inline closures of body, Button, or Alert, but should be triggered via private methods or subview callbacks.
+  - Expected correct behavior: the output file still uses the existing accountStore, authorizationController, and model; preserves login, sign-up, logout confirmation, restore purchases entry, and platform-specific behavior; subviews receive minimal necessary inputs.
+  - Common error behaviors: adding a view model; changing platform conditional behavior; leaving alert logout calls in inline complex closures; using large numbers of computed some View instead of dedicated View types.

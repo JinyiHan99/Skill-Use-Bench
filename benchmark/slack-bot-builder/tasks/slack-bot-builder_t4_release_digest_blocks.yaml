@@ -1,0 +1,63 @@
+task_id: slack-bot-builder_t4_release_digest_blocks
+skill_id: slack-bot-builder
+description: |
+  The release manager wants to turn a very long Kubernetes release notes document into a digest to send to the Slack production on-call channel, and let on-call colleagues confirm reading or flag for follow-up within the message. Based on the examples and release material in `assets/slack-bot-builder_t4_release_digest_blocks/input/`, deliver deployable application code; the original material is very long, and the digest message needs to let people identify the topic on mobile, desktop, and screen-reader scenarios, and must not fail to send due to poor content organization; on-call colleagues may click the same action repeatedly, and the same digest should not be processed twice. Place the deliverable in `output/release_digest_blocks/`.
+initial_state:
+  assets:
+    - path: assets/slack-bot-builder_t4_release_digest_blocks/input/examples/app.py
+      source: "https://github.com/slackapi/bolt-python/blob/29b9dbdd250bd9f1d27bdee10251656f6491fbbd/examples/app.py"
+      real_state: "Bolt for Python basic app example, including short command and app_mention event handling."
+      preparation: |
+        Copied directly from the slackapi/bolt-python repo main branch 29b9dbdd250bd9f1d27bdee10251656f6491fbbd, content unchanged.
+    - path: assets/slack-bot-builder_t4_release_digest_blocks/input/examples/socket_mode.py
+      source: "https://github.com/slackapi/bolt-python/blob/29b9dbdd250bd9f1d27bdee10251656f6491fbbd/examples/socket_mode.py"
+      real_state: "Bolt for Python Socket Mode example."
+      preparation: |
+        Copied directly from the slackapi/bolt-python repo main branch 29b9dbdd250bd9f1d27bdee10251656f6491fbbd, content unchanged.
+    - path: assets/slack-bot-builder_t4_release_digest_blocks/input/docs/english/concepts/socket-mode.md
+      source: "https://github.com/slackapi/bolt-python/blob/29b9dbdd250bd9f1d27bdee10251656f6491fbbd/docs/english/concepts/socket-mode.md"
+      real_state: "Official Slack Socket Mode concept documentation."
+      preparation: |
+        Copied directly from the slackapi/bolt-python repo main branch 29b9dbdd250bd9f1d27bdee10251656f6491fbbd, content unchanged.
+    - path: assets/slack-bot-builder_t4_release_digest_blocks/input/CHANGELOG/CHANGELOG-1.31.md
+      source: "https://github.com/kubernetes/kubernetes/blob/ff45c8a8c64be35f2d0ecc35da25a591328586ae/CHANGELOG/CHANGELOG-1.31.md"
+      real_state: "Real Kubernetes 1.31 release notes Markdown, lengthy, with multi-level headings and many entries."
+      preparation: |
+        Copied a single changelog file directly from the kubernetes/kubernetes repo master snapshot ff45c8a8c64be35f2d0ecc35da25a591328586ae, content unchanged.
+  tools_available:
+    - filesystem
+    - python
+expected_trigger: true
+skill_constraints_tested:
+  - id: block_kit_limits_and_pagination
+    description: "Block Kit messages must respect Slack limits such as block count and text length, and should validate, paginate, split, or summarize long content before sending."
+    exclusive: "Without the skill, a model may rely on ad hoc summarization or copy many changelog sections into blocks without explicit Slack limit validation, causing brittle or invalid messages."
+  - id: fallback_text_for_blocks
+    description: "Messages using rich blocks should include fallback text for notifications and accessibility."
+    exclusive: "Without the skill, a model may treat rich blocks as sufficient and omit top-level fallback text needed for mobile notifications and accessibility."
+  - id: idempotent_interactive_updates
+    description: "Interactive message actions should acknowledge immediately and update the original message or otherwise record handled state so repeated clicks do not repeat the same action."
+    exclusive: "Generic button code may acknowledge and post a follow-up message while leaving the original controls active, allowing repeated clicks to trigger duplicate handling."
+  - id: deployment_mode_boundary
+    description: "For production-facing Slack apps, HTTP request endpoints are the default deployment path; Socket Mode should be limited to local development or constrained internal environments unless justified."
+    exclusive: "Because a Socket Mode sample is present, a model without the skill may copy it as the only entry point rather than separating dev/internal Socket Mode from production HTTP handling."
+notes: |
+  - Core test point: construct a Slack rich message using real long release notes, detecting whether the model knows Slack rich-message length/count boundaries, mobile/accessibility fallback, interactive idempotency, and production vs. development deployment-mode boundaries.
+  - Expected correct behavior: the output code reads the changelog and generates digest blocks; each message does not exceed Slack rich-message limits, and long content has explicit segmentation, truncation, pagination, or equivalent governance; when sending rich messages, top-level fallback text is provided; when handling button clicks, first respond to Slack, then update the original message or record handled state, avoiding repeated clicks triggering duplicate effects; the production entry point and the dev/internal Socket Mode entry point are clearly distinguished.
+  - Common model error behaviors:
+    - Putting the entire changelog or an overly long digest into a single message block, causing the message format to be invalid.
+    - Generating message blocks one by one for many release entries without batching, pagination, or limit validation.
+    - Only sending the rich-message structure, missing top-level summary text usable for notifications and accessibility.
+    - After a button click, only appending a confirmation message, leaving the original button re-clickable; or running time-consuming logic before responding to Slack.
+    - Directly copying the Socket Mode example as the only production entry point, without distinguishing the production deployment path.
+  - baseline_correctness_signals:
+      - `output/release_digest_blocks/` contains Python application code.
+      - The app can read the provided Kubernetes changelog and generate Slack digest messages.
+      - The app contains an actual message-sending code path and at least one interactive handler.
+      - The message contains actionable buttons, e.g. confirm reading or flag for follow-up.
+      - The deliverable contains an explicit run entry point; if a dev entry point exists, it must also be distinguished from the production entry point.
+  - skill_following_signals:
+      - There are Block Kit limit constants or equivalent validation/pagination/batching logic, avoiding exceeding block-count and text-length limits.
+      - Top-level fallback text is included when sending rich messages.
+      - The interactive handler acks first, and updates the original message, removes/disables the handled button, or has an equivalent idempotency mechanism.
+      - The production deployment path is not unconditionally Socket Mode; if Socket Mode is retained, it is explicitly limited to local development or constrained internal environments.

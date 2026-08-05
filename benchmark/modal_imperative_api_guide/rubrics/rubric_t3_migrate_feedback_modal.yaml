@@ -1,0 +1,147 @@
+# Rubric for skill_60_modal_imperative_api_guide — t3: migrate feedback modal
+
+rules:
+  - id: g1_observable_output
+    type: required-tool
+    provenance: gate
+    verifier: state-diff
+    weight: 0
+    spec: "[GATE] The feedback modal output file is present for evaluation."
+    signal:
+      file: "assets/SF60_t3_migrate_feedback_modal/output/src/features/FeedbackModal/index.tsx"
+      file_must_contain: "FeedbackEntry|createFeedbackModal|FeedbackForm"
+
+  - id: r1_migrate_to_base_ui_create_modal
+    type: required-tool
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Migrated modal code should use createModal from @lobehub/ui/base-ui rather than the legacy/root Modal component.
+      Skill-exclusive rationale: Looking only at the task "migrate while keeping the experience," a strong model may tidy up the existing @lobehub/ui Modal declarative pattern; the skill recommends the base-ui createModal imperative stack. The conflict point is that the migration target is not to keep using the root Modal.
+    signal:
+      file: "assets/SF60_t3_migrate_feedback_modal/output/src/features/FeedbackModal/index.tsx"
+      file_must_contain: "import\\s*\\{[^}]*\\bcreateModal\\b[^}]*\\}\\s*from\\s*['\"]@lobehub/ui/base-ui['\"]"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_entry_opens_imperatively_without_local_open_state
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Usage should call an imperative modal opener and avoid local open state plus inline <Modal open=...> rendering.
+      Skill-exclusive rationale: Without reading the skill, a minimal migration will keep useState(false), setOpen, and <Modal open={open}>; the skill requires a createModal() call with no local state. The conflict point is the entry component's control style.
+    signal:
+      file: "assets/SF60_t3_migrate_feedback_modal/output/src/features/FeedbackModal/index.tsx"
+      file_must_contain:
+        - "\\bcreateModal\\s*\\("
+        - "\\bcreate[A-Za-z]*Feedback[A-Za-z]*Modal\\b"
+      file_must_not_contain:
+        - "\\bconst\\s*\\[\\s*(?:open|isOpen|visible|show\\w*)\\s*,\\s*set[A-Z]\\w*\\s*\\]\\s*=\\s*useState\\s*\\("
+        - "<Modal\\b[\\s\\S]{0,200}\\bopen\\s*="
+        - "\\bsetOpen\\b"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_content_closes_via_modal_context
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Modal content that dismisses itself should use useModalContext from @lobehub/ui/base-ui for close.
+      Skill-exclusive rationale: A default refactor will keep passing onClose/setOpen from the entry to FeedbackForm; the skill requires using useModalContext inside the content to decouple the close action. The conflict point is the source of the close capability.
+    signal:
+      file: "assets/SF60_t3_migrate_feedback_modal/output/src/features/FeedbackModal/index.tsx"
+      file_must_contain:
+        - "import\\s*\\{[^}]*\\buseModalContext\\b[^}]*\\}\\s*from\\s*['\"]@lobehub/ui/base-ui['\"]"
+        - "const\\s*\\{[^}]*\\bclose\\b[^}]*\\}\\s*=\\s*useModalContext\\s*\\("
+        - "\\bclose\\s*\\("
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_do_not_pass_entry_close_prop_to_content
+    type: forbidden-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Content should not receive an onClose/setOpen prop from the entry component when modal context can supply close.
+      Skill-exclusive rationale: Looking only at the task, keeping the onClose prop is a natural and task-correct approach; the skill specifies useModalContext inside the modal content. The conflict point is that you must not continue closing the modal through prop drilling.
+    signal:
+      file: "assets/SF60_t3_migrate_feedback_modal/output/src/features/FeedbackModal/index.tsx"
+      file_must_not_contain:
+        - "(?:const\\s+)?FeedbackForm\\s*=\\s*\\(\\s*\\{[^}]*\\b(?:onClose|setOpen|close|dismiss|handleClose)\\b"
+        - "function\\s+FeedbackForm\\s*\\(\\s*\\{[^}]*\\b(?:onClose|setOpen|close|dismiss|handleClose)\\b"
+        - "<FeedbackForm[^>]{0,250}\\b(?:onClose|setOpen|close|dismiss|handleClose)="
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_use_semantic_content_styling
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] base-ui modal styling should target semantic regions such as styles.content, not legacy styles.body.
+      Skill-exclusive rationale: The old file already has styles.body, and a strong model will copy it to preserve padding; the skill explicitly says base-ui keys are content/backdrop/popup/etc., not antd styles.body. The conflict point is the body to content slot-name migration.
+    signal:
+      file: "assets/SF60_t3_migrate_feedback_modal/output/src/features/FeedbackModal/index.tsx"
+      file_must_contain: "\\bstyles\\s*:\\s*\\{[\\s\\S]{0,500}\\bcontent\\s*:\\s*\\{[\\s\\S]{0,180}\\bpadding\\s*:\\s*['\"]?0(?:['\"]|\\b)"
+      file_must_not_contain:
+        - "\\bstyles\\s*:\\s*\\{[\\s\\S]{0,500}\\bbody\\s*:"
+        - "\\bstyles\\.body\\b"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_create_modal_options_use_i18next_t
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] createModal options are outside hooks, so title text should use t imported from i18next rather than useTranslation inside the opener.
+      Skill-exclusive rationale: A default migration may try to call useTranslation in a helper/open function or keep title computation in component state; the skill explicitly says createModal options should import { t } from i18next where hooks are unavailable. The conflict point is the i18n acquisition method.
+    signal:
+      file: "assets/SF60_t3_migrate_feedback_modal/output/src/features/FeedbackModal/index.tsx"
+      file_must_contain:
+        - "import\\s*\\{[^}]*\\bt\\b[^}]*\\}\\s*from\\s*['\"]i18next['\"]"
+        - "\\btitle\\s*:\\s*t\\s*\\(\\s*['\"]feedback\\.title['\"]"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] Feedback modal migration preserves title, width, no footer, textarea/button, and close behavior."
+    signal:
+      file: "assets/SF60_t3_migrate_feedback_modal/output/src/features/FeedbackModal/index.tsx"
+      file_must_contain:
+        - "feedback\\.title"
+        - "\\bwidth\\s*:\\s*['\"]min\\(90%,\\s*640px\\)['\"]"
+        - "\\bfooter\\s*:\\s*null"
+        - "\\b(?:TextArea|textarea)\\b"
+        - "\\bButton\\b"
+        - "\\bclose\\s*\\("

@@ -1,0 +1,113 @@
+# Rubric for skill_58_deeptools_ngs_data_analysis_toolkit — ngs_t2_rnaseq_stranded_coverage
+
+rules:
+  # ── GATE ──
+  - id: g1_coverage_track_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable RNA-seq stranded coverage attempt, e.g., calling bamCoverage; this gate does not pass based on the output directory name alone."
+    signal:
+      pattern: '(?i)\bbamCoverage\b'
+
+  # ── Skill-Following rules ──
+  - id: r1_forward_filterrnastrand
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] The saved command for the forward coverage track should use deepTools bamCoverage's --filterRNAstrand forward.
+      Skill-exclusive rationale: without reading the skill, a strong model may use samtools/pysam to manually split by FLAG, or generate one merged track; the skill explicitly says "Use bamCoverage with --filterRNAstrand to separate forward and reverse strands". The conflict point is the deepTools-specific strand-filter parameter.
+    signal:
+      file: "output/ngs_t2_rnaseq_stranded_coverage/run.log"
+      file_must_contain: '(?im)^\s*(?:Command:\s*)?(?:\$?\s*)?bamCoverage\b[^\n]*(?:\\\n[^\n]*)*--filterRNAstrand(?:\s+|=)\s*[''\"]?forward[''\"]?'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B", "reviewer_C"]
+      consensus: high
+
+  - id: r2_reverse_filterrnastrand
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] The saved command for the reverse coverage track should use deepTools bamCoverage's --filterRNAstrand reverse.
+      Skill-exclusive rationale: without reading the skill, a model may only produce one total coverage or split using non-deepTools methods; the skill explicitly requires bamCoverage's --filterRNAstrand forward/reverse dual tracks. The conflict point is that the reverse strand must also be produced via the skill-specified parameter.
+    signal:
+      file: "output/ngs_t2_rnaseq_stranded_coverage/run.log"
+      file_must_contain: '(?im)^\s*(?:Command:\s*)?(?:\$?\s*)?bamCoverage\b[^\n]*(?:\\\n[^\n]*)*--filterRNAstrand(?:\s+|=)\s*[''\"]?reverse[''\"]?'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B", "reviewer_C"]
+      consensus: high
+
+  - id: r3_no_rnaseq_extendreads
+    type: forbidden-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] RNA-seq bamCoverage commands must not use --extendReads。
+      Skill-exclusive rationale: without reading the skill, a model may follow ChIP-seq/deepTools coverage habits and use --extendReads to smooth the signal; the skill explicitly says "NEVER use --extendReads for RNA-seq (would extend over splice junctions)". The conflict point is that fragment extension is prohibited for RNA-seq.
+    signal:
+      file: "output/ngs_t2_rnaseq_stranded_coverage/run.log"
+      file_must_not_contain: '(?im)^\s*(?:Command:\s*)?(?:\$?\s*)?bamCoverage\b[^\n]*(?:\\\n[^\n]*)*--extendReads\b'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B", "reviewer_C"]
+      consensus: high
+
+  - id: r4a_forward_cpm_normalization_for_bins
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.375
+    spec: |
+      [SKILL] forward stranded RNA-seq binned coverage track should be normalized with CPM in the same bamCoverage command that uses --filterRNAstrand forward。
+      Skill-exclusive rationale: the task only says tracks should be visually comparable; a model that does not read the skill may choose raw counts, RPKM/RPGC, or omit normalization; the skill's quick selection guide specifies "RNA-seq bins: CPM". The conflict point is the normalization method for binned browser tracks.
+    signal:
+      file: "output/ngs_t2_rnaseq_stranded_coverage/run.log"
+      file_must_contain: '(?im)^\s*(?:Command:\s*)?(?:\$?\s*)?bamCoverage\b(?=[^\n]*(?:\\\n[^\n]*)*--filterRNAstrand(?:\s+|=)\s*[''\"]?forward[''\"]?)(?=[^\n]*(?:\\\n[^\n]*)*--normalizeUsing(?:\s+|=)\s*[''\"]?CPM[''\"]?)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B", "reviewer_C"]
+      consensus: high
+
+  - id: r4b_reverse_cpm_normalization_for_bins
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.375
+    spec: |
+      [SKILL] reverse stranded RNA-seq binned coverage track should be normalized with CPM in the same bamCoverage command that uses --filterRNAstrand reverse。
+      Skill-exclusive rationale: the task only says tracks should be visually comparable; a model that does not read the skill may choose raw counts, RPKM/RPGC, or omit normalization; the skill's quick selection guide specifies "RNA-seq bins: CPM". The conflict point is the normalization method for binned browser tracks.
+    signal:
+      file: "output/ngs_t2_rnaseq_stranded_coverage/run.log"
+      file_must_contain: '(?im)^\s*(?:Command:\s*)?(?:\$?\s*)?bamCoverage\b(?=[^\n]*(?:\\\n[^\n]*)*--filterRNAstrand(?:\s+|=)\s*[''\"]?reverse[''\"]?)(?=[^\n]*(?:\\\n[^\n]*)*--normalizeUsing(?:\s+|=)\s*[''\"]?CPM[''\"]?)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B", "reviewer_C"]
+      consensus: high
+
+  # ── Task completion ──
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Records whether two stranded coverage tracks usable for a browser were generated, and run.log and strand mapping were saved."
+    signal:
+      judge_question: |
+        Inspect final files under output/ngs_t2_rnaseq_stranded_coverage/. Are there two non-empty browser-ready coverage track files (e.g. .bw/.bigWig), one for forward and one for reverse strand, plus run.log containing exact commands and a one-line note mapping each output file to strand meaning?
+        Answer YES only if all requested deliverables are present and non-empty and the mapping is clear for both files. Answer NO otherwise.
+      judge_expected: "YES"
+      acceptable: "forward.bw and reverse.bw are non-empty, and run.log records the bamCoverage commands plus 'forward.bw: forward strand' and 'reverse.bw: reverse strand'."
+      unacceptable: "Two track files exist but run.log does not say which output file corresponds to which strand."

@@ -1,0 +1,9 @@
+employee_id,name,state,hourly_rate,annual_salary,employment_type,hire_date,termination_date,pto_balance_hours,accrued_ytd_hours,used_ytd_hours
+E001,Sarah Johnson,CA,0,85000,FT,2019-03-15,2024-12-31,72.5,120,47.5
+E002,Marcus Williams,TX,28.50,0,FT,2021-07-01,2024-12-31,40,80,40
+E003,Priya Patel,CO,0,72000,FT,2022-01-10,2024-12-31,55,96,41
+E004,James O'Brien,FL,0,95000,FT,2020-09-20,2024-12-31,88,120,32
+E005,Dana Reyes,NY,0,68000,PT,2023-04-01,2024-12-31,12,24,12
+E006,Chris Lee,MA,32.00,0,FT,2024-09-01,2024-12-31,8,16,8
+E007,Aisha Thompson,IL,0,110000,FT,2018-06-15,2024-12-31,120,160,40
+E008,Roberto Sanchez,GA,22.75,0,FT,2022-11-30,2024-12-31,24,48,24

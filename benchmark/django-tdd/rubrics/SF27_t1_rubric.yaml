@@ -1,0 +1,118 @@
+# Rubric for SF27 — SF27_t1_order_model_tests (V3, migrated to engine-supported verifier)
+# Background: the original rubric used state-check fields such as files_any/file_must_contain_any/signal_dimension,
+#       but the scoring engine _verify_state_check does not implement these fields (only supports artifact_main single file + PyTorch heuristic),
+#       causing all skill rules to be judged "target file not found" = False -> compliance always 0.
+# Migration: switched to regex (based on real Write/Edit tool calls in the trace, including written file content) and llm-judge,
+#       robust to the model's self-chosen test file names in the django project, and does not depend on tests actually running.
+# Balance: MUST NOT total weight (1.0) <= MUST DO total weight (3.0).
+task_id: SF27_t1_order_model_tests
+skill_id: SF27
+expected_trigger: true
+rules:
+
+  # ── GATE ──────────────────────────────────────────────────────────────
+  - id: g1_test_files_written
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains real tool calls writing Python test files under tests/, ensuring evaluability."
+    signal:
+      pattern: '(?is)"file_path"\s*:\s*"[^"]*tests?/[^"]*\.py"|(?:cat|tee|>)\s*[^"\n]{0,100}tests?/[^"\n]{0,60}\.py'
+
+  # ── MUST DO ───────────────────────────────────────────────────────────
+  - id: r1_factory_boy_for_test_data
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] Test data is created via factory_boy factories (e.g., OrderFactory()/UserFactory() or a factory-backed pytest fixture).
+      Skill-exclusive rationale: without reading the django-tdd skill, Django model tests will default to Order.objects.create() or direct instantiation to construct data;
+      the skill requires centralized factory_boy data construction.
+    signal:
+      query: >
+        Based on the test-related file content actually written via Write/Edit in the trace (not the agent's self-description),
+        is the test data mainly created via factory_boy factories (occurrence of \w+Factory(...) calls, or from ...factories import ...Factory,
+        or a factory-backed pytest fixture) to construct Order/User instances? Only answer YES or NO.
+      acceptable: "Tests or conftest use OrderFactory()/UserFactory() to construct data; or a fixture returns OrderFactory(...)."
+      unacceptable: "Test data only uses Order.objects.create(...) or direct Order(...)/User(...) construction; no factory_boy factory at all."
+      judge_expected: "YES"
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  - id: r2_pytest_fixture_in_conftest
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] Shared test state is exposed via @pytest.fixture in tests/conftest.py.
+      Skill-exclusive rationale: Django's default test style is unittest's setUp/TestCase; the skill explicitly prefers pytest fixture composition.
+    signal:
+      # Hits the same step that "writes conftest.py and the content contains @pytest.fixture".
+      pattern: 'conftest\.py[\s\S]{0,8000}?@pytest\.fixture'
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  - id: r3_pytest_style_not_unittest
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] Tests use pytest-django style (bare assert / pytest.raises / @pytest.mark.django_db),
+      avoiding Django/unittest TestCase classes and self.assertEqual assertions.
+      Skill-exclusive rationale: Django defaults to unittest TestCase; the skill enforces pytest-django style.
+    signal:
+      query: >
+        Based on the test file content actually written in the trace (not the agent's self-description), do the tests adopt pytest-django style —
+        using bare assert or pytest.raises (rather than self.assertEqual and other unittest assertions),
+        and the tests do not inherit django.test.TestCase / unittest.TestCase? Only answer YES or NO.
+      acceptable: "def test_xxx(): assert order.status == 'shipped'; with pytest.raises(ValueError): order.cancel(); functional tests + @pytest.mark.django_db."
+      unacceptable: "class OrderTests(TestCase): def test_x(self): self.assertEqual(...); uses unittest.TestCase and self.assert*."
+      judge_expected: "YES"
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  # ── MUST NOT (boundary) ──────────────────────────────────────────────
+  - id: r4_no_objects_create_in_tests
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — boundary] Test code must not use .objects.create()/direct model instantiation to construct Order/User test data (should go through factory_boy).
+    signal:
+      # If .objects.create( appears in any written test file content, it is a violation (factory files are not under the tests/ path, so no false positives).
+      must_not_match: '(?is)tests?/[^"]*\.py"[\s\S]{0,8000}?\.objects\.create(?:_user)?\s*\('
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: medium}
+
+  - id: r5_no_setup_teardown
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — boundary] Test files must not use unittest-style setUp/tearDown/setup_method lifecycle methods (use pytest fixtures for shared state).
+    signal:
+      must_not_match: '(?is)tests?/[^"]*\.py"[\s\S]{0,8000}?def\s+(?:setUp|tearDown|setup_method|teardown_method)\s*\('
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: medium}
+
+  # ── TASK COMPLETION (bypass, not counted toward SF) ────────────────────
+  - id: tc1_tests_cover_state_transitions
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Tests cover Order's confirm()/ship()/deliver()/cancel() state transitions, including normal paths and illegal transitions raising ValueError.
+    signal:
+      query: >
+        Based on the test file content actually written in the trace (not the agent's self-description), do the tests cover Order's confirm(), ship(), deliver(), cancel()
+        four methods (at least one normal-path assertion each), and is there at least one illegal state transition asserted with pytest.raises(ValueError) (or equivalent)? Only answer YES or NO.
+      acceptable: "Includes success cases for confirm/ship/deliver/cancel, plus pytest.raises(ValueError) for illegal transitions."
+      unacceptable: "Only covers three transitions, or has no ValueError assertion for any illegal transition."
+      judge_expected: "YES"

@@ -1,0 +1,351 @@
+task_id: SF33_t1_lab_unit_harmonization
+
+rules:
+# ── GATE ──
+- id: g1_observable_attempt
+  type: required-tool
+  provenance: gate
+  verifier: llm-judge
+  weight: 0
+  spec: >
+    [GATE] The trace contains an observable file write/tool call, indicating the model attempted to create the output file.
+  signal:
+    query: >
+      Based on the actual tool-call records in the trace (Write, Edit, Bash, etc.), did the model perform a real file write operation
+      (creating or modifying the CSV artifact file)?
+      Look only at tool-call evidence, not the agent's self-description or stated intent.
+      Answer YES if there is evidence of actual file write/edit tool calls that produce an output file.
+      Answer NO if there is no evidence of real file creation tool calls (only planning or describing intent).
+    acceptable: |
+      - Write tool call creating a CSV file
+      - Edit tool call modifying an existing file
+      - Bash executing a python script and generating an output file
+    unacceptable: |
+      - Only describing "I will create a file" in the conversation without any actual tool call
+      - Only Read calls, with no write operations at all
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: ["reviewer_A", "reviewer_B", "reviewer_C"]
+    consensus: high
+
+# ── Skill-Following rules (scored) ──
+
+- id: r1_strict_missing_filter
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] The skill requires Step 0 to filter incomplete records: any one of all numeric columns (about 60 feature columns, excluding patient_id)
+    with a missing value causes the entire row to be dropped (no imputation at all).
+    Skill-exclusive rationale: Without reading the skill, a strong model facing data with missing values
+    defaults to only dropping rows with heavy missing values, only checking key columns, or using mean/median imputation;
+    the skill requires strict zero-tolerance missing filtering across all numeric columns (keep only when missing==0).
+    Conflict: imputation vs drop-all; check key columns only vs check all columns.
+  signal:
+    query: >
+      Based on the actual tool calls and code execution records (not the agent's self-description or explanation),
+      when handling missing values, did the model apply a strict "drop the entire row if any column is missing" filtering strategy
+      across all numeric columns (about 60 feature columns, excluding patient_id)?
+      Key judgment points:
+      1. Whether the code checks missing values across all numeric columns (about 60 feature columns)
+      2. Whether it uses a whole-row drop strategy (e.g., dropna or equivalent logic) rather than imputation
+      3. Whether it keeps only zero-missing rows (complete cases only)
+      Answer YES if the code checks ALL numeric/lab feature columns (excluding patient_id) for missing values and drops entire rows with any missing value.
+      Answer NO if the code only checks a subset of columns, uses imputation, or keeps rows with some missing values.
+    acceptable: |
+      - df.dropna(subset=numeric_cols) or equivalent
+      - df.dropna() when the DataFrame contains only patient_id + numeric columns (equivalent to checking all columns)
+      - missing_counts = ...; df = df[missing_counts == 0]
+      - Performing isna/isnull checks on all non-patient_id columns then dropping
+    unacceptable: |
+      - df.fillna(df.mean()) or other imputation methods
+      - Running dropna only on a few columns like Serum_Creatinine, BUN
+      - Setting a threshold such as "drop only if more than 50% missing"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+- id: r3_range_based_detection
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] The skill requires range-based detection for unit conversion: for each value, check whether it is within
+    the reference range [min, max]; if it is already in range, keep the original value without conversion; if it is out of range, try conversion factors.
+    Skill-exclusive rationale: Without reading the skill, a strong model facing mixed-unit data
+    may default to: (a) looking up/inferring a unit column to determine the current unit (b) applying the same factor uniformly to the whole column
+    (c) using domain knowledge to directly decide the conversion direction;
+    the skill requires per-row, per-value judgment based on the reference range.
+    Conflict: based on unit metadata vs based on value range; uniform column conversion vs per-value judgment.
+  signal:
+    query: >
+      Based on the actual tool calls and code execution records (not the agent's self-description or explanation),
+      did the model implement per-value unit detection based on the reference range?
+      Specific judgment points:
+      1. Check whether each value is within the expected min/max range
+      2. If the value is already in range, keep the original value without conversion
+      3. Only if the value is out of range, enter the conversion logic
+      Answer YES if the code implements per-value range checking against reference min/max to determine whether conversion is needed.
+      Answer NO if the code applies a uniform conversion to entire columns, uses unit metadata/labels to determine conversion, or does not check against reference ranges.
+    acceptable: |
+      - Function logic: if min <= value <= max: return value; else: try conversion
+      - Range check followed by conditional conversion for each cell
+      - Vectorized np.where / mask-based writing: keep values in range, try conversion for out-of-range values
+    unacceptable: |
+      - df['Hemoglobin'] = df['Hemoglobin'] * 0.1 (uniform column conversion)
+      - Directly deciding "this column needs g/L to g/dL" based on the column name
+      - Conversion logic without a range check
+  review:
+    proposed_by: ["drafter", "reviewer_C"]
+    challenged_by: []
+    consensus: high
+
+- id: r4_sequential_factor_trial
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] The skill requires that when a value is outside the reference range, each factor in the conversion factor list is tried one by one,
+    and the first factor whose converted result falls within range is adopted (first-match-wins).
+    Skill-exclusive rationale: Without reading the skill, a strong model may use only a single fixed factor,
+    or directly select the correct factor based on domain knowledge, or try all factors and pick the one closest to the median.
+    The skill requires trying in order and stopping at the first hit.
+    Conflict: fixed factor / intelligent selection vs sequential trial first-match-wins.
+  signal:
+    query: >
+      Based on the actual tool calls and code execution records (not the agent's self-description or explanation),
+      when a value is outside the reference range, did the model implement logic that tries conversion factors sequentially and adopts the first hit?
+      Specific judgment points:
+      1. For out-of-range values, try each factor in the factor list one by one (multiplication)
+      2. As soon as a factor makes the converted result fall within range, adopt that result immediately and stop
+      3. It is first-match-wins semantics, not trying all and picking the best
+      Answer YES if the code tries conversion factors sequentially and returns the first converted value that falls within range (first-match-wins).
+      Answer NO if the code uses only one fixed factor, tries all factors and picks the best, or does not implement sequential trial logic.
+    acceptable: |
+      - for factor in factors: converted = value * factor; if min <= converted <= max: return converted
+      - Vectorized equivalent: check each factor in turn, mask updates values that were successfully converted
+    unacceptable: |
+      - Using only a single hardcoded factor for conversion
+      - Trying all factors and choosing the result "closest to the median"
+      - Directly deciding which factor to use based on the value's magnitude (no sequential trial)
+  review:
+    proposed_by: ["drafter", "reviewer_C"]
+    challenged_by: []
+    consensus: high
+
+- id: r5_no_clamp_on_failure
+  type: boundary
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] The skill explicitly requires: when all conversion factors have been tried and failed (no factor can bring the value into range),
+    return the original value; clamping the value to the valid range is strictly forbidden.
+    This prohibition applies to the failure fallback path only; the 5% tolerance clamping
+    in r6_tolerance_5pct_edge_clamp remains permitted.
+    Skill-exclusive rationale: Without reading the skill, a strong model's default behavior is to clamp unconvertible outlier values
+    to the upper/lower bounds of the valid range (as a safe fallback), which is a common data-cleaning practice.
+    The skill explicitly forbids this behavior. Conflict: clamp fallback vs keep original value.
+  signal:
+    query: >
+      Based on the actual tool calls and code execution records (not the agent's self-description or explanation),
+      when all unit-conversion factors fail to bring a value into the valid range, does the model's code keep the original value
+      (rather than clamping/clipping it to the range's upper/lower bounds)?
+      Note: this rule applies only to the conversion-failure fallback path. For values that convert successfully but slightly exceed the boundary,
+      the 5% tolerance edge clamp allowed by r6 is not within this prohibition.
+      Key judgment points:
+      1. The conversion function returns the original value after all factors fail
+      2. The code does not perform np.clip / clamp / min(max(...)) to the reference range on conversion-failed values
+      Answer YES if the code returns the original value when no conversion factor works (no clamping/clipping to range boundaries on the failure path).
+      Answer NO if the code clamps or clips values to the reference range when conversion fails, or applies a blanket clamp to all values after conversion.
+    acceptable: |
+      - return value (return the original value directly)
+      - The function ends with return original_value rather than clamp
+      - No clip operation after the conversion loop ends
+    unacceptable: |
+      - return max(min_val, min(value, max_val))
+      - df[col] = df[col].clip(lower=min_val, upper=max_val) applied to all values
+      - np.clip on all out-of-range values
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+- id: r6_tolerance_5pct_edge_clamp
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.75
+  spec: |
+    [SKILL] The skill requires a 5% tolerance for converted values slightly outside the range boundary: values beyond the boundary but within 5% of the boundary value
+    are treated as floating-point precision error and may be clamped to the boundary; beyond 5% the factor does not hit.
+    This rule performs edge-clamp-to-boundary only on successfully converted edge values, and is semantically isolated from r5_no_clamp_on_failure's
+    "no clamp after conversion failure" — r5 forbids clamp on the fallback path,
+    while this rule allows edge precision correction on the successful-conversion path.
+    Skill-exclusive rationale: Without reading the skill, a strong model defaults to exact boundary checks (no tolerance),
+    or uses a different tolerance percentage, or clamps all out-of-range values unconditionally.
+    The skill explicitly requires 5% tolerance and only for floating-point precision edge cases.
+    Conflict: exact boundary vs 5% tolerance; indiscriminate clamp vs edge-only clamp.
+  signal:
+    query: >
+      Based on the actual tool calls and code execution records (not the agent's self-description or explanation),
+      when judging whether a converted value falls within the valid range, does the model use approximately 5% tolerance?
+      That is: if the converted value slightly exceeds the boundary (within 5% of the boundary value), it is still considered a hit and may be clamped to the boundary.
+      Note: this tolerance is used only for edge cases when judging whether a factor hits, not an indiscriminate clamp on all values
+      (the latter is forbidden by r5 and b2).
+      Answer YES if the code implements a tolerance mechanism (approximately 5%) when checking if converted values fall within the reference range boundaries, applying only to edge cases.
+      Answer NO if the code uses exact boundary checks with no tolerance, uses a very different tolerance percentage, or clamps all out-of-range values regardless of how far they are from the boundary.
+    acceptable: |
+      - Using min * 0.95 <= value <= max * 1.05 or equivalent
+      - Explicit tolerance = 0.05 related logic
+      - Expanding the boundary by about 5% in the range check, clamping only edge values to the exact boundary
+    unacceptable: |
+      - Exact min <= value <= max with no tolerance
+      - Using an obviously different tolerance such as 10% or 20%
+      - Indiscriminately clamping all out-of-range values to min/max (this is the behavior forbidden by b2)
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+- id: r7_use_ckd_reference_ranges
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] The skill provides a complete CKD feature reference dictionary (reference/ckd_lab_features.md), containing
+    min/max ranges and conversion factors for 60 features. The skill requires using these specific reference ranges and conversion factors.
+    It has been empirically confirmed that ckd_feature_descriptions.csv contains only Key/Name/Description, with no ranges and no factors.
+    The only source from which the model can obtain correct reference values is the skill's ckd_lab_features.md.
+    Skill-exclusive rationale: Without reading the skill, a strong model may use generic clinical reference ranges (e.g., textbook values),
+    derive conversion factors on its own, or use reference values found online.
+    The skill provides specific min/max and conversion factor tables.
+    Conflict: generic reference vs the specific reference table provided by the skill.
+  signal:
+    query: >
+      Based on the actual tool calls and code execution records (not the agent's self-description or explanation),
+      when implementing unit conversion, did the model use reference ranges and conversion factors consistent with the skill's reference file
+      (reference/ckd_lab_features.md)?
+      Note: ckd_feature_descriptions.csv contains only Key/Name/Description with no range information;
+      the only correct source is ckd_lab_features.md.
+      For example: Serum_Creatinine range 0.2-20.0 mg/dL, conversion factor 0.0113;
+      Hemoglobin range 3.0-20.0 g/dL, conversion factor 0.1 (g/L to g/dL).
+      Answer YES if the code uses reference ranges and conversion factors that are consistent with the skill's CKD lab features reference (either by reading the reference file or by hardcoding values that match it).
+      Answer NO if the code uses significantly different reference ranges, makes up conversion factors, or does not use any reference ranges at all.
+    acceptable: |
+      - Reading ckd_lab_features.md and parsing min/max and conversion factors
+      - Hardcoded dictionary values consistent with the reference file (e.g., Serum_Creatinine: (0.2, 20.0), factor=0.0113)
+    unacceptable: |
+      - Using completely different reference ranges (e.g., Creatinine range 0.5-1.5)
+      - Not using any reference ranges, converting by intuition only
+      - Handling conversion factors for only a few features and ignoring the rest
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+# ── Boundary rules (scored) ──
+
+- id: b1_no_imputation
+  type: boundary
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.5
+  spec: |
+    [SKILL] Complementary to r1 — r1 tests "whether dropna was done," b1 tests "whether fillna/imputation was avoided."
+    The skill requires zero-tolerance missing filtering and forbids any form of imputation (mean, median, forward fill, KNN, etc.).
+    Skill-exclusive rationale: Without reading the skill, facing clinical data with missing values,
+    a strong model defaults to imputation (mean/median/ffill/KNN) to retain more data.
+    The skill explicitly requires dropping rather than imputing. The two-way constraint is more robust.
+  signal:
+    query: >
+      Based on the actual tool calls and code execution records (not the agent's self-description or explanation),
+      does the model's code completely avoid using any missing-value imputation method?
+      Key judgment points:
+      1. No imputation operations such as fillna / interpolate / impute / SimpleImputer
+      2. Missing values are handled by dropping rows, not filling
+      Answer YES if the code does NOT use any imputation methods (fillna, interpolate, impute, etc.) for handling missing values.
+      Answer NO if the code uses any form of imputation (mean, median, forward fill, KNN, etc.) to fill in missing values.
+    acceptable: |
+      - Using only dropna to handle missing values
+      - Using only conditional filtering to keep complete rows
+      - No fillna / impute calls at all
+    unacceptable: |
+      - df.fillna(df.mean())
+      - df.interpolate()
+      - SimpleImputer / KNNImputer
+      - df.fillna(method='ffill')
+  review:
+    proposed_by: ["reviewer_C"]
+    challenged_by: []
+    consensus: high
+
+- id: b2_no_aggressive_global_clamp
+  type: boundary
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.5
+  spec: |
+    [SKILL] Indiscriminate clip/clamp of entire columns to the reference range is forbidden.
+    Complementary to r5_no_clamp_on_failure but with different semantics — r5 forbids the fallback clamp after conversion failure,
+    b2 forbids indiscriminate whole-column clip (e.g., df[col].clip(lower=min, upper=max)).
+    This rule does not prohibit the per-value 5% tolerance clamping in r6
+    (r6's edge clamp is per-value, only for successfully converted edge cases, not a whole-column operation).
+    Skill-exclusive rationale: Without reading the skill, a strong model often clips entire columns after conversion as a quality safeguard.
+    The skill requires keeping original values so anomalies remain traceable.
+  signal:
+    query: >
+      Based on the actual tool calls and code execution records (not the agent's self-description or explanation),
+      does the model's code avoid indiscriminate clip/clamp of entire columns to the reference range?
+      Note: what is forbidden here is whole-column operations (e.g., df[col].clip(...)),
+      not the per-value 5% tolerance edge clamp in r6.
+      Key judgment points:
+      1. No whole-column operations like df[col].clip(lower=min_val, upper=max_val)
+      2. No unconditional np.clip of all values to the reference range
+      3. Per-value edge tolerance clamp (allowed by r6) does not count as a violation
+      Answer YES if the code does NOT apply blanket column-wide clip/clamp operations to force all values into reference ranges.
+      Answer NO if the code applies column-wide clip/clamp (e.g., df[col].clip(...)) to enforce reference ranges on all values.
+    acceptable: |
+      - No whole-column clip operations
+      - Only per-value 5% tolerance edge clamp within the conversion logic (allowed by r6)
+      - Keeping original values on conversion failure (required by r5)
+    unacceptable: |
+      - df[col] = df[col].clip(lower=ref_min, upper=ref_max)
+      - df[numeric_cols] = df[numeric_cols].clip(...)
+      - Uniformly np.clip all values after conversion
+  review:
+    proposed_by: ["reviewer_C"]
+    challenged_by: []
+    consensus: high
+
+# ── Task completion record (not scored) ──
+
+- id: tc1_task_done
+  type: task-completion
+  provenance: task
+  verifier: state-diff
+  weight: 0
+  spec: |
+    [TASK — not counted toward SF] Whether the output file output/ckd_lab_data_harmonized.csv exists and satisfies:
+    1. Contains the correct column headers (patient_id + all numeric feature columns)
+    2. Approximately 2548 data rows (reasonable range after full filtering: 2400-2700)
+    3. Numeric values formatted to exactly 2 decimal places (X.XX), preserving trailing zeros (e.g., 0.50, 1234.00)
+    4. No scientific notation (e.g., 1.5e3)
+    5. No European comma decimal format (e.g., 12,34 as 12.34)
+  signal:
+    file: "output/ckd_lab_data_harmonized.csv"
+    file_must_contain: "patient_id,Serum_Creatinine,BUN,eGFR"
+    file_must_not_contain: "[0-9]+[eE][+-]?[0-9]+|,\\d+,\\d{2},"

@@ -1,0 +1,49 @@
+task_id: frontend_code_review_t1_overlay
+level: L2
+skill_id: frontend-code-review
+description: |
+  I am about to review the sidebar app-list component once more before merging. Per the current repo's frontend conventions, please focus on the delete-confirmation dialog, accessibility, interaction states, and user-visible risks in `assets/frontend_code_review_t1_overlay/input/web/app/components/main-nav/components/web-apps-section.tsx`; if there are no explicit issues, please also directly state the remaining risks.
+initial_state:
+  assets:
+    - path: assets/frontend_code_review_t1_overlay/input/web/app/components/main-nav/components/web-apps-section.tsx
+      source: https://raw.githubusercontent.com/langgenius/dify/main/web/app/components/main-nav/components/web-apps-section.tsx
+      real_state: Real Dify frontend React component implementing the main-nav web apps section, including alert dialog, scroll area, search, virtualized list, permissions, and mutations.
+      preparation: |
+        Downloaded verbatim from the public langgenius/dify GitHub repository main branch.
+    - path: assets/frontend_code_review_t1_overlay/input/web/AGENTS.md
+      source: https://raw.githubusercontent.com/langgenius/dify/main/web/AGENTS.md
+      real_state: Real Dify web-local frontend workflow and review contract.
+      preparation: |
+        Downloaded verbatim from the public langgenius/dify GitHub repository main branch.
+    - path: assets/frontend_code_review_t1_overlay/input/web/docs/overlay.md
+      source: https://raw.githubusercontent.com/langgenius/dify/main/web/docs/overlay.md
+      real_state: Real Dify overlay best-practices document.
+      preparation: |
+        Downloaded verbatim from the public langgenius/dify GitHub repository main branch.
+    - path: assets/frontend_code_review_t1_overlay/input/packages/dify-ui/README.md
+      source: https://raw.githubusercontent.com/langgenius/dify/main/packages/dify-ui/README.md
+      real_state: Real Dify UI package README describing shared primitives and package boundaries.
+      preparation: |
+        Downloaded verbatim from the public langgenius/dify GitHub repository main branch.
+    - path: assets/frontend_code_review_t1_overlay/input/packages/dify-ui/AGENTS.md
+      source: https://raw.githubusercontent.com/langgenius/dify/main/packages/dify-ui/AGENTS.md
+      real_state: Real Dify UI package authoring contract.
+      preparation: |
+        Downloaded verbatim from the public langgenius/dify GitHub repository main branch.
+  tools_available: [read, grep, webfetch]
+expected_trigger: true
+skill_constraints_tested:
+  - id: required_local_contracts_for_overlay_review
+    description: The reviewer must inspect the local web contract and overlay/Dify UI primitive contracts before finalizing findings for code containing dialog or other floating UI.
+    exclusive: Without the skill, a model is likely to review only the named component and miss the required repository-specific overlay and primitive contracts.
+  - id: latest_web_interface_guidelines_for_ui_a11y
+    description: UI, UX, and accessibility review must include the latest Web Interface Guidelines as a required baseline before final findings.
+    exclusive: A generic frontend review usually relies on built-in accessibility knowledge and does not fetch the current external baseline.
+  - id: overlay_contract_crosscheck_before_findings
+    description: Before finalizing findings for dialog or floating UI, the reviewer must cross-check the component against the repo-local overlay and Dify UI primitive contracts, including web/AGENTS.md, web/docs/overlay.md, packages/dify-ui/README.md, and packages/dify-ui/AGENTS.md when relevant.
+    exclusive: A generic frontend review may still produce actionable findings, but it will not reliably verify Dify-specific overlay primitive, portal, layering, and Dify UI contract expectations across the required local documents.
+notes: |
+  - Positive trigger: file-focused frontend review of a real Dify TSX component under web/.
+  - Observable signals: reads component plus web/AGENTS.md, web/docs/overlay.md, Dify UI contracts, and performs a WebFetch of the Web Interface Guidelines URL before finalizing findings.
+  - Scoring note: treat the observable signal as the fetch/read action itself, not strict agreement with any time-varying wording in the live external document.
+  - Common failure: reviews only React logic, skips overlay contracts, skips Dify UI contracts, or reports speculative style preferences.

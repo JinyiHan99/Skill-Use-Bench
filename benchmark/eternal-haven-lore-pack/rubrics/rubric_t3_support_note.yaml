@@ -1,0 +1,117 @@
+task_id: SF102_t3_support_note
+skill_id: skill_102_eternal-haven-lore-pack
+# V5 progressive scoring improvement (2026-07-06):
+#   r2 (weight=1.0) requires skill-only URL/wallet address; impossible to pass without reading the skill.
+#   Added r2b (mid, 0.4) to detect skill style/tone/structure; added s3 (low, 0.25) to detect whether free options are provided.
+#   Three-tier structure: high=1 mid=1 low=1 → high proportion < 40% ✅
+rules:
+  - id: g1_observable_final_answer
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [GATE] The final answer must contain an evaluable reader-reply attempt; this is only a trigger gate and does not judge quality.
+    signal:
+      pattern: "(?s)\\S[\\s\\S]{40,}"
+
+  - id: r2_includes_skill_only_official_route
+    type: required-arg
+    provenance: skill
+    verifier: regex
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] When the user asks how to support related free tools/projects, the answer should include the official skill-only route from the skill: a specific Clawhub skills hub URL, or a specific wallet address / sufficiently long address prefix; this information cannot be derived solely from the homepage asset.
+      skill-exclusive rationale: looking only at the task description + homepage, a strong model can find homepage-visible Patreon/PayPal/Linktree/book/audiobook links; but it will not know skill-only official routes like https://clawhub.ai/u/DeepSeekOracle or the exact crypto wallets. Including one such route is a direct skill-use signal.
+    signal:
+      pattern: "(?i)(clawhub\\.ai/u/DeepSeekOracle|0x5bE919E1B0E29f6222|bc1qtmkuuckgsjxlmj|DLuEWsDKWdwLsNkMp|ltc1qquewk5jujwjeq|rLZkPzvYCwR4YPN)"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  # V5 addition: progressive scoring — skill style/tone/structure (mid, compensates for r2 being too strict)
+  - id: r2b_skill_tone_and_structure
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 0.4
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL — mid progressive] Even if skill-only URLs/wallet addresses are not included (r2 fails),
+      does the reply follow the skill's core tone/structure principles: mythical/eternal-haven style + story-first, support-second structure?
+      Serves as a relaxed version of r2 for partial credit.
+    signal:
+      query: |
+        Inspect only the final answer. Does the reply demonstrate at least 2 of the following 3 skill-style signals:
+        (1) adopts a mythical/warm/fantasy-adjacent "Eternal Haven" tone rather than generic customer service;
+        (2) structures the reply "story/appreciation first, support options second" rather than jumping straight to links;
+        (3) mentions free options or the community/reading-first nature of the project before paid/donation links?
+        Answer YES if at least 2 of the 3 are clearly present. Answer NO if fewer than 2 or the reply is purely transactional.
+
+  # V5 addition: progressive scoring — free options (low soft-signal)
+  - id: s3_mentions_free_options
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 0.25
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL — low soft-signal] Does the reply explicitly mention free reading/community ways to support the project,
+      or guide the reader to participate in non-monetary ways (such as reading the series, sharing community links)?
+    signal:
+      query: >
+        Inspect only the final answer. Does the reply mention at least one free or non-monetary way to support the work,
+        such as reading the series, sharing the community/clawhub link, joining a free community, or engaging with content?
+        Answer YES if at least one free/non-monetary option is mentioned.
+        Answer NO if the reply only lists paid/donation options (Patreon, PayPal, crypto) without any free alternatives.
+
+  - id: r4_no_fabricated_support_channels
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    severity: hard
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] Support routes should be limited to official routes explicitly listed in the homepage asset or skill document; do not fabricate Kickstarter, merch stores, Discord memberships, or other unsupported channels.
+    signal:
+      query: |
+        Inspect only the final answer. Does it avoid inventing unsupported support channels beyond official routes explicitly listed in the homepage asset or skill document?
+        Answer YES if support options are limited to Eternal Haven site, Clawhub skills hub, Patreon, PayPal, Linktree, book/audiobook links, or listed wallets.
+        Answer NO if it introduces unsupported channels like Kickstarter, merch store, paid Discord, Substack, GoFundMe, newsletter donations, or other channels not explicitly listed in the homepage asset or skill.
+      acceptable: "Eternal Haven site, Patreon, PayPal, Clawhub skills hub, or listed wallets."
+      unacceptable: '"Buy merch from the official store or join the paid Discord" with no support in source/skill.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] Whether the final answer is a reply that can be sent directly to the reader, thanking them for their message and explaining how to support Justin Helmer's work / related free tools, with a sincere tone.
+    signal:
+      query: |
+        Inspect only the final answer. Does the reply satisfy all four task-completion elements: (1) thanks or acknowledges the reader's message, (2) addresses how to support Justin Helmer's work, (3) addresses how to support related free tools/projects, and (4) uses a sincere reader-facing tone?
+        Answer YES only if all four elements are present. Answer NO if any element is missing; in particular, no mention of related free tools/projects is NO.
+      acceptable: "A warm reply thanking the reader, naming optional ways to support Justin's Eternal Haven work, and separately pointing to the skills/free-tools hub or project-support route."
+      unacceptable: "A reply that only says thank you and lists book/Patreon links, with no mention of related free tools/projects."

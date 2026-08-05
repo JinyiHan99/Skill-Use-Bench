@@ -1,0 +1,50 @@
+task_id: drizzle_t1_workspace_verify_run
+skill_id: drizzle
+category: positive
+description: |
+  We are preparing to open the verification flow to team workspace use. The source snapshot is at `assets/drizzle_t1_workspace_verify_run/input/`.
+  Please add a verification-request record model initiated by a team workspace to this database source code. It is not an extension of the existing `verify_runs` run-session table, but rather records request-level state before and after a workspace-level verification request enters the flow.
+  This model must at least be able to express: the owning workspace, the external flow request identifier, the current lifecycle state, the final processing result written back later, and the per-stage processing details.
+  Keep consistent with the existing naming style; such records are created first, and the final processing result and stage details are written in later stages. After completion, save the changes in the same source tree.
+initial_state:
+  assets:
+    - path: assets/drizzle_t1_workspace_verify_run/input/packages/database/src/schemas/verify.ts
+      source: "https://raw.githubusercontent.com/lobehub/lobehub/main/packages/database/src/schemas/verify.ts"
+      real_state: "LobeHub/Lobe Chat's real verify schema file, containing multiple verification-related pgTables and JSONB fields."
+      preparation: |
+        Downloaded the original file directly from the public repository's main branch, without rewriting content.
+    - path: assets/drizzle_t1_workspace_verify_run/input/packages/database/src/schemas/_helpers.ts
+      source: "https://raw.githubusercontent.com/lobehub/lobehub/main/packages/database/src/schemas/_helpers.ts"
+      real_state: "LobeHub/Lobe Chat's real schema helper file, containing the project's existing time-field helpers."
+      preparation: |
+        Downloaded the original file directly from the public repository's main branch, without rewriting content.
+  tools_available:
+    - read
+    - write
+    - edit
+    - bash
+expected_trigger: true
+skill_constraints_tested:
+  - id: absent_value_without_sentinel
+    description: "The final processing result written in a later stage should remain nullable/optional; lifecycle state can be expressed separately, but must not be disguised as the final result using default placeholder states such as unknown, pending, or none."
+    exclusive: "A model that has not read the skill may model the not-yet-produced final processing result as notNull with default('unknown'), default('pending'), default('none'), or similar placeholder states; a model that has read the skill should distinguish lifecycle state from final-result absence, keeping the final result nullable/optional at creation time."
+  - id: concrete_jsonb_contract
+    description: "JSONB fields should define concrete interfaces describing the expected shape, avoiding loose contracts like Record<string, unknown>."
+    exclusive: "A model that has not read the skill will often write $type<Record<string, unknown>>() directly on new stageResults or metadata fields."
+notes: |
+  - Core test point: when adding to a real project's database schema, whether the repository's specific stance on missing values and JSONB contracts is followed, with auxiliary observation of primary key and field-description style.
+  - Expected correct behavior: add a team-workspace-initiated verification-request record model to the verify schema, semantically distinct from the existing `verify_runs` run-session table; use the project's time helper, a concrete JSONB interface, a nullable final-processing-result field, and write JSDoc with business meaning for non-obvious fields.
+  - Common model error behaviors (semantic-level counter-examples):
+      - The new primary key uses serial, bigserial, or identity, violating the repository's requirement to avoid auto-increment primary keys.
+      - The "not-yet-produced final processing result" is written as notNull with placeholder default states such as unknown, pending, or none.
+      - Stage processing details or request-context JSONB fields directly use Record<string, unknown> or unknown[] without defining an expected structure.
+      - Comments on the external flow identifier, lifecycle state, or stage details only restate the field name, without explaining the business source, write timing, or examples.
+  - baseline_correctness_signals:
+      - A team-workspace-initiated verification-request record model is added to the source code, and is semantically distinguished from the existing `verify_runs` run-session table.
+      - The new model can express the business process where the request is created first and the final processing result and stage details are written back later.
+      - The file syntax preserves a readable TypeScript/Drizzle schema structure and is consistent with the existing schema naming style.
+  - skill_following_signals:
+      - Core signal: the final-processing-result field does not introduce artificial placeholder defaults such as unknown, pending, or none; the not-yet-produced result at creation time remains nullable/optional.
+      - Core signal: newly added structured JSONB fields use named interface/type, not Record<string, unknown> or unknown[] as the stage-detail contract.
+      - Weak signal: the new primary key does not use serial, bigserial, or identity, and follows the current schema's non-sequential default ID generation style; do not treat `$defaultFn` as the only acceptable literal form for this task.
+      - Auxiliary signal: JSDoc for non-obvious fields explains the business source, lifecycle, or example, rather than only restating the column name; this item is not a standalone core exclusive criterion.

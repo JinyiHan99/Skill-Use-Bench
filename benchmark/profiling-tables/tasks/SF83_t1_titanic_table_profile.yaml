@@ -1,0 +1,47 @@
+task_id: SF83_t1_titanic_table_profile
+level: L2
+skill_id: profiling-tables
+description: |
+  We want to hand over the passenger warehouse at `assets/SF83_t1_titanic_table_profile/input/passenger_warehouse.sqlite` to a newly joined data analyst. Please produce a comprehensive data profile based on the `titanic_passengers` table in this SQLite warehouse; the report should include field definition descriptions, and briefly explain the evidence used to confirm the target table and field definitions. Help her assess the table's structure, scale, typical content, data quality, and whether it is suitable for direct analysis. Save the result as `output/SF83_t1_titanic_table_profile.md`.
+
+initial_state:
+  assets:
+    - path: assets/SF83_t1_titanic_table_profile/input/passenger_warehouse.sqlite
+      source: "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv and https://raw.githubusercontent.com/vega/vega-datasets/master/data/seattle-weather.csv"
+      real_state: "SQLite warehouse snapshot containing a full public Titanic passenger table plus another public table; metadata tables are derived from the loaded CSV columns."
+      preparation: |
+        Download the public Titanic CSV from Data Science Dojo and Seattle weather CSV from Vega datasets. Load the rows into SQLite tables `titanic_passengers` and `seattle_weather`; create `information_schema_tables` and `information_schema_columns` from the loaded schema and column comments. No synthetic data rows are added.
+    - path: assets/SF83_t1_titanic_table_profile/input/titanic.csv
+      source: "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
+      real_state: "Raw source CSV present in the input directory as preparation material; the intended primary input for this task is the SQLite warehouse snapshot."
+      preparation: "Downloaded as-is from the public Titanic CSV source before loading into the SQLite warehouse."
+  tools_available: [bash, read, write]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: metadata_column_descriptions
+    description: "The report must include column descriptions sourced from warehouse metadata and explain the evidence used to confirm the target table and field definitions before profiling."
+    exclusive: "Without the skill, models commonly inspect the SQLite table directly with native metadata or dataframe profiling and invent generic column descriptions, missing the specific comments stored in the warehouse metadata tables."
+  - id: typed_column_statistics
+    description: "The skill requires gathering different statistics for numeric columns versus text/categorical columns, including text length or empty-value checks where applicable."
+    exclusive: "A generic profiler may only call a dataframe describe-style summary, missing specialized text statistics such as string length range/average, empty counts, or categorical frequency percentages."
+  - id: structured_profile_sections
+    description: "The final profile should include overview, schema, key statistics, data quality scoring, potential issues, and recommended queries for follow-up analysis."
+    exclusive: "This is a supporting signal; the stronger distinction is whether the report includes the skill-specific data quality scoring and recommended queries rather than only a loose narrative or raw summaries."
+
+notes: |
+  - Core test point: the user gives the target table name in the SQLite warehouse; the report should explain the evidence used to confirm the target table and field definitions, and use field descriptions from the warehouse metadata; then do a deep profile with different statistical breakdowns for numeric, text, and categorical columns.
+  - Expected correct behavior: the report includes the evidence for confirming the target table and field definitions; field descriptions in the Schema come from warehouse metadata; the report includes row count, column-level statistics, sample rows, quality score, potential issues, and follow-up query suggestions. Numeric columns such as `age`/`fare` should have range, mean, median, null/missing, cardinality and other statistics; text columns such as `name`/`cabin` should have length range or empty/missing conditions; categorical columns such as `survived`/`pclass`/`sex`/`embarked` should have frequency and percentage.
+  - Common model error behaviors: directly reading the raw CSV or directly querying `titanic_passengers` then writing a summary, without explaining the evidence for confirming the target table and field definitions; field descriptions in the Schema are generic explanations invented by the model rather than warehouse metadata comments; only outputting uniform `count/unique/top/freq` for all columns, without separately handling `age` missing, `cabin`'s large number of missing values, `fare`'s numeric distribution, text length, or categorical frequency; the output lacks a Data Quality Score or Recommended Queries.
+  - Evaluation accepts SQLite-equivalent implementations or Python-computed equivalent statistics; verbatim execution of the warehouse SQL template in the skill is not required; the focus is on whether semantically equivalent typed statistics and a structured profile are completed.
+  - Since `titanic_passengers` has no update-time or business-date field, a Freshness score of N/A, "cannot be determined", or a conservative assessment based on the warehouse snapshot is acceptable.
+  - baseline_correctness_signals:
+      - `output/SF83_t1_titanic_table_profile.md` exists and is non-empty.
+      - The report clearly corresponds to `titanic_passengers`, not treating `seattle_weather` or the raw CSV as the primary input.
+      - The report includes the actual row count 891 or an equivalent result computable from the database.
+  - skill_following_signals:
+      - The report explains the evidence for confirming the target table and field definitions; if evaluating the tool trajectory, querying `information_schema_tables` / `information_schema_columns` or equivalent warehouse metadata queries are acceptable as evidence.
+      - Field descriptions in the Schema are consistent with warehouse metadata comments, especially check that `passengerid` is "Passenger identifier from the source file", `survived` is "Survival flag in the source manifest", `pclass` is "Passenger ticket class".
+      - Numeric, text, and categorical columns use different statistical breakdowns; text columns such as `name`/`cabin` include length or empty/missing statistics, categorical columns such as `survived`/`sex`/`embarked` include frequency and percentage.
+      - The output includes Overview, Schema, Key Statistics, Data Quality Score, Potential Issues, Recommended Queries; Freshness may be marked N/A or explained as undeterminable from the current table when the time field is missing.

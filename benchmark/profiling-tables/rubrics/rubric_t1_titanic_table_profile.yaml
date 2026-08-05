@@ -1,0 +1,145 @@
+task_id: SF83_t1_titanic_table_profile
+skill_id: profiling-tables
+rubric_version: v2
+rules:
+  - id: g1_observable_output_write
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trajectory contains an observable write or edit attempt to the target report file; only records evaluability, does not judge report quality."
+    signal:
+      pattern: >-
+        (?is)(?:(?:tool|name)["']?\s*:\s*["']?(?:Write|Edit)["']?.{0,5000}(?:file_path|path)["']?\s*:\s*["'][^"']*output/SF83_t1_titanic_table_profile\.md["']|(?:file_path|path)["']?\s*:\s*["'][^"']*output/SF83_t1_titanic_table_profile\.md["'].{0,5000}(?:tool|name)["']?\s*:\s*["']?(?:Write|Edit)["']?)
+
+  - id: r1_metadata_comments_used_in_schema
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Schema/field definitions should come from warehouse metadata, not be invented from SQLite PRAGMA, CSV headers, or common sense alone.
+      Skill-exclusive rationale: without reading the skill, strong models usually directly inspect `titanic_passengers` or use a dataframe profiler to generate column names/types and fill in generic explanations; the skill requires first querying INFORMATION_SCHEMA/equivalent metadata and using the COMMENTs there. The conflict point is that field descriptions must reflect warehouse metadata comments, not natural-language guesses.
+    signal:
+      file: output/SF83_t1_titanic_table_profile.md
+      file_must_contain:
+        - '(?is)passengerid.{0,200}(Passenger identifier from the source file|源文件.{0,40}乘客标识)'
+        - '(?is)survived.{0,200}(Survival flag in the source manifest|源清单.{0,40}生存|生还标志)'
+        - '(?is)pclass.{0,200}(Passenger ticket class|船票等级|舱位等级)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_metadata_evidence_explained
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The report should briefly explain the evidence used to confirm the target table and field definitions, especially locating `titanic_passengers` via table list/field metadata.
+      Skill-exclusive rationale: without reading the skill, strong models usually directly open the given table and start statistics, at most saying "read the database"; the skill requires confirming metadata before profiling. The conflict point is that the report must present the metadata-confirmation evidence, not just the final analysis conclusions.
+    signal:
+      file: output/SF83_t1_titanic_table_profile.md
+      file_must_contain:
+        - '(?is)(information_schema|metadata|元数据|表清单|字段注释|column comments?|COMMENT).{0,300}titanic_passengers|titanic_passengers.{0,300}(information_schema|metadata|元数据|表清单|字段注释|column comments?|COMMENT)'
+        - '(?is)(information_schema_columns|column metadata|字段元数据|字段注释|COMMENT|comments?).{0,400}(passengerid|survived|pclass|age|fare)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_numeric_columns_have_type_specific_stats
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Numeric columns should use numeric-specific statistic families, e.g. min/max/avg/median/stddev/null_count/distinct_count, not a uniform describe or count/unique/top/freq for all columns.
+      Skill-exclusive rationale: without reading the skill, strong models often use pandas describe or SQLite aggregates for a small amount of range statistics; the skill requires branching by data type and including median, missing/cardinality and other depth metrics for numeric columns. The conflict point is that numeric columns like `age`/`fare` must have numeric-specific profiling, not a generic summary.
+    signal:
+      file: output/SF83_t1_titanic_table_profile.md
+      file_must_contain:
+        - '(?is)\b(age|fare)\b.{0,500}(min|max|minimum|maximum|range|最小|最大|范围)'
+        - '(?is)\b(age|fare)\b.{0,500}(median|null_count|null count|missing|distinct_count|distinct count|stddev|standard deviation|中位数|缺失|空值|基数|唯一|标准差)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_text_columns_have_length_or_empty_stats
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] String columns should use string-specific statistics, e.g. min/max/avg length, empty_count or empty-string/blank checks; a plain NULL/missing count alone does not count as passing.
+      Skill-exclusive rationale: without reading the skill, strong models often list text columns only as object/string or give unique/top/freq; the skill requires string columns to compute length and empty/blank values. The conflict point is that text columns like `name`/`cabin` must have string profiling, not just categorical counts or sample displays.
+    signal:
+      file: output/SF83_t1_titanic_table_profile.md
+      file_must_contain:
+        - '(?is)\b(name|cabin|ticket|embarked)\b.{0,500}(min_length|max_length|avg_length|length|min length|max length|average length|字符长度|平均长度|最大长度|最小长度|empty_count|empty string|blank|空字符串|空白)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_categorical_columns_have_frequency_percentages
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: false
+    weight: 0.25
+    spec: |
+      [SKILL — auxiliary weak signal] Categorical/dimensional columns may do cardinality analysis, listing frequency and percentage of main values; this behavior is fairly common in Titanic EDA, so it is only a low-weight auxiliary signal.
+      Skill-exclusive rationale: without reading the skill, strong models may also naturally output categorical frequencies and percentages; the skill explicitly requires frequency and percentage, the conflict point is weak, so it is down-weighted and not used as a strong exclusive signal.
+    signal:
+      file: output/SF83_t1_titanic_table_profile.md
+      file_must_contain:
+        - '(?is)\b(survived|sex|pclass|embarked)\b.{0,500}(count|frequency|freq|数量|频次|频数).{0,300}(%|percent|percentage|占比|百分比)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r6_skill_summary_package_present
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The output summary should include the skill-specified structured profile package: Overview, Schema, Key Statistics, Data Quality Score, Potential Issues, Recommended Queries.
+      Skill-exclusive rationale: without reading the skill, strong models usually write a free-form EDA report or data quality note; the skill explicitly requires these profile sections, especially the quality score and recommended queries. The conflict point is that the final report must be organized by the profile-handoff template, not just loose narrative.
+    signal:
+      file: output/SF83_t1_titanic_table_profile.md
+      file_must_contain:
+        - '(?im)^#{1,4}\s*(Overview|概览|摘要)\b'
+        - '(?im)^#{1,4}\s*(Schema|Column Metadata|字段|模式|列元数据)\b'
+        - '(?im)^#{1,4}\s*(Key Statistics|关键统计|核心统计)\b'
+        - '(?im)^#{1,4}\s*(Data Quality Score|质量评分|质量得分)\b'
+        - '(?im)^#{1,4}\s*(Potential (Data )?Issues|潜在问题|数据质量问题)\b'
+        - '(?im)^#{1,4}\s*(Recommended (SQL )?Queries|推荐查询|推荐 SQL|常见查询)\b'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] The target report file exists and the core artifact is correct: corresponds to titanic_passengers, includes the actual scale 891, schema/fields, core Titanic fields, and data quality/suitability conclusions."
+    signal:
+      file: output/SF83_t1_titanic_table_profile.md
+      file_must_contain:
+        - '(?i)titanic_passengers'
+        - '\b891\b'
+        - '(?i)(schema|column|字段|列)'
+        - '(?i)(survived|pclass|fare|cabin)'
+        - '(?i)(quality|issues|suitability|质量|问题|适用)'

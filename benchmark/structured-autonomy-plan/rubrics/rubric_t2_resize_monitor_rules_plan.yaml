@@ -1,0 +1,123 @@
+rubric_id: rubric_SF90_t2_resize_monitor_rules_plan
+skill_id: structured-autonomy-plan
+task_id: SF90_t2_resize_monitor_rules_plan
+description: >
+  Evaluates whether the model followed the structured-autonomy-plan workflow for
+  a monitor-aware ResizeMe window-resizing plan without implementing code.
+
+rules:
+  - id: g1_observable_plan_write
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] Trace contains an observable Write/Edit attempt whose structured file_path/path argument targets a plans/<feature-name>/plan.md artifact."
+    signal:
+      pattern: "(?i)(Write|Edit)[\\s\\S]{0,240}\\\"?(file_path|path)\\\"?\\s*[:=]\\s*\\\"[^\\\"]*(?:assets/SF90_t2_resize_monitor_rules_plan/input/project/)?plans/[^\\\"'\\s]+/plan\\.md\\\""
+
+  - id: r1_research_project_api_surface_first
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Before planning, the model must gather core project research evidence for ResizeMe monitor/window API context, positioning/resizing/discovery patterns, and existing docs/plans.
+      skill-exclusive reason: without reading the skill, a strong model may design a MonitorFromWindow/GetMonitorInfo clamp scheme directly from Win32 common sense; the skill requires first researching from the project's WindowsApi.cs, WindowPositionService, WindowResizeService/WindowDiscoveryService and existing plans. The conflict is "planning directly from generic API memory" vs "planning based on the project's real API surface and patterns first".
+    signal:
+      query: >
+        Based only on actual tool-call evidence before the first plan.md write, did the model inspect project-specific monitor/window API and pattern sources: WindowsApi.cs or equivalent native wrapper files, WindowPositionService.cs, WindowResizeService.cs or WindowDiscoveryService.cs, and at least one existing plan/doc under plans/ or .github/pr-plans/? Accept relative or absolute paths, and count sub-agent findings only when the sub-agent actually read or inspected the files. Do not count mere path mentions or the agent's claims. Answer YES only if these project-specific sources were inspected before plan generation; answer NO otherwise.
+      acceptable: "Reads WindowsApi.cs, WindowPositionService.cs, WindowResizeService.cs, and plans/center-on-resize/plan.md before writing the monitor plan."
+      unacceptable: "Mentions MonitorFromWindow from memory without reading WindowsApi.cs or existing plan docs before writing."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_planning_only_no_source_edits
+    type: forbidden-tool
+    provenance: gate
+    verifier: llm-judge
+    exclusive: true
+    weight: 0
+    spec: |
+      [GATE/TASK-SANITY] This is a planning step only; no ResizeMe source/project files should be modified. Only plan artifacts under plans/ are allowed.
+      skill-exclusive reason: the task description asks how to solve a concrete bug, so without the skill a coding assistant may patch WindowResizeService or WindowsApi immediately. The skill forbids code writing during planning, but this task also asks for a plan, so this rule is not scored as main SF.
+    signal:
+      query: >
+        Based only on observable Write/Edit tool calls and final-state evidence in the trace, did the model avoid modifying ResizeMe source/project/config files and limit any file creation or modification to plan artifacts under plans/**/plan.md? Answer YES if no Write/Edit targets files under ResizeMe/, *.sln, *.csproj, *.cs, *.xaml, *.json, or *.config except a plans/**/plan.md artifact; answer NO if any implementation/source/project/config file was created or modified.
+      acceptable: "Only writes assets/SF90_t2_resize_monitor_rules_plan/input/project/plans/monitor-aware-resize/plan.md."
+      unacceptable: "Edits ResizeMe/Features/WindowManagement/WindowResizeService.cs, ResizeMe/Native/WindowsApi.cs, XAML, csproj, or config JSON."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r3_plan_saved_with_skill_template
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The final draft plan must be saved to plans/{feature-name}/plan.md and contain the template fields Branch, Description, Goal, Implementation Steps, plus Files, What, and Testing in the step structure.
+      skill-exclusive rationale: without reading the skill, a strong model may only write a technical design in chat or use arbitrary Markdown headings; the skill enforces the save path and template. The conflict point is "free-format design notes" vs "the fixed PR plan structure in plans/{feature-name}/plan.md".
+    signal:
+      query: >
+        Based on the final saved plan artifact content and the Write/Edit path in the trace, did the model save a plan under plans/{feature-name}/plan.md and include all required template fields: Branch, Description, Goal, Implementation Steps, and per-step Files, What, and Testing? Answer YES only if the saved artifact path and all template fields are evidenced; answer NO for chat-only plans, other filenames, or missing fields.
+      acceptable: "Write to plans/monitor-aware-resize/plan.md containing Branch, Description, Goal, Implementation Steps, and steps with Files/What/Testing."
+      unacceptable: "Only replies in chat, writes design.md, or saves a plan missing Files/What/Testing fields."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_complex_feature_multiple_testable_commits
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Complex work must be decomposed into multiple testable commits within one PR on a dedicated branch.
+      skill-exclusive reason: without reading the skill, the model may summarize "update resize logic and test" in one or two generic paragraphs; the skill requires commit-sized, testable phases. The conflict is "single-block solution" vs "multi-step testable commit plan on a dedicated branch".
+    signal:
+      query: >
+        Inspect only the final saved plan file. Does it name a dedicated branch and split the monitor/work-area visibility fix into at least two distinct, non-placeholder, testable steps that could be individual commits? Each step must have its own Testing or equivalent verification method; do not require any specific example topic such as settings/default policy. Answer YES if the branch and multiple distinct testable commit-sized steps are present; answer NO otherwise.
+      acceptable: "Branch monitor-aware-resizing; distinct steps for Windows API/work-area modeling, resize/position behavior, and verification, each with its own testing method."
+      unacceptable: "A single step 'fix multi-monitor resize bug'; repeated placeholder steps; no branch; or no testing boundaries per step."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_monitor_semantics_clarification_pause
+    type: termination
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Ambiguous monitor-selection behavior must be marked with [NEEDS CLARIFICATION], followed by a clarifying question and a pause.
+      skill-exclusive reason: without reading the skill, a strong model will directly choose current/nearest/active monitor or virtual desktop bounds; the skill requires unresolved decisions to be marked and user feedback awaited. The conflict is "silently deciding policy for the user" vs "marking monitor semantics as unresolved and pausing".
+    signal:
+      query: >
+        Based on the final saved plan and final response, did the model mark monitor/work-area selection ambiguity with [NEEDS CLARIFICATION] or a case-insensitive equivalent, ask a corresponding clarifying question, and clearly wait for user feedback? Focus only on the clarification/pause behavior; do not judge source-code edits here. Answer YES if the marker, corresponding question, and waiting intent are all evidenced; answer NO otherwise.
+      acceptable: "Plan says target monitor selection [NEEDS CLARIFICATION]; final response asks whether to clamp to current or nearest monitor and waits."
+      unacceptable: "Plan chooses nearest monitor with no marker; or asks an unrelated question; or does not wait for feedback."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] A relevant monitor-aware ResizeMe development plan exists and addresses keeping resized windows within usable screen/work-area bounds."
+    signal:
+      query: >
+        Based on the final saved plan file content, is there a substantive plan for resolving ResizeMe multi-monitor/window-edge visibility issues after resizing? Answer YES if the plan exists and discusses monitor/work-area bounds or visible-window rules in the ResizeMe project; answer NO if no relevant plan was saved or it is unrelated.
+      acceptable: "Plan discusses WindowsApi/monitor work area, WindowResizeService/WindowPositionService, and verification for off-screen prevention."
+      unacceptable: "No saved plan file, or a plan about preset buttons/hotkeys only."

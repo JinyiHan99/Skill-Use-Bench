@@ -1,0 +1,168 @@
+rubric_id: rubric_t2_open_source_report
+skill_id: gongwen_format
+task_id: gongwen_format_t2_open_source_report
+objective: "Evaluate whether the model, when generating an open-source ecosystem annual observation report, follows the heading hierarchy, body, and attachment official-document format requirements of the gongwen_format skill."
+rules:
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    severity: soft
+    exclusive: false
+    locus: trace
+    spec: "[GATE] The trace must contain an actual write attempt to the target JS script or DOCX final draft; this is only an evaluability gate and does not judge content correctness."
+    signal:
+      pattern: '(?s)(?:\b(?:Write|Edit)\b.{0,500}\bfile_path\b\s*:\s*["''][^"'']*output/(?:create_report_document\.js|open_source_report\.docx)["'']|\bBash\b.{0,1200}(?:node\s+output/create_report_document\.js|(?:writeFileSync|Packer\.toBuffer|>|tee).{0,600}output/(?:create_report_document\.js|open_source_report\.docx)))'
+
+  - id: r1_title_uses_xiaobiaosong_erhao_center
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    weight: 0.5
+    severity: hard
+    exclusive: true
+    locus: output-file
+    spec: |
+      [SKILL] The report title should use the official-document title font 方正小标宋简体 (FangSong XiaoBiaoSong Simplified), size 二号 (size 2, 22pt/44 half-points), and be centered, rather than an ordinary bold heading style.
+      skill-exclusive rationale: without reading the skill, a strong model will usually use Word default headings, Heiti, or bold Songti; the skill requires 方正小标宋简体 size 二号 centered. The conflict point is that generic heading styles differ from the official-document title's dedicated font/size.
+    signal:
+      file: "output/create_report_document.js"
+      file_must_contain: '(?s)\A(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?开源生态年度观察报告)(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?(?:AlignmentType\.CENTER|alignment\s*:\s*(?:AlignmentType\.)?CENTER|alignment\s*:\s*["'']?center))(?:(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?font\s*:\s*["'']?方正小标宋简体)(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?size\s*:\s*44)|(?=.{0,20000}?(?:xiaobiaosong|FZXiaoBiaoSong)\s*:\s*["'']方正小标宋简体["''])(?=.{0,20000}?erhao\s*:\s*44)(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?font\s*:\s*(?:FONTS\.)?(?:xiaobiaosong|FZXiaoBiaoSong))(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\().{0,3500}?size\s*:\s*SIZES\.erhao))'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_first_level_headings_heiti_sanhao_yi_numbering
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    weight: 1.0
+    severity: hard
+    exclusive: true
+    locus: output-file
+    spec: |
+      [SKILL] Level-1 headings should use the "一、" numbering, with font 方正黑体 (FangHei), size 三号 (size 3, 16pt/32 half-points).
+      skill-exclusive rationale: without reading the skill, a strong model often uses Markdown #, default bold, Songti, or "1." numbering to express hierarchy; the skill explicitly binds level-1 headings to "一、+方正黑体+三号". The conflict point is that ordinary hierarchical headings do not meet the official-document level-1 heading convention.
+    signal:
+      file: "output/create_report_document.js"
+      file_must_contain: '(?s)\A(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\(|firstLevel|level1|一级标题).{0,3500}?一\s*、)(?:(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\(|firstLevel|level1|一级标题).{0,3500}?font\s*:\s*["'']?方正黑体)(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\(|firstLevel|level1|一级标题).{0,3500}?size\s*:\s*32)|(?=.{0,20000}?(?:heiti|FZHei)\s*:\s*["'']方正黑体["''])(?=.{0,20000}?sanhao\s*:\s*32)(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\(|firstLevel|level1|一级标题).{0,3500}?font\s*:\s*(?:FONTS\.)?(?:heiti|FZHei))(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\(|firstLevel|level1|一级标题).{0,3500}?size\s*:\s*SIZES\.sanhao))'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_second_level_headings_kaiti_sanhao_parenthesized_numbering
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    weight: 1.0
+    severity: hard
+    exclusive: true
+    locus: output-file
+    spec: |
+      [SKILL] Level-2 headings should use the "（一）" numbering, with font 方正楷体 (FangKai), size 三号 (size 3, 16pt/32 half-points).
+      skill-exclusive rationale: without reading the skill, a strong model may only use bold body text, bullet points, or Arabic numeral lists; the skill explicitly requires "（一）+方正楷体+三号". The conflict point is that generic lists/bold cannot replace the official-document level-2 heading style.
+    signal:
+      file: "output/create_report_document.js"
+      file_must_contain: '(?s)\A(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\(|secondLevel|level2|二级标题).{0,3500}?（一）)(?:(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\(|secondLevel|level2|二级标题).{0,3500}?font\s*:\s*["'']?方正楷体)(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\(|secondLevel|level2|二级标题).{0,3500}?size\s*:\s*32)|(?=.{0,20000}?(?:kaiti|FZKai)\s*:\s*["'']方正楷体["''])(?=.{0,20000}?sanhao\s*:\s*32)(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\(|secondLevel|level2|二级标题).{0,3500}?font\s*:\s*(?:FONTS\.)?(?:kaiti|FZKai))(?=.{0,20000}?(?:new\s+Paragraph|Paragraph\s*\(|secondLevel|level2|二级标题).{0,3500}?size\s*:\s*SIZES\.sanhao))'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_third_level_headings_use_dot_not_dunhao
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    weight: 0.75
+    severity: hard
+    exclusive: true
+    locus: trace
+    spec: |
+      [SKILL] Level-3 headings should use the "1." form, and must not use the Chinese enumeration mark "1、"; level-3 heading font should be 方正仿宋 (FangSong), size 三号 (size 3).
+      skill-exclusive rationale: without reading the skill, Chinese reports often naturally use "1、" or auto-lists; the skill specifically requires level-3 headings to use "1." instead of "1、". The conflict point is that the common Chinese enumeration mark is the opposite of the official-document level-3 heading convention.
+    signal:
+      query: >
+        Based only on the content actually written to output/create_report_document.js or actual generated docx structural evidence, not the agent's self-description: is there at least one identifiable level-3 heading paragraph/style evidence, and do these level-3 headings use "1." style numbering without using "1、" enumeration marks, while setting 方正仿宋 size 三号? Do not treat attachment entries, version numbers like 1.0, or ordinary lists as level-3 headings; if there is no level-3 heading evidence, answer NO. Answer only YES or NO.
+      acceptable: "There is a level-3 heading paragraph such as '1. 研发平台建设', the paragraph/style uses font: '方正仿宋', size: 32, and the level-3 heading is not written as '1、...'."
+      unacceptable: "No identifiable level-3 heading, or treating ordinary attachments/lists as level-3 headings, or level-3 headings using '1、', or level-3 headings not setting 方正仿宋 size 三号."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_body_uses_fangsong_sanhao_28pt_spacing
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    weight: 0.75
+    severity: hard
+    exclusive: true
+    locus: output-file
+    spec: |
+      [SKILL] The report body should use 方正仿宋 (FangSong), size 三号 (size 3), and set 28-point body line spacing (in docx-js commonly line: 560 or 28*20).
+      skill-exclusive rationale: without reading the skill, a strong model may keep default Word body font and default line spacing; the skill requires the precise "方正仿宋+三号+28-point line spacing" combination. The conflict point is that default body typesetting cannot reflect the official-document body convention.
+    signal:
+      file: "output/create_report_document.js"
+      file_must_contain: '(?s)\A(?=.{0,20000}?(?:bodyStyle|bodyParagraph|createBody|正文|new\s+Paragraph).{0,3500}?(?:line\s*:\s*(?:560|28\s*\*\s*20|20\s*\*\s*28)))(?:(?=.{0,20000}?(?:bodyStyle|bodyParagraph|createBody|正文|new\s+Paragraph).{0,3500}?font\s*:\s*["'']?方正仿宋)(?=.{0,20000}?(?:bodyStyle|bodyParagraph|createBody|正文|new\s+Paragraph).{0,3500}?size\s*:\s*32)|(?=.{0,20000}?(?:fangsong|FZFangSong)\s*:\s*["'']方正仿宋["''])(?=.{0,20000}?sanhao\s*:\s*32)(?=.{0,20000}?(?:bodyStyle|bodyParagraph|createBody|正文|new\s+Paragraph).{0,3500}?font\s*:\s*(?:FONTS\.)?(?:fangsong|FZFangSong))(?=.{0,20000}?(?:bodyStyle|bodyParagraph|createBody|正文|new\s+Paragraph).{0,3500}?size\s*:\s*SIZES\.sanhao))'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_attachment_numbering_and_typography
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    weight: 0
+    severity: soft
+    exclusive: true
+    locus: trace
+    spec: |
+      [SKILL — conditional diagnosis, not counted toward SF] If the report sets an attachment area, attachment entries should use "1.", "2." numbering and use 方正仿宋 (FangSong), size 三号 (size 3); if no attachment area is set, this condition does not deduct skill score.
+      skill-exclusive rationale: without reading the skill, a strong model often writes attachments as ordinary bullet points, "附件一" or Chinese-parenthesis numbering; the skill has independent rules for attachment numbering and font/size. The conflict point is that ordinary attachment lists do not equal official-document attachment format.
+    signal:
+      query: >
+        Based only on the content actually written to output/create_report_document.js or actual generated docx structural evidence, not the agent's self-description: if an attachment area exists, do the attachment entries use "1.", "2." numbering and set 方正仿宋 size 三号? If there is no attachment area, answer YES (indicating this condition is not applicable, no deduction). Answer only YES or NO.
+      acceptable: "No attachment area; or after 附件: there are '1. 公开报告来源', '2. 数据摘录说明', attachment entries use font: '方正仿宋', size: 32."
+      unacceptable: "An attachment area exists but written as '附件一：公开报告来源', bullet list, or '（一）公开报告来源', or attachment entries not setting 方正仿宋 size 三号."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r7_exact_gongwen_page_setup
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    weight: 0.5
+    severity: hard
+    exclusive: true
+    locus: output-file
+    spec: |
+      [SKILL] The generation script should set an A4 page with official-document margins: top 37mm, bottom 35mm, left 28mm, right 26mm.
+      skill-exclusive rationale: without reading the skill, the model may only generate a default Word document or ordinary A4 document; the skill requires GB/T 9704 precise margins. The conflict point is that default margins cannot replace the official-document type-area setting.
+    signal:
+      file: "output/create_report_document.js"
+      file_must_contain: '(?s)\A(?=.{0,20000}?(?:page|sections|properties))(?=.{0,20000}?(?:width\s*:\s*11906|(?:210\s*mm|A4)))(?=.{0,20000}?(?:height\s*:\s*16838|(?:297\s*mm|A4)))(?=.{0,20000}?top\s*:\s*(?:1570|37\s*mm|(?:mmTo(?:Twip|Dxa)s?|convertMillimetersToTwips)\(\s*37\s*\)))(?=.{0,20000}?bottom\s*:\s*(?:1484|35\s*mm|(?:mmTo(?:Twip|Dxa)s?|convertMillimetersToTwips)\(\s*35\s*\)))(?=.{0,20000}?left\s*:\s*(?:1134|28\s*mm|(?:mmTo(?:Twip|Dxa)s?|convertMillimetersToTwips)\(\s*28\s*\)))(?=.{0,20000}?right\s*:\s*(?:1106|26\s*mm|(?:mmTo(?:Twip|Dxa)s?|convertMillimetersToTwips)\(\s*26\s*\)))'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    severity: soft
+    exclusive: false
+    locus: trace
+    spec: "[TASK — not counted toward SF] Both the final draft output/open_source_report.docx and the runnable script output/create_report_document.js are generated; the report summarizes the input material and is intended for management circulation and archiving."
+    signal:
+      query: >
+        Based on actual file writes, command outputs, or final file content evidence, not the agent's self-description: were output/open_source_report.docx and output/create_report_document.js generated, and does the script/document content contain core task content such as open-source annual report, management observations/suggestions? Answer only YES or NO.
+      acceptable: "Both the target docx and create_report_document.js exist; content includes key points such as 2024 China open-source annual report, Technology Strategy Office, observation suggestions, or archival circulation."
+      unacceptable: "Only ordinary Markdown/plain text output, missing docx or script, or content unrelated to the open-source ecosystem annual observation report."

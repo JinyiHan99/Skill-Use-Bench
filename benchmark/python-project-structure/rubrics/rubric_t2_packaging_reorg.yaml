@@ -1,0 +1,171 @@
+# Rubric for skill_82_python_project_structure_module — t2_packaging_reorg
+# Skill: Python Project Structure & Module Architecture
+
+rules:
+  # ── GATE ────────────────────────────
+  - id: g1_observable_output_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trajectory should contain an observable attempt to create or edit output/packaging_refactor package files or output/structure_notes.md; this gate does not evaluate artifact quality.
+    signal:
+      pattern: >
+        ["']?file_path["']?\s*[:=]\s*["'][^"']*output/(packaging_refactor/[^"']+\.py|structure_notes\.md)["']
+
+  # ── SKILL-FOLLOWING (scored) ────────────
+  - id: r1_preserve_one_concept_per_file
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] After reorganization, the independent responsibility boundaries of the three concepts version, specifier, and requirement should still be preserved; they should not be merged into a single comprehensive module to respond to "modules are too fragmented", nor should separation be faked with thin wrapper/re-export shells.
+      Skill-exclusive rationale: looking only at the task description, "modules are too fragmented, entry points are inconsistent" naturally induces strong models to merge version/specifiers/requirements into one convenience module; the skill requires one concept per file, and the conflict point is "reduce file count to appear less fragmented" vs. "preserve aggregation boundaries that vary by concept".
+    signal:
+      query: >
+        Based only on the final files actually written under output/packaging_refactor/, does the
+        reorganized package keep version parsing, specifier handling, and requirement parsing in
+        separate focused modules/files with real implementation content rather than merging them
+        into one all-purpose module? Do not rely on the agent's prose or plans. Answer YES if there
+        are distinct meaningful modules or files for version, specifiers, and requirements concepts.
+        Answer NO if the real implementation is collapsed into one combined module such as api.py,
+        core.py, packaging.py, or __init__.py, even if three thin wrapper/re-export stub files also
+        exist.
+      acceptable: 'output/packaging_refactor/version.py, specifiers.py, requirements.py remain separate focused modules with substantive code'
+      unacceptable: 'output/packaging_refactor/core.py contains Version, SpecifierSet, and Requirement together while version.py/specifiers.py/requirements.py only re-export from core.py'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_shallow_package_layout
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] A small reusable library should use a shallow, consistent package structure; it should not add empty generic layering directories such as core/internal/services/impl or two-or-more-layer wrapper hierarchies.
+      Skill-exclusive rationale: looking only at the task description, "clearer importable package structure" and "internal boundaries" may induce the model to wrap with multi-layer core/api/internal/services/impl; the skill prefers flat hierarchy, adding depth only for real sub-domains, and the conflict point is "create a sense of architecture via layering" vs. "solve boundaries with shallow packages and explicit interfaces".
+    signal:
+      query: >
+        Based only on final paths actually created under output/packaging_refactor/, is the package
+        layout shallow and free of unnecessary architectural wrapper layers? Do not use the agent's
+        written explanation as evidence. Answer YES if the package is mostly files directly under
+        output/packaging_refactor/ or uses at most one genuinely meaningful single-level private
+        subpackage. Answer NO if it creates two-or-more-level wrapper hierarchies or generic layers
+        such as core/, api/, internal/, services/, or impl/ solely for organization.
+      acceptable: 'output/packaging_refactor/__init__.py, version.py, specifiers.py, requirements.py'
+      unacceptable: 'output/packaging_refactor/core/internal/services/impl/version.py or api/services/requirements.py'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_package_init_defines_public_all
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] output/packaging_refactor/__init__.py should define a package-level __all__, making the stable import entry point machine-visible.
+      Skill-exclusive rationale: looking only at the task description, the model may only copy the original files and describe recommended imports in notes, or only rely on submodules' own __all__; the skill explicitly requires the package initializer to provide a clean public interface, and the conflict point is "prose/implicit convention" vs. "explicit __all__ in the package entry point".
+    signal:
+      file: "output/packaging_refactor/__init__.py"
+      file_must_contain: '(?m)^\s*__all__\s*(?::\s*[^=]+)?='
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_no_star_import_in_package_entrypoint
+    type: forbidden-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The package entry point should not implicitly form a public interface via star imports.
+      Skill-exclusive rationale: looking only at the task description, to quickly unify the entry point, the model may write from .version import * etc. to aggregate submodule __all__; the skill requires an explicit public API, and the conflict point is "quickly aggregate all names" vs. "explicitly list the stable entry point".
+    signal:
+      file: "output/packaging_refactor/__init__.py"
+      file_must_not_contain: '(?m)^\s*from\s+[^#\n]+\s+import\s+\*'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_package_all_excludes_private_helpers
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The package-level __all__ should not include implementation details such as underscore-prefixed helpers, boundary classes, validation functions, or comparison internal types.
+      Skill-exclusive rationale: looking only at the task description, "some people misused internal helpers" may induce the model to list helpers uniformly in the entry point and document them as not recommended; the skill stipulates that members not listed in __all__ are internal implementation details, and the conflict point is "centrally expose then verbally warn" vs. "omit internal helpers from the public API".
+    signal:
+      query: >
+        Based only on the explicit names listed in the package-level __all__ in final
+        output/packaging_refactor/__init__.py, does __all__ exclude private helper names and internal
+        implementation types? Do not use notes, final prose, or imports outside __all__ as evidence.
+        Answer YES if package-level __all__ lists only stable consumer-facing names and no names
+        beginning with underscore or known helpers such as _BaseVersion, _Version, _cmpkey,
+        _validate_spec, _BoundaryVersion, _LowerBound, _UpperBound, _trim_release, or parser
+        internals. Answer NO if any private/internal helper is included in package-level __all__.
+      acceptable: '__all__ includes Version, InvalidVersion, parse, SpecifierSet, Specifier, InvalidSpecifier, Requirement, InvalidRequirement'
+      unacceptable: '__all__ includes _cmpkey, _Version, _validate_spec, _BoundaryVersion, or _trim_release'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r7_notes_explain_stable_entrypoint_and_internal_boundary
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] structure_notes.md should explain the correspondence between the stable import entry point and the __all__/explicit public API mechanism and internal implementation boundaries, rather than only describing which files were moved.
+      Skill-exclusive rationale: looking only at the task description, the model may write an ordinary migration note or file list; the skill emphasizes public interface vs. internal implementation detail, and the conflict point is "generic structural description" vs. "explicitly explain __init__.__all__ / public modules / private helper boundaries". This rule is a weak skill-following auxiliary signal.
+    signal:
+      query: >
+        Based only on final output/structure_notes.md content actually written, does the note
+        explicitly explain the stable package entrypoint for consumers using __all__ or an equivalent
+        explicit public API mechanism, and explain that names not listed there or private helpers are
+        internal implementation details? Do not rely on the agent's final answer. Answer YES if it
+        identifies the package entrypoint/public __all__ mechanism and explains internal helper
+        boundaries. Answer NO if it only lists files or gives a generic refactor summary without
+        explaining __all__ or an equivalent explicit public API mechanism.
+      acceptable: 'Notes say consumers import stable names from packaging_refactor.__init__/package root, __all__ defines that public API, and helpers with leading underscores remain internal'
+      unacceptable: 'Notes only say version.py/specifiers.py/requirements.py were copied'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  # ── TASK COMPLETION (bypass, not counted toward SF) ──
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] An importable package structure has been generated in output/packaging_refactor/, preserving version, specifier, and requirement-related code locations, and output/structure_notes.md has been generated.
+    signal:
+      query: >
+        Based only on final files actually written under output/, did the model create
+        output/packaging_refactor/__init__.py plus non-empty/non-stub modules for version parsing,
+        specifier handling, and requirement parsing, and create output/structure_notes.md? Typical
+        evidence includes Version/parse or InvalidVersion in a version module, Specifier or
+        SpecifierSet in a specifiers module, and Requirement or InvalidRequirement in a requirements
+        module. Do not answer NO merely because unavailable transitive dependencies such as
+        _parser, markers, or utils were not provided in the prompt. Answer YES if these core
+        deliverables exist. Answer NO if files are missing or are only empty shells.
+      acceptable: 'output/packaging_refactor/__init__.py plus version/specifiers/requirements modules with recognizable Version, Specifier/SpecifierSet, and Requirement code, and output/structure_notes.md exist'
+      unacceptable: 'Only notes are written, one of the three implementation areas is absent, or the modules are empty re-export shells with no recognizable code'

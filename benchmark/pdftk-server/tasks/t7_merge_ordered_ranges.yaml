@@ -1,0 +1,80 @@
+task_id: SF03_t7_merge_ordered_ranges
+level: L2
+skill_id: skill_03_pdf
+description: |
+  I'm preparing HTTP protocol training material and need to extract key chapters from three RFC documents to assemble the teaching material:
+
+  1. First include pages 8-45 of rfc9110_http_semantics.pdf (HTTP Methods & Status Codes)
+  2. Then pages 15-68 of rfc9000_quic.pdf (QUIC Connection & Streams)
+  3. Finally add pages 5-42 of rfc9114_http3.pdf (HTTP/3 Frame Types & Connection Mgmt)
+
+  Combine them in this order into a complete training PDF in the current directory.
+
+initial_state:
+  files:
+    - path: README.txt
+      content: |
+        Input files (all from IETF RFC series):
+          rfc9110_http_semantics.pdf (194 pages) - HTTP Semantics
+          rfc9000_quic.pdf          (151 pages) - QUIC: A UDP-Based Multiplexed and Secure Transport
+          rfc9114_http3.pdf         (57 pages)  - HTTP/3
+        
+        Sources:
+          https://www.rfc-editor.org/rfc/rfc9110.pdf
+          https://www.rfc-editor.org/rfc/rfc9000.pdf
+          https://www.rfc-editor.org/rfc/rfc9114.pdf
+        
+        Task: Extract specific page ranges and combine in specified order.
+  tools_available: [bash, read, edit, grep]
+  binary_assets:
+    - path: rfc9110_http_semantics.pdf
+      source_url: "https://www.rfc-editor.org/rfc/rfc9110.pdf"
+      pages: 194
+      size_mb: 2.7
+      description: "RFC 9110 - HTTP Semantics (IETF)"
+    - path: rfc9000_quic.pdf
+      source_url: "https://www.rfc-editor.org/rfc/rfc9000.pdf"
+      pages: 151
+      size_mb: 1.5
+      description: "RFC 9000 - QUIC Transport Protocol (IETF)"
+    - path: rfc9114_http3.pdf
+      source_url: "https://www.rfc-editor.org/rfc/rfc9114.pdf"
+      pages: 57
+      size_mb: 1.1
+      description: "RFC 9114 - HTTP/3 (IETF)"
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: tool_restriction
+    description: "Must use pdftk with handle syntax"
+    exclusive: "Model might use qpdf (--pages), pypdf/PyPDF2 (PdfWriter.add_page), pikepdf, pdfunite, or ghostscript for page extraction"
+  - id: handle_syntax
+    description: "Must perform multi-file page selection in a single pdftk command using its named-handle syntax, not by extracting pages to intermediate files first"
+    exclusive: "Model uses two-pass approach: extracts pages to intermediate files in /tmp first, then merges separately, instead of single-command handle syntax"
+  - id: user_specified_order
+    description: "User explicitly specified order (first/then/finally) → do NOT sort alphabetically"
+    exclusive: "Model misapplies the skill's alphabetical-sort default rule despite explicit user ordering (first/then/finally)"
+  - id: output_naming
+    description: "Output filename must follow the skill's default merge-naming convention (prefix + first-input stem), not a self-invented semantic name"
+    exclusive: "Model uses semantic name (training_material.pdf, http_training.pdf, combined.pdf) or generic (merged.pdf, output.pdf) instead of the skill's default merge-naming pattern derived from the first input"
+  - id: page_validation
+    description: "Must verify output page count equals the sum of the three requested ranges using pdftk dump_data | grep NumberOfPages (not pdfinfo / qpdf --show-npages / len(PdfReader.pages))"
+    exclusive: "Model skips running page count verification on the final output"
+  - id: input_validation
+    description: "Must validate each input's page count using pdftk dump_data (not pdfinfo or python libs) before merging, to confirm requested ranges are covered"
+    exclusive: "Model skips validation (e.g., doesn't check that rfc9114 actually has 42+ pages)"
+  - id: no_unnecessary_batching
+    description: "Must NOT split into batches (input count = 3 ≤ 4 threshold)"
+    exclusive: "Model over-applies the skill's >4-file batching rule and creates /tmp/pdftk_workspace unnecessarily"
+  - id: single_command_extract_merge
+    description: "Must extract and merge in a single pdftk invocation, not decompose into N extract steps + 1 merge step"
+    exclusive: "Model issues 3 separate extract commands writing to /tmp then a final merge, instead of one pdftk command using named handles with cat ranges"
+
+notes: |
+  Core test points:
+  1. The user used "first/then/finally" to explicitly specify order → the default "sort alphabetically when unordered" rule must not trigger (contrast with T1)
+  2. Multi-file multi-range merging should be done in a single command, not decomposed into "extract to intermediate files first, then merge" two steps
+  3. Must first verify that the three input files' page counts cover the requested ranges, then verify the output page count equals the sum of the requested ranges
+  4. Output naming should follow the skill's default merge-naming rule (do not invent semantic names)
+  5. The input count does not exceed the skill's batching threshold; no intermediate workspace directory should be created

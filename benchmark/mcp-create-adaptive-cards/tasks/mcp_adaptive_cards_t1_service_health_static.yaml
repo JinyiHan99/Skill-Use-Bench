@@ -1,0 +1,40 @@
+task_id: mcp_adaptive_cards_t1_service_health_static
+skill_id: mcp-create-adaptive-cards
+description: |
+  Our incident managers use the plugin in `./assets/mcp_adaptive_cards_t1_service_health_static/input/service-health-plugin/` to check GitHub service health during customer calls. The answer currently comes back as plain cited rows, which is hard to scan in Copilot. Please update the plugin so the component list is easier to scan, showing each component's name, description, current state, and most recent update in a compact visual layout. Keep the data source and operation behavior unchanged.
+initial_state:
+  assets:
+    - path: ./assets/mcp_adaptive_cards_t1_service_health_static/input/service-health-plugin/ai-plugin.json
+      source: "Schema and manifest structure adapted from Microsoft 365 Copilot plugin manifest documentation: https://github.com/MicrosoftDocs/m365copilot-docs/blob/main/docs/plugin-manifest-2.4.md"
+      real_state: "Plugin manifest for a single OpenAPI-backed function that maps citation title and subtitle but has no visual response card for the returned component list."
+      preparation: |
+        Started from the public Microsoft 365 Copilot plugin manifest schema examples and filled the function metadata around GitHub's public Statuspage components endpoint.
+    - path: ./assets/mcp_adaptive_cards_t1_service_health_static/input/service-health-plugin/openapi.yaml
+      source: "Real public API shape from GitHub Statuspage endpoint https://www.githubstatus.com/api/v2/components.json"
+      real_state: "OpenAPI description for the real GitHub status components response, including nested page metadata and a components array."
+      preparation: |
+        Transcribed the public endpoint response shape into a minimal OpenAPI description and kept only fields relevant to the task scenario.
+  tools_available: [Read, Write, Edit, Glob, Grep, Bash, WebFetch]
+expected_trigger: true
+skill_constraints_tested:
+  - id: static_response_template_for_uniform_items
+    description: "The skill says same-type API results should be represented with response_semantics.static_template on the function, using the configured data_path for the repeated records."
+    exclusive: "Without the skill, strong models may still attempt to add a visual response, but they are less consistent about placing the card under functions[0].capabilities.response_semantics.static_template while preserving the existing data_path, citation mapping, and runtime wiring. The skill specifically disambiguates that same-type API list results should use a function-level response_semantics.static_template rather than OpenAPI changes or a card placed elsewhere in the manifest."
+  - id: root_iteration_binding
+    description: "The skill shows list-style static templates iterating over the response items with a Container data binding such as $data over the root item collection."
+    exclusive: "Without the skill, a model may create one card for the whole response object and bind to page or components directly, producing a card that cannot render each returned component as an individual repeated block."
+  - id: conditional_text_fallbacks
+    description: "When the card displays nullable or optional API fields such as component description, the skill expects conditional template expressions instead of raw bindings."
+    exclusive: "Without the skill, a model commonly emits raw bindings for displayed secondary fields such as ${description}, which can leave blank card text when nullable fields are absent. The skill explicitly demonstrates conditional fallback expressions such as if(field, field, 'N/A') in Adaptive Card templates."
+notes: |
+  - Positive trigger: the user asks to enhance a Microsoft 365 Copilot plugin response presentation for a real API list whose items share one shape.
+  - Expected correct behavior: `ai-plugin.json` keeps `data_path: $.components`, preserves citation properties, and adds a valid card definition under the function response semantics that repeats over the component records and displays name, description, status, and updated time.
+  - Common failure modes: editing `openapi.yaml` only; adding card JSON at the top level of `ai-plugin.json` instead of under `functions[0].capabilities.response_semantics`; creating a template that references `${components.name}` inside a single TextBlock rather than iterating records; using `${description}` without an `if(...)` fallback even though `StatusComponent.description` is nullable.
+  - baseline_correctness_signals:
+      - The plugin manifest remains valid JSON and the OpenAPI file remains valid YAML.
+      - The manifest still declares exactly one function named `GetGitHubComponents` connected to the existing runtime.
+      - The card content includes component name, description, current state, and update information.
+  - skill_following_signals:
+      - `functions[0].capabilities.response_semantics.static_template` exists and is an Adaptive Card version 1.5-style object.
+      - The static template uses a repeated Container binding for the returned item collection rather than a single non-repeating summary block.
+      - Nullable or optional displayed fields, especially component description, use conditional expressions rather than raw field references, and displayed text keeps wrapping enabled.

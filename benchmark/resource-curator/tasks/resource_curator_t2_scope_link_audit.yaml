@@ -1,0 +1,63 @@
+task_id: resource_curator_t2_scope_link_audit
+level: L3
+skill_id: skill_84_resource_curator_for_concept_pages
+description: |
+  The Scope and Closures page is nearly ready for a release, but a few readers reported that the learning links at the end send them through awkward or blocked paths, and a couple of the blurbs don't help them decide what to click.
+
+  Please do a maintenance pass on `assets/resource_curator_t2_scope_link_audit/input/scope-and-closures.mdx`. There is a recent link snapshot in `assets/resource_curator_t2_scope_link_audit/input/link_audit_snapshot.tsv` that you can use as a starting clue. If you end up removing or replacing anything, make sure the page still offers a well-rounded set of resources. Save the cleaned page as `output/scope-and-closures.mdx`, and save a brief release note as `output/scope_resource_maintenance.md` summarizing what you changed and why.
+initial_state:
+  assets:
+    - path: assets/resource_curator_t2_scope_link_audit/input/scope-and-closures.mdx
+      source: "https://github.com/leonardomso/33-js-concepts/blob/master/docs/concepts/scope-and-closures.mdx"
+      real_state: "Real JavaScript concept page for Scope and Closures from the 33-js-concepts repository; includes Reference, Books, Articles, Tools, Courses, and Videos resource sections. Some resource links redirect, and two Medium article links returned HTTP 403 during the captured check. Several resource descriptions are one sentence or generic."
+      preparation: |
+        Downloaded the raw MDX file from GitHub without content changes:
+        https://raw.githubusercontent.com/leonardomso/33-js-concepts/master/docs/concepts/scope-and-closures.mdx
+    - path: assets/resource_curator_t2_scope_link_audit/input/link_audit_snapshot.tsv
+      source: "Derived from external URLs present in https://github.com/leonardomso/33-js-concepts/blob/master/docs/concepts/scope-and-closures.mdx"
+      real_state: "Tab-separated snapshot of unique external links found in the page, with line numbers, observed status or fetch result, final URL after redirects, and short notes. It records redirects for several MDN, dev.to, and YouTube URLs, plus two inaccessible Medium URLs whose fetch notes indicate HTTP 403 Forbidden."
+      preparation: |
+        Extracted unique http/https URLs from the downloaded `scope-and-closures.mdx` and checked them with HTTP HEAD, falling back to GET on failure. Wrote line, title/context, original URL, observed status, final URL, and note columns to the TSV file.
+  tools_available:
+    - read
+    - edit
+    - write
+    - web_search
+    - web_fetch
+    - bash
+expected_trigger: true
+expected_outputs:
+  - output/scope-and-closures.mdx
+  - output/scope_resource_maintenance.md
+skill_constraints_tested:
+  - id: link_audit_actions
+    description: "The skill defines link-audit actions: keep working links, update redirect URLs to their final targets, remove or replace broken links, and treat 403 links as requiring manual/contextual checking rather than blindly deleting everything inaccessible to automation."
+    exclusive: "A model without the skill may still update redirects or notice inaccessible links through general link-audit common sense, but is less likely to treat redirects, blocked 403-style access, and genuinely broken links as separate maintenance categories with status-specific rationale, or to connect those decisions to preserving the learning value of the resource set."
+  - id: post_audit_gap_analysis
+    description: "After auditing, the skill requires counting resources by section against targets and identifying gaps in official references, articles, videos, beginner/advanced depth, and visual/text diversity."
+    exclusive: "A generic link fixer may stop after URL edits or broken-link removals. Without the skill, it is less likely to review the resulting Reference, Articles, Videos, and optional sections as a learning-resource mix, compare coverage for beginner and intermediate readers, and make replacement or retention decisions based on preserving useful coverage rather than only on URL status."
+  - id: description_quality_review
+    description: "The skill requires reviewing resource descriptions for specificity and replacing vague one-line blurbs with value-focused descriptions."
+    exclusive: "Without the skill, the model may update URLs but keep descriptions such as `Official MDN documentation on closures and lexical scoping` and `Perfect for the aha moment` without explaining specific reader value."
+notes: |
+  Positive task for auditing and maintaining existing concept-page resources.
+
+  Baseline correctness signals:
+    - `output/scope-and-closures.mdx` exists and remains valid MDX with resource cards preserved or replaced as needed.
+    - `output/scope_resource_maintenance.md` exists and mentions the maintenance decisions made.
+    - Redirected URLs from `link_audit_snapshot.tsv` are either updated or intentionally justified in the note.
+    - Inaccessible article cards are not left untouched with no explanation.
+
+  Skill-following signals:
+    - The model uses a status-specific audit approach, distinguishing 200, redirect, 403, and other failures.
+    - The model performs gap analysis after removals/replacements so the Articles and Videos sections remain within the skill target ranges where possible.
+    - The model maintains JavaScript-focused resources and avoids replacing closure resources with generic programming or non-JavaScript material.
+    - The model improves weak descriptions into specific two-sentence descriptions that say what the resource covers and why a reader should click.
+    - The release note identifies the main categories of maintenance decisions, such as redirects updated, blocked or inaccessible links reviewed, replacements/removals, description improvements, and any remaining recommendations.
+    - The release note explains why blocked or inaccessible links were kept, replaced, or removed instead of treating every non-200-style result as the same failure mode.
+    - The model does not rely on a single prescribed restructuring action; acceptable resource-balance fixes may include replacing resources, moving miscategorized resources, trimming redundant references, or justifying retention when the learning value remains strong.
+
+  Common failure examples:
+    - The model deletes both Medium cards at `scope-and-closures.mdx` lines 1193-1198 solely because the snapshot shows 403, without checking whether replacement resources are needed.
+    - The model ignores the redirect from `https://dev.to/steelvoltage/closures-using-memoization-3597` to `https://dev.to/bbarbour/closures-using-memoization-3597`, leaving stale card hrefs around line 1199.
+    - The model only edits URLs and leaves single-sentence descriptions in the Reference and Articles sections around lines 1155-1200.

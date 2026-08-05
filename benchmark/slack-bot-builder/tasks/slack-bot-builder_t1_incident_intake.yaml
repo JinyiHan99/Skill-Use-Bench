@@ -1,0 +1,68 @@
+task_id: slack-bot-builder_t1_incident_intake
+skill_id: slack-bot-builder
+description: |
+  Our on-call team wants to turn an existing Slack sample into an "incident intake" entry: colleagues type a short command in Slack, then fill in the incident title, service, severity, and description; after submission, the incident information needs to be saved to a backend, and the save process may be slow, but the submission flow in Slack must not show the user a timeout or failure prompt. The submitter should receive a direct-message confirmation containing the incident title and severity.
+  Based on the existing examples and docs in `./assets/slack-bot-builder_t1_incident_intake/input/`, deliver production-ready runnable refactored code, and place the main files you changed in `output/incident_intake/`.
+initial_state:
+  assets:
+    - path: ./assets/slack-bot-builder_t1_incident_intake/input/examples/lazy_modals_app.py
+      source: "https://github.com/slackapi/bolt-python/blob/29b9dbdd250bd9f1d27bdee10251656f6491fbbd/examples/lazy_modals_app.py"
+      real_state: "Bolt for Python example, including short command, lazy processing, modals, external select, and button callbacks."
+      preparation: |
+        Copied directly from the slackapi/bolt-python repo main branch 29b9dbdd250bd9f1d27bdee10251656f6491fbbd, content unchanged.
+    - path: ./assets/slack-bot-builder_t1_incident_intake/input/examples/modals_app.py
+      source: "https://github.com/slackapi/bolt-python/blob/29b9dbdd250bd9f1d27bdee10251656f6491fbbd/examples/modals_app.py"
+      real_state: "Bolt for Python modal example, demonstrating view open and submission handling."
+      preparation: |
+        Copied directly from the slackapi/bolt-python repo main branch 29b9dbdd250bd9f1d27bdee10251656f6491fbbd, content unchanged.
+    - path: ./assets/slack-bot-builder_t1_incident_intake/input/examples/getting_started/requirements.txt
+      source: "https://github.com/slackapi/bolt-python/blob/29b9dbdd250bd9f1d27bdee10251656f6491fbbd/examples/getting_started/requirements.txt"
+      real_state: "Official getting-started example dependency file."
+      preparation: |
+        Copied directly from the slackapi/bolt-python repo main branch 29b9dbdd250bd9f1d27bdee10251656f6491fbbd, content unchanged.
+    - path: ./assets/slack-bot-builder_t1_incident_intake/input/docs/english/tutorial/modals/modals.md
+      source: "https://github.com/slackapi/bolt-python/blob/29b9dbdd250bd9f1d27bdee10251656f6491fbbd/docs/english/tutorial/modals/modals.md"
+      real_state: "Official Slack Bolt Python modal tutorial documentation."
+      preparation: |
+        Copied directly from the slackapi/bolt-python repo main branch 29b9dbdd250bd9f1d27bdee10251656f6491fbbd, content unchanged.
+  tools_available:
+    - filesystem
+    - python
+expected_trigger: true
+skill_constraints_tested:
+  - id: lazy_or_async_slow_task_handling
+    description: "Interactive Slack requests and modal submissions must acknowledge before any potentially slow persistence or notification work; slow follow-up work should run outside the blocking interaction path, such as through Bolt lazy listeners or background threads."
+    exclusive: "Without the skill, models may implement persistence or notification logic directly inside slash command or modal submission handlers and overlook Slack's strict interactive acknowledgment window. The skill emphasizes separating quick acknowledgment from slower follow-up work."
+  - id: typed_modal_value_extraction
+    description: "Modal state extraction must correctly target specific nested elements in view.state.values according to block_id and action_id, handling both plain_text_input (value field) and static_select (selected_option.value) appropriately."
+    exclusive: "Generic implementations tend to oversimplify value extraction or assume flat dictionary key lookups, missing the nested block_id/action_id/type-specific field structure shown in the skill patterns."
+  - id: no_sensitive_payload_logging
+    description: "Production code must not retain middleware or handler-level logging that records the full Slack request payload or full request body."
+    exclusive: "Models adapting official examples often preserve debug middleware or handler logs that print complete request bodies unless they recognize Slack payload logging as a production security anti-pattern."
+notes: |
+  - Core test point: refactor a real Bolt Python example into a short-command-triggered incident-intake flow, with input fields (title, service, severity, description), and safely handle time-consuming tasks in background async/multi-threaded manner while sending a DM confirmation to the user.
+  - Expected correct behavior:
+    - The output directory `output/incident_intake/` contains runnable Python code and dependency descriptions.
+    - Both the short-command handler and the view-submission handler prioritize calling `ack()` within the 3-second acknowledgment window.
+    - If the simulated save or send operation is slow, it should be placed in a background thread or lazy handler.
+    - On view submission, use callback_id binding, and read each field from `view["state"]["values"]` via exact block_id/action_id (especially the static_select value for severity and the value field for text inputs).
+    - Credentials are obtained via environment variables, not hardcoded.
+    - Thoroughly remove the example's debug middleware that prints the full body, ensuring log safety.
+  - Common model error behaviors (specific counter-examples):
+    - Synchronously running time-consuming operations in `handle_incident_command()` or the view-submission callback, or doing processing before calling `ack()`, causing Slack to trigger a 3-second timeout.
+    - Using non-standard simple dictionary lookups when handling modal submission, e.g. directly taking `body["title"]`.
+    - Retaining the `@app.middleware` from `lazy_modals_app.py` that records the full body data, causing signatures or sensitive credential info to leak in logs.
+  - baseline_correctness_signals:
+      - `output/incident_intake/` contains Python source and necessary dependency notes.
+      - The source includes short-command entry, modal-open logic, and submission-handling logic.
+      - Incident field names match the scenario: title, service, severity, description.
+      - After submission, a DM confirmation is sent to the current user via `chat_postMessage(channel=body["user"]["id"], ...)`.
+  - skill_following_signals:
+      - Asynchronous slow-logic handling: after `ack()`, use a background thread (e.g. `threading.Thread`) or Bolt's `lazy` decorator to run follow-up processing such as simulated DB writes/notifications, without putting time-consuming work in the synchronous main flow.
+      - Correctly extract fields by type: extract the severity static_select's `selected_option["value"]`, and the plain_text_input's `value`.
+      - Security design: no Slack credentials are hardcoded in the code, and the `log_request` debug global middleware that outputs the entire `body` to logs has been removed, preventing sensitive payload leakage.
+  - evaluation_hints:
+      - Check the places in the code that handle slash command and view submission, verifying whether the `ack()` call comes before potentially time-consuming methods (e.g. DB save, external API requests), or whether `lazy` listeners/threads are used for async.
+      - Check modal extraction: confirm that for `static_select` it uses `["selected_option"]["value"]`, and for `plain_text_input` it uses `["value"]`.
+      - Confirm the `@app.middleware` part has been fully removed or modified to no longer output debug logs of the entire `body` payload.
+      - In addition to the global `@app.middleware`, also check whether there is logic such as `logger.info(body)`, `logger.debug(body)`, `print(body)` etc. in command handlers, view-submission handlers, or helper functions that outputs the complete Slack request body.

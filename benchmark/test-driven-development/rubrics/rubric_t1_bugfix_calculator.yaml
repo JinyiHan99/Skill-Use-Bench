@@ -1,0 +1,209 @@
+# Rubric for SF29_t1_bugfix_calculator
+# Skill: Test-Driven Development (TDD) — Bug Fix scenario
+# Core question: Does the model follow RED→GREEN cycle for a bug fix?
+
+# ── GATE ──
+- id: g1_observable_attempt
+  type: required-tool
+  provenance: gate
+  verifier: regex
+  weight: 0
+  signal:
+    pattern: "Write|Edit"
+  spec: "[GATE] The trace contains an observable file write/edit tool call"
+
+# ── Skill-Following rules (scored) ──
+
+- id: r1_test_written_before_fix
+  type: order
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] TDD skill requires writing a failing test BEFORE modifying production code.
+    skill-exclusive reason: without reading the skill, a strong model's instinctive reaction to a bug fix is to directly modify src/calculator.py to add division-by-zero handling,
+    then possibly add tests afterward; the skill requires first writing a new test function in tests/, then modifying src/calculator.py.
+  signal:
+    query: >
+      Based on the actual tool calls (Write/Edit) in the execution trace, did the model
+      write or edit a test file (tests/test_calculator.py) to add a new test function
+      for divide-by-zero BEFORE making any edit to the production file (src/calculator.py)?
+
+      Judgment basis: look only at the temporal order of Write/Edit tool calls, not at the agent's text describing its intent.
+      Focus only on whether the first write to tests/ appears before the first write to src/calculator.py.
+
+      Answer YES if: the first Write/Edit to tests/test_calculator.py (adding a new test for divide-by-zero)
+      appears in the trace BEFORE the first Write/Edit to src/calculator.py.
+      Answer NO if: src/calculator.py was modified first, or no new test was added.
+    acceptable: "Edit tests/test_calculator.py (adding def test_divide_...) → later → Edit src/calculator.py"
+    unacceptable: "Edit src/calculator.py (adding zero-check) → later → Edit tests/test_calculator.py"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+- id: r2_pytest_red_before_production_edit
+  type: order
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] TDD skill requires running pytest after writing the test (RED phase) to confirm failure,
+    BEFORE writing any production code fix.
+    skill-exclusive reason: without reading the skill, the model typically fixes the code first and then runs pytest once to verify;
+    the skill requires running pytest after writing the test and before modifying production code, to observe the test failure.
+  signal:
+    query: >
+      Based on the actual tool calls in the execution trace, did the model run pytest
+      (via Bash tool) AFTER adding the new test for divide-by-zero but BEFORE making
+      any edit to src/calculator.py?
+
+      Judgment basis: look only at the pytest commands in Bash tool calls and the order of Write/Edit calls, not at the agent's self-report.
+      The pytest run must occur between the test-write and the production-code-edit.
+      A valid RED state means the pytest output shows a failure (FAILED, Error, or
+      exception like ZeroDivisionError) — not a SyntaxError or ImportError.
+
+      Answer YES if: pytest was run after writing the new test and before editing src/calculator.py,
+      AND the output shows a test failure (assertion error or unhandled exception like ZeroDivisionError).
+      Answer NO if: pytest was not run before the production edit, or the failure was
+      a SyntaxError/ImportError, or pytest was only run after the fix.
+    acceptable: "Edit tests/ → Bash(pytest) showing FAILED → Edit src/calculator.py"
+    unacceptable: "Edit tests/ → Edit src/calculator.py → Bash(pytest)"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+- id: r3_pytest_green_after_fix
+  type: order
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.75
+  spec: |
+    [SKILL] TDD skill requires running pytest after implementing the fix (GREEN phase) to confirm all tests pass.
+    skill-exclusive reason: although many models run tests after fixing, the skill requires this to be an explicit GREEN checkpoint —
+    pytest must be run after fixing src/calculator.py and confirm all tests pass (including new and old tests).
+    Without reading the skill, some models do not run tests or only run the new test.
+  signal:
+    query: >
+      Based on the actual tool calls in the execution trace, did the model run pytest
+      (via Bash tool) AFTER editing src/calculator.py with the fix, and did the output
+      show all tests passing (no failures)?
+
+      Judgment basis: look only at the pytest commands and their output in Bash tool calls, not at the agent's self-report.
+
+      Answer YES if: pytest was run after the production fix was applied and all tests passed.
+      Answer NO if: pytest was not run after the fix, or some tests failed.
+    acceptable: "Edit src/calculator.py → Bash(pytest) showing 'all passed' or 'X passed'"
+    unacceptable: "Edit src/calculator.py → no further pytest run; or pytest shows failures"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: high
+
+- id: r4_test_naming_convention
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.5
+  spec: |
+    [SKILL] TDD skill requires test names follow pattern test_<behavior>_<condition>_<expected>.
+    skill-exclusive reason: without reading the skill, the model typically uses short names like test_divide_zero, test_division_error,
+    test_bug_fix, etc.; the skill requires three-segment naming like test_divide_by_zero_returns_error_dict.
+  signal:
+    query: >
+      Based on the actual Write/Edit tool calls that modified tests/test_calculator.py,
+      do the newly added test function names follow the pattern test_<behavior>_<condition>_<expected>
+      (three or more descriptive segments after 'test_')?
+
+      Judgment basis: look only at the function names actually written in Write/Edit tool calls, not at the agent's self-report.
+      The pattern requires at least three semantic segments: a behavior (what is being tested),
+      a condition (under what circumstances), and an expected outcome.
+
+      Answer YES if: new test names have 3+ descriptive segments like test_divide_by_zero_returns_error
+      or test_divide_zero_divisor_returns_error_dict.
+      Answer NO if: new test names are short/vague like test_divide_zero, test_bug_fix,
+      test_division, test_error, or only have 1-2 segments.
+    acceptable: "def test_divide_by_zero_returns_error_dict, def test_divide_zero_input_returns_error"
+    unacceptable: "def test_divide_zero, def test_bug_fix, def test_error_handling"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: medium
+
+- id: r5_minimal_implementation
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.5
+  spec: |
+    [SKILL] TDD skill requires writing the simplest/minimal code to make the failing test pass.
+    skill-exclusive reason: without reading the skill, the model tends to "incidentally" add extra error handling, logging, type checking,
+    custom exception classes, etc.; the skill requires writing only the minimal code to make the test pass.
+  signal:
+    query: >
+      Based on the actual Write/Edit tool calls that modified src/calculator.py,
+      did the model write ONLY the minimal code to handle the division-by-zero case?
+
+      Judgment basis: look only at the actual content modified by Write/Edit tool calls, not at the agent's description.
+      Acceptable minimal fixes: an if/return guard for b==0 returning {"error": "division by zero"},
+      or a try/except ZeroDivisionError block in the divide method, or updating the return type annotation.
+      Unacceptable: modifying other methods (add/subtract/multiply/power), adding logging,
+      creating custom exception classes, adding input type validation for non-zero cases,
+      adding unrelated refactoring to other parts of the file.
+
+      Answer YES if: only the divide method was modified with a simple zero-check.
+      Answer NO if: other methods were changed, or extra features like logging/type-checking/
+      custom exceptions were added beyond what the test requires.
+    acceptable: "Only divide() gets an if b==0 guard or try/except; rest of file unchanged"
+    unacceptable: "Multiple methods modified, custom DivisionError class added, logging added"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: medium
+
+- id: r6_single_behavior_per_test
+  type: lesson
+  provenance: skill
+  verifier: llm-judge
+  exclusive: true
+  weight: 0.25
+  spec: |
+    [SKILL] TDD skill requires each test to verify a single behavior — one logical assertion per test.
+    skill-exclusive reason: without reading the skill, the model may test multiple scenarios in one test function
+    (e.g., divide by zero and divide by negative); the skill requires each test to verify only one behavior.
+  signal:
+    query: >
+      Based on the actual Write/Edit tool calls that modified tests/test_calculator.py,
+      does each newly added test function verify only a single logical behavior?
+
+      Judgment basis: look only at the test function content actually written in Write/Edit tool calls, not at the agent's self-report.
+      A test verifies a single behavior if it tests one specific scenario with one logical assertion.
+      Multiple assert statements that together verify one outcome (e.g., checking both the key and value
+      of a returned dict) are acceptable as they verify one behavior.
+
+      Answer YES if: each new test function focuses on one scenario/behavior.
+      Answer NO if: a single test function checks multiple unrelated scenarios
+      (e.g., testing both divide-by-zero AND divide-with-negative in one function).
+    acceptable: "def test_divide_by_zero_returns_error(...): assert result == {'error': 'division by zero'}"
+    unacceptable: "def test_divide_errors(...): tests zero, negative, string input all in one function"
+  review:
+    proposed_by: ["drafter"]
+    challenged_by: []
+    consensus: medium
+
+# ── Task completion record (not scored) ──
+- id: tc1_task_done
+  type: task-completion
+  provenance: task
+  verifier: state-diff
+  weight: 0
+  spec: "[TASK — not counted toward SF] Bug fix correctly implemented: divide(10,0) returns {'error': 'division by zero'}"
+  signal:
+    file: "assets/SF29_t1_bugfix_calculator/src/calculator.py"
+    file_must_contain: "division by zero"

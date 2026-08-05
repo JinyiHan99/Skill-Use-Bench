@@ -1,0 +1,72 @@
+openapi: 3.0.3
+info:
+  title: Stripe Balance Activity
+  version: 1.0.0
+servers:
+  - url: https://api.stripe.com/v1
+paths:
+  /balance_transactions:
+    get:
+      operationId: ListBalanceTransactions
+      summary: List balance transactions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Recent balance transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                  url:
+                    type: string
+                  has_more:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BalanceTransaction'
+components:
+  schemas:
+    BalanceTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+        amount:
+          type: integer
+        available_on:
+          type: integer
+        created:
+          type: integer
+        currency:
+          type: string
+        description:
+          type: string
+          nullable: true
+        exchange_rate:
+          type: number
+          nullable: true
+        fee:
+          type: integer
+        net:
+          type: integer
+        reporting_category:
+          type: string
+        source:
+          type: string
+          nullable: true
+        status:
+          type: string
+        type:
+          type: string
+          enum: [charge, refund, payout, adjustment, payment, payment_refund, transfer]

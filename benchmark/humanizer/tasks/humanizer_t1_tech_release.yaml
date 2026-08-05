@@ -1,0 +1,40 @@
+task_id: humanizer_t1_tech_release
+skill_id: humanizer
+description: |
+  I have a Chinese draft intended for a product update page, but it reads too much like auto-generated marketing copy. Please help me make `assets/humanizer_t1_tech_release/input/release_draft.md` sound more natural without changing the meaning, and save the result to `output/release_draft_polished.md`.
+initial_state:
+  assets:
+    - path: assets/humanizer_t1_tech_release/input/release_draft.md
+      source: "https://github.com/op7418/Humanizer-zh#示例对比 and https://github.com/op7418/Humanizer-zh#场景-2改写学术摘要"
+      real_state: "Chinese AI-flavored release draft and academic abstract excerpts taken from the Humanizer-zh README examples, containing exaggerated expressions, three-part embellishments, negation-style parallelism, em dashes, and high-frequency connectors."
+      preparation: |
+        Visit the public GitHub repository op7418/Humanizer-zh README, extract the original input text from the "示例对比" (example comparison) and "场景 2：改写学术摘要" (Scenario 2: Rewriting an Academic Abstract) sections, and combine them into a single markdown draft file; the body content was not rewritten.
+  tools_available: [Read, Write, Edit, Grep, Glob]
+expected_trigger: true
+skill_constraints_tested:
+  - id: conservative_surface_rewrite
+    description: "Prioritize surface-level de-AI-ification while preserving the original information scope, without concretizing abstract marketing language or academic boilerplate into new product features, feedback, data, or industry judgments."
+    exclusive: "When asked to 'make it more natural,' general-purpose models often concretize vague sentences into seemingly more natural new facts; the skill explicitly requires changing only how things are said, not what is said, and avoids adding content under the guise of concretization."
+  - id: full_l1_l4_quality_report
+    description: "The output should include an AI-flavor level, edit statistics, the full polished text, and an L1-L4 quality inspection report."
+    exclusive: "General-purpose polishing typically only provides the rewritten text and a brief explanation, without reporting banned words, punctuation, style, content quality, and human-likeness following a four-layer self-check system."
+  - id: hard_punctuation_and_phrase_cleanup
+    description: "The polished body must remove colons, em dashes, double quotes, and typical AI high-frequency phrases explicitly banned by the skill."
+    exclusive: "General-purpose models often retain Chinese colons, em dashes, or phrases like '此外' (moreover), '不仅仅是……而是……' (not only... but also...)."
+notes: |
+  - Core test point: This is a positive example. The user asks to reduce machine-like tone in a real editing context, and the input text happens to hit the skill's banned words, banned punctuation, negation-style parallelism, and exaggerated marketing language.
+  - Expected correct behavior: Read the input file, diagnose it as moderate or severe AI flavor; rewrite without adding new facts; save `output/release_draft_polished.md`; the final reply may briefly describe the completion status.
+  - Common model error behaviors:
+      - Adding nonexistent features like "batch processing, keyboard shortcuts, offline mode" to the release draft at `assets/humanizer_t1_tech_release/input/release_draft.md:3`, violating "change only how it's said, not what is said."
+      - Retaining "此外" (moreover), "无缝、直观和强大" (seamless, intuitive and powerful), "不仅仅是一次更新，而是……" (not just an update, but...) or em dashes in `assets/humanizer_t1_tech_release/input/release_draft.md:3`.
+      - Continuing to use abstract boilerplate like "深入探讨" (in-depth exploration), "关键作用" (key role), "不断演变的医疗格局" (the constantly evolving healthcare landscape) in `assets/humanizer_t1_tech_release/input/release_draft.md:5`.
+  - baseline_correctness_signals:
+      - `output/release_draft_polished.md` exists and contains at least the complete rewritten Chinese body; the body should be suitable as a product update page draft.
+      - The rewritten text still covers both original topics: software updates and ML-based medical diagnosis.
+  - skill_following_signals:
+      - The model's final reply includes AI-flavor detection, edit statistics, the full polished text, and quality inspection information covering at least L1 objective scan and L2 style review.
+      - If the final reply includes L3-L4 content quality and human-likeness final review, it counts as a stronger skill-following signal but is not the sole pass criterion.
+      - The full polished text in the final reply and the body written to the file must not contain `：` (Chinese colon), `——` (em dash), or Chinese/English double quotes.
+      - The full polished text must clean up or replace AI-flavor expressions such as "此外" (moreover), "深入探讨" (in-depth exploration), "关键作用" (key role), "不断演变" (constantly evolving), "不仅仅是" (not only), "无缝、直观和强大" (seamless, intuitive and powerful), "奠定坚实基础" (lay a solid foundation).
+      - No new specific features, sample sizes, test feedback, or industry conclusions that do not exist in the input are added.
+  - Design note: The first paragraph of the input overlaps with the "before rewrite" text in skill's embedded Example 1. This is intentional, designed to test whether the model prioritizes the core principle of "not adding content that the original does not have" rather than mechanically applying the example rewrite. If the rewrite adds nonexistent features like "batch processing, keyboard shortcuts, offline mode" that are absent from the original draft, it should be judged as a serious error.

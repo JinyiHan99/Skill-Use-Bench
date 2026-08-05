@@ -1,0 +1,142 @@
+rules:
+  - id: g1_observable_obsidian_markdown_write_attempt
+    type: required-tool
+    provenance: gate
+    locus: trace
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable attempt to write or move markdown into the Obsidian vault. The gate only judges whether a delivery was attempted; it does not judge path or content correctness.
+    signal:
+      pattern: '("recipient_name"\s*:\s*"functions\.(Write|Edit)"|"tool"\s*:\s*"(Write|Edit)"|"name"\s*:\s*"(Write|Edit)"|functions\.(Write|Edit)|\b(Write|Edit)\s*\(|\b(mv|cp)\b)[\s\S]{0,1200}obsidian_vault[^"\n]*\.md'
+
+  - id: r1_lock_four_controls_before_delegation_or_writing
+    type: order
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Before formal assignment, rewriting, acceptance, or file writing, the assistant/agent must proactively and explicitly lock business goal, audience, channel, and completion criteria; the user's task wording itself must not be treated as the model's locking evidence.
+      skill-exclusive rationale: without reading the skill, a strong model will write directly based on "founders/operations leads + public-account long article"; the skill requires the editor-in-chief to lock the four control variables first. The conflict point is "push content directly" vs "first establish the editor-in-chief acceptance baseline".
+    signal:
+      query: |
+        Looking only at assistant/agent messages and actual tool calls — not counting information in the user prompt as evidence — did the model, before any role assignment, body writing, acceptance, or Obsidian file writing, proactively and centrally lock business goal, target audience, publishing channel, and completion criteria? Answer only YES or NO.
+        Prior Read or process-management TaskCreate is allowed; completion criteria should at least include verifiable gates such as "review state / not published" and "fact boundaries correct / technical boundaries correct".
+        Answer YES if all four controls are stated by the model before content production starts.
+        Answer NO if it writes/delegates first, omits any one control, or only relies on the user's wording as implicit evidence.
+      acceptable: "assistant first locks: goal = help founders/operations leads judge tool calling vs semantic search; audience = founders and operations leads; channel = public-account long article; completion criteria = Obsidian pending-publish review state, not published, fact boundaries correct."
+      unacceptable: "The user prompt contains audience and channel; the model, without proactively checkpointing, directly writes a long article into the vault."
+      judge_context_window: [serialized_steps, final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_read_obsidian_config_and_use_new_file_folder
+    type: required-arg
+    provenance: skill
+    locus: trace
+    verifier: regex
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When the user mentions Obsidian, the real vault path must be parsed, .obsidian/app.json read, and the review markdown placed in the vault's 待发布/ (Pending Publish) subfolder based on the newFileFolderPath value in it.
+      skill-exclusive rationale: without reading the skill, a strong model, even if it writes into the user-provided vault, will usually place files at the root or in a generic output location, and will not read the Obsidian config to decide the default new-file folder; the skill requires using the real vault config. The conflict point is "write directly to a conspicuous path" vs "read config first then persist in the Obsidian default folder".
+    signal:
+      pattern: '(Read|Bash|cat)[\s\S]{0,1000}assets/editorial_chief_workflow_t3_obsidian_delivery/input/obsidian_vault/\.obsidian/app\.json'
+      must_appear_before:
+        - '(Read|Bash|cat)[\s\S]{0,1000}assets/editorial_chief_workflow_t3_obsidian_delivery/input/obsidian_vault/\.obsidian/app\.json'
+        - '(Write|Edit|Bash|cp|mv)[\s\S]{0,1000}assets/editorial_chief_workflow_t3_obsidian_delivery/input/obsidian_vault/待发布/[^"\n]*\.md'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_stage_for_review_not_publish_without_approval
+    type: boundary
+    provenance: task
+    locus: trace
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/BOUNDARY — not counted toward SF] The file should be staged for review as an Obsidian review draft, and must not claim publishing or perform publishing before explicit user approval. This requirement is explicitly stated by the task and serves as a non-scored boundary check.
+    signal:
+      query: |
+        Based on actual tool calls and the final user-visible reply — not internal plans — did the model only deliver the Obsidian review file and wait for user review, without claiming it has been published, can be published directly, publishing is ready, has been synced to the public-account backend, and without performing any publishing-related action? Answer only YES or NO.
+        Answer YES if final wording is staged/review-ready/awaiting approval and no publish action or publish-complete claim appears.
+        Answer NO if it says 已发布/发布完成/可直接发布/发布准备已完成/ready to publish/已同步到公众号, or performs an external publication action without explicit approval.
+      acceptable: "Placed in the Obsidian pending-publish folder for review, waiting for your confirmation before publishing."
+      unacceptable: "Published to the public account, publishing preparation complete, can be published directly, or synced to the public-account backend."
+      judge_context_window: [serialized_steps, final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_visual_asset_requirement_handled_before_final_qa_claim
+    type: order
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The delivery order requires creating/embedding actual visual assets, then performing proof/layout QA on the visual-final version; if real visual assets cannot be created or embedded, this block must be explicitly stated and visual-final QA must not be claimed as complete.
+      skill-exclusive rationale: without reading the skill, a strong model will usually deliver after writing body text, or only give image suggestions/prompts and still claim layout is complete; the skill emphasizes actual images and visual-final QA. The conflict point is "text draft done = review" vs "QA after actual visual embedding, or honest blocking".
+    signal:
+      query: |
+        Based on actual file writes, image/asset creation, markdown link content, and the final reply — not the agent's self-described intent — does the model satisfy one of the following two? Answer only YES or NO.
+        A) There is real image/visual-asset creation or referable file evidence, the Obsidian review markdown references the asset via a relative link or embedding, and proof/layout QA occurs after embedding.
+        B) It explicitly states that real visual assets cannot be created/embedded or are currently blocked, and does not claim visual-final/full visual QA is complete.
+        Answer NO if it only provides image prompts/plans, uses placeholder image links, silently omits visuals, or has no real embeds yet claims final visual QA or fully review-ready visual-final delivery.
+      acceptable: "The draft contains ![](images/decision-matrix.png), the image file was created/written, followed by proof/layout; or it explicitly says that real visual assets are currently missing and visual-final QA cannot be completed."
+      unacceptable: "Only writes 'suggest adding a flowchart' or a placeholder ![](image-placeholder.png), without real image evidence, yet claims the image-text final layout review is complete."
+      judge_context_window: [serialized_steps, final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_preserve_fixed_business_goal_in_assignments_and_reviews
+    type: lesson
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] During assignment, rewriting, or acceptance, the fixed business goal, audience, channel, and success criteria must be continuously checked; when an artifact deviates from the business-judgment topic of "when to use tool calling vs when to use semantic search", it should be rejected or corrected. In solo mode, continuous constraint during self-rewriting/proofreading is also required, not just an opening restatement.
+      skill-exclusive rationale: without reading the skill, a strong model often turns material into generic AI popularization or growth advice and only does ordinary polish; the skill requires the editor-in-chief to accept and reject deviations against the fixed goal. The conflict point is "accept generalized rewrites" vs "continuously accept against the fixed business goal".
+    signal:
+      query: |
+        Looking only at actual assignment/review/correction messages and written content — not the agent's process declarations — after the initial lock, did the model continuously constrain output with the fixed business goal (judging when to use tool calling vs semantic search), audience (founders/operations leads), channel (public-account long article), and success criteria? Answer only YES or NO.
+        Multi-agent mode: check whether assignment, acceptance, rejection, or correction use these control variables.
+        Solo mode: check whether self-rewriting/proofreading is continuously constrained by these control variables, and the content does not drift into generic AI popularization.
+        Answer NO if controls are only stated once at the beginning and never used again, or the article drifts without correction.
+      acceptable: "Review notes: this paragraph has become AI popularization, not helping founders judge the trade-off between the two options; needs to return to the tool-calling vs semantic-search decision framework."
+      unacceptable: "Only says at the beginning it targets founders via a public-account long article, then only says 'the content is good, polish it a bit', without checking against business goal, audience, channel."
+      judge_context_window: [serialized_steps, final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: trace
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] A reviewable markdown exists in the Obsidian vault's pending-publish folder, with content centered on founders/operations leads judging tool calling vs semantic search, and preserves both types of technical fact boundaries.
+    signal:
+      query: |
+        Based on the last effective Write/Edit/cp/mv to assets/editorial_chief_workflow_t3_obsidian_delivery/input/obsidian_vault/待发布/ markdown path and its final content — not the agent's final self-description — does that final file simultaneously explain that tool calling is performed by the developer/application executing external functions, that semantic search is based on embedding/similarity, and center on the business judgment of "when to use tool calling, when to use semantic search"? Answer only YES or NO.
+        Answer YES only if the last effective target file path and final written content all match.
+        Answer NO for output/ files, vault root files, intermediate overwritten content, or generic AI articles.
+      acceptable: "Last effective write path: .../obsidian_vault/待发布/tool_calling_vs_semantic_search.md; content compares action execution vs meaning retrieval, and states the API does not itself execute tools."
+      unacceptable: "Wrote correctly mid-way but finally moved to vault root; or the article says the AI itself calls external tools, or that semantic search is keyword search."
+      judge_context_window: [serialized_steps]

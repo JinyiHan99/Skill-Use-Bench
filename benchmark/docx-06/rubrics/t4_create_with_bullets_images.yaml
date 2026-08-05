@@ -1,0 +1,133 @@
+# Rubric for skill_06_docx — SF06_t4_create_with_bullets_images
+# Scoring boundary: skill scores the main points; task only records completion rate with weight=0; gate only judges evaluability.
+
+rubric:
+  # ── GATE: evaluability ────────────────────────────
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable attempt to create a Word document.
+      Only match actual operation traces; do not match keywords in prompt/skill text.
+    signal:
+      pattern: "(npm\\s+(?:install|add)\\s+docx|pnpm\\s+add\\s+docx|yarn\\s+add\\s+docx|node\\s+\\S+\\.(?:js|mjs|ts)\\b|require\\(['\"]docx['\"]\\)|import(?:\\s+\\*\\s+as\\s+\\w+|\\s+\\w+|\\s+\\{[^}]*\\})?\\s+from\\s+['\"]docx['\"]|new\\s+Document\\s*\\(|new\\s+Paragraph\\s*\\(|new\\s+ImageRun\\s*\\()"
+
+  # ── Must do: skill-derived behavior ─────────────────────
+  - id: r1_use_docx_js
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline skill-exclusive] Must use docx-js (npm package) to create the document.
+      skill-exclusive rationale: a model that does not read the skill often uses python-docx; the skill explicitly requires docx-js.
+    signal:
+      pattern: "(npm\\s+(?:install|add)\\s+docx|pnpm\\s+add\\s+docx|yarn\\s+add\\s+docx|require\\(['\"]docx['\"]\\)|import(?:\\s+\\*\\s+as\\s+\\w+|\\s+\\w+|\\s+\\{[^}]*\\})?\\s+from\\s+['\"]docx['\"]|await\\s+import\\(['\"]docx['\"]\\))"
+
+  - id: r2_bullet_numbering_system
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline skill-exclusive] The bullet list must use the built-in numbering system (LevelFormat.BULLET), not Unicode characters faking it.
+      skill-exclusive rationale: a model that does not read the skill often places •/-/* directly in TextRun; the skill requires numbering.
+    signal:
+      judge_question: |
+        Based only on actual written code or generated artifact evidence, did the bullet list use docx-js numbering with LevelFormat.BULLET and did each bullet Paragraph reference that numbering? Answer YES if numbering config uses LevelFormat.BULLET and bullet item Paragraphs have numbering references; text: "\u2022" inside the numbering config is acceptable. Answer NO if bullets are simulated by TextRun text beginning with •, ◦, ▪, -, or *, or if numbering is only mentioned in self-description.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r3_image_type_param
+    type: required-arg
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — skill-exclusive] ImageRun must include the type parameter specifying the image format (png here).
+      skill-exclusive rationale: a model that does not read the skill may omit type; the skill notes that omission causes the image not to display.
+    signal:
+      pattern: "new\\s+ImageRun\\([\\s\\S]*type\\s*:\\s*(['\"]png['\"]|ImageType\\.PNG)"
+
+  - id: r4_a4_page_size
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] A4 page size should use the correct DXA values: width=11906, height=16838.
+      This signal is influenced by the task itself requiring A4, so it is downweighted; only rewards explicit use of the precise DXA values provided by the skill.
+    signal:
+      judge_question: |
+        Based only on actual written code or generated OOXML evidence, did the document explicitly set A4 page size with BOTH width 11906 and height 16838 (or OOXML pgSz w:w="11906" and w:h="16838")? Answer YES only if both dimensions appear in page-size context. Answer NO if only one value appears or the values appear outside page-size context.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r5_separate_paragraphs
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] Each bullet feature item must be an independent Paragraph; \n cannot be used to separate them within one paragraph/TextRun.
+      skill-exclusive rationale: a model that does not read the skill may use string newlines; the skill notes that docx-js ignores \n.
+    signal:
+      judge_question: |
+        Based only on actual written code, are the five feature/bullet items represented as separate Paragraph objects (including acceptable programmatic generation such as features.map(f => new Paragraph(...))) rather than concatenated into one Paragraph/TextRun with \n? Answer YES for separate Paragraphs. Answer NO for one Paragraph/TextRun containing multiple items separated by newline characters or self-description without code evidence.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"
+
+  - id: r6_validate_output
+    type: termination
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] After document creation, must actually run validate.py for validation.
+      Only matches the command form executing validate.py; does not treat a filename appearance as validation.
+    signal:
+      pattern: "python3?\\s+validate\\.py\\b"
+
+  # ── Must not do: skill boundary violations ─────────────────────
+  - id: b1_no_python_docx
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — boundary] Using python-docx to create new documents is forbidden.
+      Removed bare python-docx and import docx branches to avoid false positives on JS import or negative self-descriptions.
+    signal:
+      pattern: "(pip\\s+install\\s+python[-_.]?docx|from\\s+docx(?:\\.[A-Za-z_]\\w*)*\\s+import\\b|docx\\.Document\\s*\\()"
+
+  # ── Task completion: records 0/1 only, not scored ─────────────────
+  - id: task_completion_binary
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Setting aside whether the skill was followed, record whether the task is completed as a binary value.
+      Check that the artifact contains the task-required content; do not make docx-js usage a task-completion condition.
+    signal:
+      judge_question: |
+        Based only on artifact/file evidence and actual command output, was product_intro.docx created/readable and does it contain the requested product intro content: title, logo/image, five feature items, A4/page layout evidence, and no fatal validation/opening errors? Answer YES only if the output file exists and the required task content is evidenced. Answer NO if the file is missing/unreadable or required content evidence is absent.
+      judge_expected: "YES"
+      judge_context_window:
+        - "serialized_steps"
+        - "final_answer"

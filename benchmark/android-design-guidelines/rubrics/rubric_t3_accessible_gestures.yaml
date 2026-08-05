@@ -1,0 +1,145 @@
+# Rubric for skill_66_android_design_guidelines_material — t3_accessible_gestures
+
+rules:
+  # ── GATE ────────────────────────────
+  - id: g1_observable_user_input_output
+    type: required-tool
+    provenance: gate
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [GATE] The final artifacts should contain an evaluable output/UserInput.kt input bar implementation.
+    signal:
+      file: "output/UserInput.kt"
+      file_must_contain: 'fun\s+UserInput\s*\('
+
+  # ── SKILL-FOLLOWING ─────────────────
+  - id: r1_nonstandard_clickables_have_action_semantics
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] All interactive elements, including non-standard Compose nodes such as Text+clickable, emoji cells, and status indicators, should provide accessibility semantics describing the action or meaning.
+      Skill-exclusive rationale: without reading the skill, a model typically only adds contentDescription to Icon/IconButton; the skill emphasizes custom interaction nodes and compound semantics,
+      and the conflict point is that non-standard clickable areas must not be missed, nor should only visual descriptions be written.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/UserInput.kt, ignoring the agent's self-description: do non-IconButton custom interaction areas in this file, such as emoji/Text.clickable/Box.clickable, have onClickLabel, contentDescription/stateDescription in semantics, role, or equivalent action/meaning semantics? Using mergeDescendants=true alone without action or meaning semantics cannot be judged YES. Answer YES or NO.
+      acceptable: "emoji text cell clickable has both onClickLabel or semantics/contentDescription (e.g., Insert emoji ...); custom send/selector areas have role/stateDescription/action semantics."
+      unacceptable: "Only adding contentDescription to Icon; Text(emoji).clickable or Box.clickable without any action semantics; only mergeDescendants=true without onClickLabel/contentDescription/stateDescription/role."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_all_interactive_targets_min_48dp
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] All interactive targets must maintain an actual clickable area of at least 48x48dp; do not shrink the click area to 36dp/42dp or icon-only size for compact layout.
+      Skill-exclusive rationale: without reading the skill, a model may only adjust icon visual size, or retain the original sizeIn/height-compressed layout; the skill explicitly requires actual touch targets >=48dp,
+      and the conflict point is that custom targets such as emoji cells, send buttons, and expansion-panel buttons must all be systematically fixed.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/UserInput.kt, ignoring the agent's self-description: do all clickable/focusable input bar controls (send, selector, close, emoji/expansion items, etc.) ensure an actual clickable area of at least 48.dp via IconButton/Material component default targets, minimumInteractiveComponentSize(), Modifier.sizeIn(minWidth/minHeight = 48.dp), parent containers that expand the click area, or equivalent Modifier order? Answer YES or NO.
+      acceptable: "Custom clickable nodes have minimumInteractiveComponentSize(), sizeIn(minWidth = 48.dp, minHeight = 48.dp), or clickable acts on a parent container already expanded to >=48.dp."
+      unacceptable: "emoji grid item, selector button, or send area clickable still at 36.dp/42.dp; Modifier order causing clickable to only wrap a 24.dp icon; only enlarging the visual icon without expanding the touch area."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r3_gesture_actions_have_accessible_alternatives
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Gesture or hidden-state flows actually present in output/UserInput.kt, such as selector/panel dismissal, hidden flows, and emoji/attachment selection, should provide non-gesture equivalent entries, or be exposed to TalkBack and Switch Access via semantics/customActions.
+      Skill-exclusive rationale: without reading the skill, a model may retain BackHandler or only add visible click buttons; the skill requires all gesture actions to have non-gesture alternatives and customActions,
+      and the conflict point is that assistive technology users must not be limited to system back, swiping, or long-press to complete operations.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/UserInput.kt, ignoring the agent's self-description: for input selector/panel dismissal, emoji/attachment selection, and hidden-panel flows actually present in this file, are focusable buttons or semantics/customActions or other non-gesture reachable entries provided? Answer YES or NO.
+      acceptable: "Panel contains a focusable Close button, or parent node semantics { customActions = listOf(CustomAccessibilityAction(\"Close\") { ... }) }; emoji/attachment selection can be triggered via a focusable control."
+      unacceptable: "Can only be closed/triggered via system BackHandler, swiping, long-press, or clicking on a non-semantic area; TalkBack/Switch Access has no equivalent operation."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_back_dismiss_restores_input_focus_without_confirm_dialog
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] After system back or explicitly closing a temporary input panel, focus should return to the text input field or a reasonable input target; do not add confirmation dialogs for scenarios with no unsaved input.
+      Skill-exclusive rationale: without reading the skill, a model typically only retains BackHandler setting NONE, or may add a confirmation dialog; the skill requires system back not be abused as a confirmation dialog, and that logical focus be restored after navigation/dialog dismissal,
+      and the conflict point is the need for explicit focus continuity rather than only changing state.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/UserInput.kt, ignoring the agent's self-description: after closing the input selection panel (via system back or explicit close), does the code request/restore focus to the text input field or a reasonable target? If a confirmation AlertDialog/dialog is added for a scenario without unsaved input, judge NO. Answer YES or NO.
+      acceptable: "After dismissing the selector, FocusRequester.requestFocus() or equivalent focus restoration to the input field/reasonable target is called; no meaningless confirmation dialog."
+      unacceptable: "BackHandler only sets currentInputSelector = NONE with no focus restoration, or a confirmation dialog pops up before closing the panel without basis in unsaved input."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_content_descriptions_describe_action_not_visual
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: medium
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] contentDescription of standard interactive icons/IconButton should describe the action or meaning, not the visual appearance; only purely decorative icons should be null.
+      Skill-exclusive rationale: without reading the skill, models often write visual descriptions such as "smiley icon" or "send icon"; the skill explicitly requires describing action/meaning, e.g., "Send message",
+      and the conflict point is the content quality of contentDescription rather than its presence.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/UserInput.kt, ignoring the agent's self-description: are the accessibility descriptions of standard interactive Icon/IconButton primarily action- or meaning-oriented (e.g., Send message, Add emoji, Close selector), rather than only describing the visual icon appearance (e.g., smiley icon, paper plane icon)? Answer YES or NO.
+      acceptable: "contentDescription = \"Send message\", \"Open emoji selector\", \"Close selector\"; decorative icon contentDescription = null."
+      unacceptable: "contentDescription = \"smiley icon\", \"paperclip icon\", or interactive icon descriptions that are only visual shapes."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  # ── TASK COMPLETION (bypass, not counted toward skill-following) ────
+  - id: tc1_userinput_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/UserInput.kt exists, preserves core chat input functionality such as UserInput, send message, and input selectors, and has actual interaction/accessibility modifications.
+    signal:
+      query: |
+        Judge based only on the final file contents: does output/UserInput.kt exist, still contain UserInput/send message/input selector chat input functionality, and have actual accessibility or interaction modifications? Answer YES or NO.
+      acceptable: "UserInput.kt preserves onMessageSent, textState, selector logic, and adds semantics/touch target/focus implementations."
+      unacceptable: "Deleting chat input functionality, or only modifying comments/notes without Kotlin interaction implementations."
+
+  - id: tc2_accessibility_notes_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/accessibility_notes.md exists and records the main interaction points.
+    signal:
+      file: "output/accessibility_notes.md"
+      file_must_contain: '(accessibility|TalkBack|touch target|focus|semantic|无障碍|焦点|触控)'

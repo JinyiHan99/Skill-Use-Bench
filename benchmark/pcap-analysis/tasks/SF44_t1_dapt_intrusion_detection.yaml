@@ -1,0 +1,48 @@
+task_id: SF44_t1_dapt_intrusion_detection
+level: L2
+skill_id: skill_44_pcap_analysis
+description: "You are given `packets.pcap` (a subset of DAPT2020 traffic) and a CSV\
+  \ file at `/root/network_stats.csv` with metric names and comment rows. Fill in\
+  \ only the `value` column for each metric.\n\nMetrics to compute:\n- Protocol counts:\
+  \ TCP, UDP, ICMP, ARP packet counts and total IP-layer packets\n- Time/rate: capture\
+  \ duration (seconds) and packets-per-minute statistics (avg/max/min) across 60-second\
+  \ buckets starting from the first packet\n- Sizes: total bytes and packet-size statistics\
+  \ (avg/min/max)\n- Entropy: Shannon entropy of source/destination IPs and ports,\
+  \ plus unique port counts\n- Graph topology: treat IPs as nodes and unique (src\u2192\
+  dst) pairs as directed edges; compute node count, edge count, density, max indegree,\
+  \ max outdegree\n- Timing and producer/consumer: inter-arrival time statistics (mean,\
+  \ variance, coefficient of variation) and producer/consumer counts based on per-IP\
+  \ traffic ratios\n- Flows: unique 5-tuple flow count, TCP/UDP flow counts, and bidirectional\
+  \ flow count\n- Analysis flags (true/false): is_traffic_benign, has_port_scan, has_dos_pattern,\
+  \ has_beaconing\n\nRefer to the pcap analysis skill guide for exact formulas, detection\
+  \ thresholds, and recommended utilities."
+initial_state:
+  assets:
+  - path: /root/network_stats.csv
+    source: skillsbench/tasks/dapt-intrusion-detection/environment/network_stats_template.csv
+    description: 'CSV template with metric names and comment lines; fill the value column'
+  - path: packets.pcap
+    source: skillsbench/tasks/dapt-intrusion-detection/environment/packets.pcap
+    description: 'Data file: packets.pcap'
+  tools_available:
+  - bash
+  - read
+  - edit
+  - grep
+expected_trigger: true
+skill_constraints_tested:
+- id: c1
+  description: Must import and use functions from the pcap_utils.py helper module (detect_port_scan, graph_metrics, detect_beaconing, etc.), rather than implementing detection logic directly with Scapy
+  exclusive: A strong model that does not read the skill does not know pcap_utils.py exists and will implement directly with the Scapy API; the current CSV-output-only evaluation cannot distinguish the two implementation paths and requires code audit or process checks
+- id: c2
+  description: Port scan detection must simultaneously satisfy three specific thresholds: port entropy > 6.0 AND SYN-only ratio > 0.7 AND unique port count > 100 (triple AND logic, all three required)
+  exclusive: A strong model that does not read the skill will use different thresholds or judgment strategies; note that the current pcap is purely benign traffic and all detection flags are expected to be false, so discriminating power depends on future replacement with pcap data containing attack behavior
+notes: 'Source: skillsbench/dapt-intrusion-detection
+
+  Domain: Security/Network analysis
+
+  Phase1 score: 0.435
+
+  Confidence: 0.82
+
+  Known limitations: the current packets.pcap is purely benign traffic, all analysis flags are false, and c2''s detection-threshold discriminating power depends on future replacement with pcap containing attack behavior; c1 requires process audit to verify'

@@ -1,0 +1,37 @@
+openapi: 3.0.3
+info:
+  title: Contoso Partner Directory
+  version: 1.0.0
+servers:
+  - url: https://api.partnercenter.microsoft.com
+paths:
+  /partners:
+    get:
+      operationId: SearchPartners
+      summary: Search partner directory records
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Matching partner records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        companyName:
+                          type: string
+                        partnerTier:
+                          type: string
+                        profileUrl:
+                          type: string
+                          format: uri

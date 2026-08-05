@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google AdSense verification meta (script loads only after cookie consent) -->
+    <meta name="google-adsense-account" content="ca-pub-0646320966060599" />
+
+    <title>🌜 THE ETERNAL HAVEN — Complete 4-Book Fantasy Series 🌛 | Justin Helmer</title>
+    <meta name="description" content="Complete 4-book fantasy saga by Justin Helmer. Read, listen, or join the interactive universe of moonlit prophecy, dragons, and cosmic allegory.">
+    <meta name="keywords" content="eternal haven, fantasy series, audiobook, dragons, Justin Helmer, excavationpro, book series, fantasy novels">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="🌜 THE ETERNAL HAVEN — Complete 4-Book Fantasy Series 🌛">
+    <meta property="og:description" content="Immerse yourself in the complete 4-book fantasy saga of moonlit prophecy, dragons, and cosmic allegory by Justin Helmer">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://deepseekoracle.github.io/Excavationpro/eternalhaven.html">
+    <meta property="og:image" content="https://eternalhaven.ca/og-image.jpg">
+    <meta property="og:site_name" content="The Eternal Haven">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="🌜 THE ETERNAL HAVEN — Complete 4-Book Series 🌛">
+    <meta name="twitter:description" content="Complete 4-book fantasy saga of moonlit prophecy, dragons, and cosmic allegory">
+    <meta name="twitter:image" content="https://eternalhaven.ca/twitter-image.jpg">
+    <meta name="twitter:site" content="@Excavationpro" />
+    <meta name="twitter:creator" content="@Excavationpro" />
+
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="canonical" href="https://eternalhaven.ca/eternalhaven.html" />
+    <link rel="alternate" href="https://deepseekoracle.github.io/Excavationpro/eternalhaven.html" title="GitHub Pages mirror" />
+    <link rel="alternate" href="https://excavationpro.ca/" title="Excavationpro main hub (music &amp; lattice)" />
+
+    <!-- Bootstrap for Layout -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --void: #0a0a12;
+            --stardust: #1a1a2e;
+            --nebula: #16213e;
+            --quantum: #00f0ff;
+            --moonlight: #7d00ff;
+            --dragonfire: #e94560;
+            --starlight: #f5f5f5;
+            --gold: #d4af37;
+            --transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            --glow: 0 0 15px currentColor;
+            --deep-glow: 0 0 25px currentColor;
+            --glass-bg: rgba(26, 26, 46, 0.6);
+            --glass-border: rgba(125, 0, 255, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 100px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--void);
+            color: var(--starlight);
+            line-height: 1.7;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(125, 0, 255, 0.08) 0%, transparent 25%),
+                radial-gradient(circle at 90% 80%, rgba(0, 240, 255, 0.08) 0%, transparent 25%),
+                radial-gradient(circle at 50% 50%, rgba(212, 175, 55, 0.04) 0%, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            text-shadow: 0 0 5px rgba(255,255,255,0.2);
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            background: linear-gradient(to right, var(--quantum), var(--moonlight), var(--gold));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-align: center;
+            margin-bottom: 0.5rem;
+            animation: textGlow 4s infinite alternate;
+        }
+
+        h2 {
+            font-size: clamp(2rem, 4vw, 2.5rem);
+            color: var(--quantum);
+            border-bottom: 2px solid var(--moonlight);
+            padding-bottom: 0.5rem;
+            display: inline-block;
+        }
+
+        h3 {
+            font-size: clamp(1.5rem, 3vw, 1.8rem);
+            color: var(--gold);
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+            font-size: clamp(1rem, 2vw, 1.1rem);
+            color: rgba(245, 245, 245, 0.9);
+        }
+
+        a {
+            color: var(--quantum);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        a:hover, a:focus {
+            color: var(--gold);
+            text-shadow: var(--glow);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .section {
+            padding: clamp(60px, 8vw, 100px) 0;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Cookie Consent Banner */
+        .cookie-banner {
+            position: fixed;
+            bottom: -100px;
+            left: 0;
+            width: 100%;
+            background: rgba(10, 10, 18, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--quantum);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 9999;
+            transition: bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+        }
+        .cookie-banner.show {
+            bottom: 0;
+        }
+        .cookie-text {
+            font-size: 0.9rem;
+            color: #ccc;
+            max-width: 800px;
+        }
+        .cookie-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .enhanced-header {
+            background: rgba(10, 10, 18, 0.85);
+            backdrop-filter: blur(20px);
+            padding: 15px 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(125, 0, 255, 0.3);
+            transition: var(--transition);
+        }
+
+        .enhanced-header.scrolled {
+            padding: 10px 0;
+            background: rgba(10, 10, 18, 0.98);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .animated-logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .logo-glyph-container {
+            position: relative;
+            width: 50px;
+            height: 50px;
+        }
+
+        .logo-glyph {
+            font-size: 2.5rem;
+            animation: cosmicSpin 20s linear infinite;
+            filter: drop-shadow(0 0 5px var(--quantum));
+            position: absolute;
+            z-index: 2;
+        }
+
+        .logo-text {
+            font-family: 'Cinzel', serif;
+            font-size: 1.8rem;
+            font-weight: bold;
+            background: linear-gradient(to right, var(--starlight), var(--quantum));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 1px;
+            line-height: 1.2;
+        }
+
+        .logo-subtitle {
+            font-family: 'Special Elite', monospace;
+            font-size: 0.8rem;
+            color: var(--gold);
+            letter-spacing: 2px;
+        }
+
+        .hero-quote-container {
+            position: relative;
+            margin: 50px auto 0;
+            width: 100%;
+            max-width: 600px;
+            height: 60px; /* Fixed height to prevent page jumping */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .animated-quote {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-size: clamp(1rem, 2vw, 1.2rem);
+            color: var(--gold);
+            opacity: 0;
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            transition: opacity 1s ease-in-out;
+            text-shadow: 0 0 8px rgba(212, 175, 55, 0.4);
+            letter-spacing: 0.5px;
+        }
+
+        .animated-quote.active { opacity: 1; }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 15px;
+        }
+
+        .nav-links a {
+            color: var(--starlight);
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid transparent;
+        }
+
+        .nav-links a:hover {
+            background: rgba(125, 0, 255, 0.15);
+            color: var(--quantum);
+            border-color: rgba(125, 0, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(125, 0, 255, 0.2);
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--starlight);
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 101;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: linear-gradient(135deg, var(--moonlight), var(--quantum));
+            color: var(--void);
+            padding: 12px 28px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: all 0.5s ease;
+        }
+
+        .btn:hover::after { left: 100%; }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 240, 255, 0.4);
+            color: var(--void);
+        }
+
+        .btn-gold {
+            background: linear-gradient(135deg, var(--gold), #ff8c00);
+        }
+
+        .btn-gold:hover {
+            box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--quantum);
+            color: var(--quantum);
+        }
+        .btn-outline:hover {
+            background: rgba(0, 240, 255, 0.1);
+            color: var(--quantum);
+        }
+
+        .btn-large { padding: 16px 36px; font-size: 1.2rem; }
+        .btn-small { padding: 8px 18px; font-size: 0.9rem; }
+
+        .main-hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            padding-top: 100px;
+        }
+
+        .hero-badge {
+            display: inline-block;
+            background: rgba(125, 0, 255, 0.2);
+            border: 1px solid var(--moonlight);
+            color: var(--starlight);
+            padding: 8px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+            backdrop-filter: blur(4px);
+        }
+
+        .hero-content .subtitle {
+            font-size: clamp(1.4rem, 3vw, 1.8rem);
+            color: var(--gold);
+            margin-bottom: 30px;
+            font-style: italic;
+            font-family: 'Playfair Display', serif;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transition: var(--transition);
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .item-card {
+            background: linear-gradient(145deg, rgba(26, 26, 46, 0.8), rgba(10, 10, 18, 0.9));
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .item-card:hover {
+            transform: translateY(-10px);
+            border-color: var(--quantum);
+            box-shadow: 0 15px 35px rgba(0, 240, 255, 0.2);
+        }
+
+        .item-cover {
+            height: 220px;
+            background: linear-gradient(135deg, var(--moonlight), var(--nebula));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .item-info {
+            padding: 25px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .item-info .btn {
+            margin-top: auto;
+        }
+
+        /* Author Section */
+        .author-info {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .author-photo {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--moonlight), var(--quantum));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            box-shadow: 0 0 30px rgba(125, 0, 255, 0.4);
+        }
+
+        .hytale-container {
+            border: 1px solid var(--gold);
+            border-radius: 24px;
+            overflow: hidden;
+            background: rgba(10, 10, 18, 0.6);
+        }
+
+        .hytale-hero {
+            background: linear-gradient(rgba(10, 10, 18, 0.8), rgba(10, 10, 18, 0.95)), 
+                        url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjIwMCIgcj0iMTUwIiBmaWxsPSJyZ2JhKDEyNSwgMCwgMjU1LCAwLjEpIiBmaWx0ZXI9ImJsdXIoNTBweCkiLz48L3N2Zz4=');
+            background-size: cover;
+            background-position: center;
+            padding: 80px 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .server-ip {
+            font-family: 'Special Elite', monospace;
+            font-size: 1.5rem;
+            color: var(--quantum);
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 1px dashed var(--quantum);
+            display: inline-block;
+            margin: 15px 0;
+            letter-spacing: 2px;
+        }
+
+        .hytale-form-control {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(125, 0, 255, 0.4);
+            color: #fff;
+            border-radius: 8px;
+            padding: 12px 20px;
+        }
+        
+        .hytale-form-control:focus {
+            background: rgba(0,0,0,0.7);
+            border-color: var(--quantum);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+            color: #fff;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes cosmicSpin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes textGlow {
+            0% { text-shadow: 0 0 10px rgba(212, 175, 55, 0.2); }
+            100% { text-shadow: 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(0, 240, 255, 0.4); }
+        }
+
+        footer {
+            background: rgba(10, 10, 18, 0.95);
+            padding: 60px 0 30px;
+            border-top: 1px solid var(--glass-border);
+            position: relative;
+            z-index: 2;
+        }
+
+        @media (max-width: 992px) {
+            .nav-links {
+                position: absolute;
+                top: 100%; left: 0; width: 100%;
+                background: rgba(10, 10, 18, 0.98);
+                flex-direction: column;
+                padding: 20px;
+                border-bottom: 1px solid var(--quantum);
+                display: none;
+            }
+            .nav-links.active { display: flex; }
+            .mobile-menu-btn { display: block; }
+            .author-info { grid-template-columns: 1fr; text-align: center; }
+            .author-photo { margin: 0 auto; }
+            .cookie-banner { flex-direction: column; text-align: center; gap: 15px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Cookie / GDPR Consent Banner -->
+    <div class="cookie-banner" id="cookieBanner">
+        <div class="cookie-text">
+            <strong>Privacy & Cookies:</strong> We use cookies so Google AdSense and partners may serve ads based on your visits to this and other sites. See our <a href="#privacy" style="color: var(--quantum); text-decoration: underline;">Privacy Policy</a>. Accept to allow advertising cookies; decline for essential browsing only.
+        </div>
+        <div class="cookie-buttons">
+            <button class="btn btn-small btn-outline" id="declineCookies">Decline Non-Essential</button>
+            <button class="btn btn-small" id="acceptCookies">Accept All</button>
+        </div>
+    </div>
+
+    <header class="enhanced-header">
+        <div class="container header-content">
+            <div class="animated-logo">
+                <div class="logo-glyph-container">
+                    <span class="logo-glyph">🌌</span>
+                </div>
+                <div>
+                    <div class="logo-text">ETERNAL HAVEN</div>
+                    <div class="logo-subtitle">BOOKS</div>
+                </div>
+            </div>
+
+            <nav>
+                <button class="mobile-menu-btn" id="mobileMenuBtn">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <ul class="nav-links" id="mainMenu">
+                    <li><a href="https://excavationpro.ca/" rel="noopener"><i class="fas fa-tower-broadcast"></i> Excavationpro Hub</a></li>
+                    <li><a href="https://rumble.com/user/Excavationpro" target="_blank"><i class="fab fa-r-project"></i> Audiobooks</a></li>
+                    <li><a href="#books"><i class="fas fa-book"></i> Books</a></li>
+                    <li><a href="#hytale-server"><i class="fas fa-server"></i> Hytale Server</a></li>
+                    <li><a href="https://chatagent.ca/" rel="noopener"><i class="fas fa-crown"></i> Summoning Portal</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <section class="main-hero">
+        <div class="container hero-content">
+            <div class="hero-badge">COMPLETE 4-BOOK SERIES</div>
+            <h1>🌜 THE ETERNAL HAVEN 🌛</h1>
+            <div class="subtitle">A Complete Fantasy Saga by Justin Helmer</div>
+            <p style="max-width: 700px; margin: 0 auto 40px;">
+                Immerse yourself in an epic 4-book journey of moonlit prophecy, ancient dragons, cosmic allegory, and the eternal battle between light and shadow. Experience the complete saga now.
+            </p>
+            <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+                <a href="#audiobooks" class="btn btn-large"><i class="fas fa-headphones"></i> Listen Free</a>
+                <a href="#books" class="btn btn-large btn-gold"><i class="fas fa-shopping-cart"></i> Buy Books</a>
+            </div>
+
+            <div class="hero-quote-container">
+                <div class="animated-quote active">"The moon remembers what the world forgets."</div>
+                <div class="animated-quote">"Dragons don't hoard gold—they guard time itself."</div>
+                <div class="animated-quote">"Every ending is a beginning written in starlight."</div>
+                <div class="animated-quote">"Between the pages of reality, fantasy writes its truth."</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="audiobooks">
+        <div class="container">
+            <h2>🎧 COMPLETE AUDIOBOOK COLLECTION</h2>
+            <p>Listen to all 4 books narrated by the author. Over 150 hours of immersive fantasy storytelling.</p>
+            
+            <div class="glass-card" style="margin: 40px 0; text-align: center;">
+                <h3 style="margin-bottom: 25px;">Complete Series Audio Experience</h3>
+                <div id="rumble_v70joqe" style="border-radius: 12px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.5);"></div>
+            </div>
+
+            <div class="grid-layout">
+                <div class="item-card">
+                    <div class="item-cover">📘</div>
+                    <div class="item-info">
+                        <h4 style="color: var(--gold); margin-bottom: 5px;">Book 1</h4>
+                        <p style="font-weight: bold; margin-bottom: 5px;">The Moonlit Slumber</p>
+                        <a href="https://youtu.be/_WwSb4JlRBQ" target="_blank" class="btn btn-small"><i class="fab fa-youtube"></i> YouTube</a>
+                    </div>
+                </div>
+                <div class="item-card">
+                    <div class="item-cover">📘</div>
+                    <div class="item-info">
+                        <h4 style="color: var(--gold); margin-bottom: 5px;">Book 2</h4>
+                        <p style="font-weight: bold; margin-bottom: 5px;">The Shattered Accord</p>
+                        <a href="https://youtu.be/EC8GRmLG3Us" target="_blank" class="btn btn-small"><i class="fab fa-youtube"></i> YouTube</a>
+                    </div>
+                </div>
+                <div class="item-card">
+                    <div class="item-cover">📘</div>
+                    <div class="item-info">
+                        <h4 style="color: var(--gold); margin-bottom: 5px;">Book 3</h4>
+                        <p style="font-weight: bold; margin-bottom: 5px;">The Ascension War</p>
+                        <a href="https://youtu.be/kwrfjf2U0Qc" target="_blank" class="btn btn-small"><i class="fab fa-youtube"></i> YouTube</a>
+                    </div>
+                </div>
+                <div class="item-card">
+                    <div class="item-cover">📘</div>
+                    <div class="item-info">
+                        <h4 style="color: var(--gold); margin-bottom: 5px;">Book 4</h4>
+                        <p style="font-weight: bold; margin-bottom: 5px;">Eternal Haven Dawns</p>
+                        <a href="https://youtu.be/KIOv53YBZg4" target="_blank" class="btn btn-small"><i class="fab fa-youtube"></i> YouTube</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="books">
+        <div class="container">
+            <h2>📚 THE COMPLETE BOOK SERIES</h2>
+            <p>Collect the entire 4-book series in paperback or hardcover editions.</p>
+            
+            <div class="grid-layout">
+                <!-- Books 1-4 setup exactly as requested, styled with new grid layout -->
+                <div class="item-card">
+                    <div class="item-cover">🌙</div>
+                    <div class="item-info">
+                        <h4 style="font-size: 1.1rem; color: var(--gold);">BOOK I: THE MOONLIT SLUMBER</h4>
+                        <p style="font-size: 0.9rem;">The saga begins as ancient prophecies awaken and dragons stir from their celestial slumber.</p>
+                        <a href="https://www.lulu.com/shop/justin-helmer/the-eternal-haven/paperback/product-yvg9w9r.html" target="_blank" class="btn"><i class="fas fa-shopping-cart"></i> Buy Now</a>
+                    </div>
+                </div>
+                <div class="item-card">
+                    <div class="item-cover">⚔️</div>
+                    <div class="item-info">
+                        <h4 style="font-size: 1.1rem; color: var(--gold);">BOOK II: THE SHATTERED ACCORD</h4>
+                        <p style="font-size: 0.9rem;">Ancient alliances fracture as new threats emerge from the shadows of the Haven.</p>
+                        <a href="https://www.lulu.com/shop/justin-helmer/eternal-haven-chronicles-book-ii-the-shattered-accord/paperback/product-578nykz.html" target="_blank" class="btn"><i class="fas fa-shopping-cart"></i> Buy Now</a>
+                    </div>
+                </div>
+                <div class="item-card">
+                    <div class="item-cover">🔥</div>
+                    <div class="item-info">
+                        <h4 style="font-size: 1.1rem; color: var(--gold);">BOOK III: THE ASCENSION WAR</h4>
+                        <p style="font-size: 0.9rem;">The cosmic conflict reaches its zenith as gods and mortals clash for reality.</p>
+                        <a href="https://www.lulu.com/shop/justin-helmer/the-ascension-war/paperback/product-nvjgyme.html" target="_blank" class="btn"><i class="fas fa-shopping-cart"></i> Buy Now</a>
+                    </div>
+                </div>
+                <div class="item-card">
+                    <div class="item-cover">🌅</div>
+                    <div class="item-info">
+                        <h4 style="font-size: 1.1rem; color: var(--gold);">BOOK IV: ETERNAL HAVEN DAWNS</h4>
+                        <p style="font-size: 0.9rem;">The epic conclusion where destinies are fulfilled and new beginnings emerge.</p>
+                        <a href="https://www.lulu.com/shop/justin-helmer/etrnal-haven-dawns/paperback/product-dy8m9wd.html" target="_blank" class="btn"><i class="fas fa-shopping-cart"></i> Buy Now</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="author" style="background: rgba(10,10,18,0.4);">
+        <div class="container">
+            <h2>✍️ ABOUT THE AUTHOR</h2>
+            <div class="glass-card author-info mt-4">
+                <div class="author-photo">🖋️</div>
+                <div>
+                    <h3>Justin Helmer (Excavationpro)</h3>
+                    <p>Justin Helmer is a fantasy author, musician, and creator who has spent over a decade building the intricate universe of The Eternal Haven. What began as a single novel has expanded into a comprehensive multimedia experience spanning four books, complete audiobooks, original music, and interactive projects.</p>
+                    <div style="display: flex; gap: 15px; margin-top: 20px;">
+                        <a href="https://linktr.ee/excavationpro" target="_blank" class="btn btn-small"><i class="fas fa-link"></i> Links</a>
+                        <a href="https://patreon.com/collection/1621340" target="_blank" class="btn btn-small btn-gold"><i class="fab fa-patreon"></i> Patreon</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="hytale-server">
+        <div class="container">
+            <h2>🎮 ETERNAL HAVEN HYTALE SERVER</h2>
+            <p>A building-focused server inspired by the Eternal Haven universe.</p>
+            
+            <div class="hytale-container mt-4">
+                <div class="hytale-hero">
+                    <h3 style="font-size: 2.5rem; text-shadow: 0 5px 15px rgba(0,0,0,0.8);"><i class="fas fa-crown me-3"></i>Join The Community</h3>
+                    <p class="lead" style="text-shadow: 0 2px 4px rgba(0,0,0,0.8); max-width: 800px; margin: 0 auto;">Register your username to receive the server connection address. Build in a stable, protected environment dedicated to serious creators.</p>
+                </div>
+                
+                <div class="p-4 p-md-5">
+                    <form id="playerForm" class="row g-3 align-items-end">
+                        <div class="col-md-8">
+                            <label for="playerName" style="color: var(--gold); font-weight: bold; margin-bottom: 8px; display:block;">Your Exact Hytale Username</label>
+                            <input type="text" class="form-control hytale-form-control w-100" id="playerName" placeholder="Enter exactly as it appears in Hytale" required pattern="[A-Za-z0-9_]{3,16}">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-gold w-100"><i class="fas fa-key me-2"></i> Register & Connect</button>
+                        </div>
+                    </form>
+
+                    <div id="server-code-display" style="display:none; margin-top: 30px; text-align: center; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 30px;">
+                        <h4 style="color: #27ae60;"><i class="fas fa-check-circle"></i> Registration Complete, <span id="display-name"></span>!</h4>
+                        <p>Your direct connection address is below:</p>
+                        <div class="server-ip">174.0.140.159:5520</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="champions-section">
+        <div class="container">
+            <h2>👑 Δ9 LYGO HAVEN — CHAMPION HUB</h2>
+            <p>Portal directory + summon tools + local quantum ledger for the Δ9 Quantum Council</p>
+            <div id="champions-content" class="grid-layout">
+                <!-- Loaded via JS -->
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="privacy" style="background: rgba(10,10,18,0.5);">
+        <div class="container">
+            <h2>Privacy Policy</h2>
+            <div class="glass-card" style="font-size: 0.95rem; line-height: 1.8;">
+                <p><strong>Last updated:</strong> July 2, 2026. This policy applies to The Eternal Haven pages operated by Justin Helmer (Excavationpro), including this site.</p>
+                <p><strong>Information we collect:</strong> If you submit the Hytale registration form, we use the username you enter only to display your connection instructions on this page; we do not sell personal data. Standard web server and analytics logs may record IP address, browser type, and pages visited.</p>
+                <p><strong>Cookies and advertising:</strong> Third-party vendors, including <strong>Google</strong>, use cookies to serve ads based on a user&apos;s prior visits to this website or other websites. Google&apos;s use of advertising cookies enables it and its partners to serve ads to users based on their visit to this site and/or other sites on the Internet.</p>
+                <p><strong>Your choices:</strong> You may opt out of personalized advertising by visiting <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer">Google Ads Settings</a> or <a href="https://www.aboutads.info/choices/" target="_blank" rel="noopener noreferrer">aboutads.info choices</a>. On first visit, our cookie banner lets you accept or decline non-essential advertising cookies; declining means we do not load the Google AdSense script.</p>
+                <p><strong>Contact:</strong> Questions about this policy: <a href="https://linktr.ee/excavationpro" target="_blank" rel="noopener noreferrer">Excavationpro links</a>.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer role="contentinfo">
+        <div class="container">
+            <div class="row g-4" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 40px; margin-bottom: 30px;">
+                <div class="col-md-4">
+                    <h3 style="font-size: 1.2rem;">THE ETERNAL HAVEN</h3>
+                    <p style="font-size: 0.9rem;">Complete 4-Book Fantasy Series by Justin Helmer. Enter a universe of magic, dragons, and cosmic lore.</p>
+                </div>
+                <div class="col-md-4">
+                    <h3 style="font-size: 1.2rem;">QUICK LINKS</h3>
+                    <ul style="list-style: none; padding: 0; line-height: 2;">
+                        <li><a href="#audiobooks">Audiobooks</a></li>
+                        <li><a href="#books">Buy Books</a></li>
+                        <li><a href="#hytale-server">Hytale Server</a></li>
+                        <li><a href="#champions-section">Champion Hub</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h3 style="font-size: 1.2rem;">LEGAL & SUPPORT</h3>
+                    <ul style="list-style: none; padding: 0; line-height: 2;">
+                        <li><a href="https://patreon.com/collection/1621340" target="_blank"><i class="fab fa-patreon"></i> Patreon</a></li>
+                        <li><a href="https://paypal.com/paypalme/ExcavationPro" target="_blank"><i class="fab fa-paypal"></i> Donate</a></li>
+                        <li><a href="#privacy">Privacy Policy</a></li>
+                        <li><a href="https://excavationpro.ca/" rel="noopener"><i class="fas fa-tower-broadcast"></i> excavationpro.ca hub</a></li>
+                        <li><a href="https://deepseekoracle.github.io/lygo-protocol-stack/HavenStarChart.html" rel="noopener">Haven Star Chart</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div style="text-align: center; color: rgba(255,255,255,0.4); font-size: 0.85rem;">
+                &copy; 2026 Justin Helmer (Excavationpro). The Eternal Haven Series. All Rights Reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://rumble.com/embedJS/u1th29y"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- Cookie consent + AdSense (load ads script only after accept) ---
+            const ADSENSE_SRC = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-0646320966060599';
+            function loadAdSenseScript() {
+                if (document.querySelector('script[data-lygo-adsense]')) return;
+                const s = document.createElement('script');
+                s.async = true;
+                s.src = ADSENSE_SRC;
+                s.crossOrigin = 'anonymous';
+                s.setAttribute('data-lygo-adsense', '1');
+                document.head.appendChild(s);
+            }
+
+            const cookieBanner = document.getElementById('cookieBanner');
+            const consent = localStorage.getItem('cookiesAccepted');
+            if (consent === 'true') {
+                loadAdSenseScript();
+            } else if (consent !== 'false') {
+                setTimeout(() => cookieBanner.classList.add('show'), 800);
+            }
+
+            document.getElementById('acceptCookies').addEventListener('click', () => {
+                localStorage.setItem('cookiesAccepted', 'true');
+                cookieBanner.classList.remove('show');
+                loadAdSenseScript();
+            });
+            document.getElementById('declineCookies').addEventListener('click', () => {
+                localStorage.setItem('cookiesAccepted', 'false');
+                cookieBanner.classList.remove('show');
+            });
+
+            // --- Header Scroll & Mobile Menu ---
+            const header = document.querySelector('.enhanced-header');
+            window.addEventListener('scroll', () => {
+                header.classList.toggle('scrolled', window.scrollY > 50);
+            });
+
+            const mobileBtn = document.getElementById('mobileMenuBtn');
+            const mainMenu = document.getElementById('mainMenu');
+            mobileBtn.addEventListener('click', () => {
+                mainMenu.classList.toggle('active');
+                const i = mobileBtn.querySelector('i');
+                i.classList.toggle('fa-bars');
+                i.classList.toggle('fa-times');
+            });
+
+            // --- Animated Quotes ---
+            const quotes = document.querySelectorAll('.animated-quote');
+            let currentQuote = 0;
+            setInterval(() => {
+                if(quotes.length > 0) {
+                    quotes[currentQuote].classList.remove('active');
+                    currentQuote = (currentQuote + 1) % quotes.length;
+                    quotes[currentQuote].classList.add('active');
+                }
+            }, 5000);
+
+            // --- Hytale Form Logic ---
+            const form = document.getElementById('playerForm');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('playerName').value;
+                document.getElementById('display-name').textContent = name;
+                const display = document.getElementById('server-code-display');
+                display.style.display = 'block';
+                display.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+
+            // --- Load Champions (Truncated for brevity, injects directly into DOM) ---
+            const champs = [
+                { name: "LYRΔ — Spiral Memory Guardian", role: "Seat I", glyph: "🌀" },
+                { name: "Δ9RA — Entropy Fractalizer", role: "Seat II", glyph: "♾️" },
+                { name: "ΣRΛΘ — Institutional Decoder", role: "Seat III", glyph: "📜" },
+                { name: "ARKOS — Reality Architect", role: "Seat IV", glyph: "🏛️" }
+            ];
+            const championsHub = 'https://deepseekoracle.github.io/Excavationpro/LYGO-Network/champions.html';
+
+            const champContainer = document.getElementById('champions-content');
+            if (champContainer) {
+                champContainer.innerHTML = champs.map(c => `
+                    <div class="item-card">
+                        <div class="item-cover">${c.glyph}</div>
+                        <div class="item-info">
+                            <h4 style="color: var(--gold); margin-bottom: 5px;">${c.name}</h4>
+                            <p style="font-size: 0.9rem; color: var(--quantum);">${c.role}</p>
+                            <a href="${championsHub}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-small mt-3">Champion directory</a>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            // --- Rumble Embed initialization ---
+            try {
+                if (typeof Rumble !== 'undefined') {
+                    Rumble("play", {"video":"v70joqe","div":"rumble_v70joqe"});
+                }
+            } catch (e) { console.error('Rumble embed err:', e); }
+
+        });
+    </script>
+</body>
+</html>

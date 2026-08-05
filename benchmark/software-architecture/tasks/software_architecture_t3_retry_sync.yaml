@@ -1,0 +1,45 @@
+task_id: software_architecture_t3_retry_sync
+skill_id: software-architecture
+description: |
+  The API client in `assets/software_architecture_t3_retry_sync/input/` is used by a demo app that sometimes fails during short network hiccups. Please make it more resilient for callers while keeping the public client shape familiar to the app.
+initial_state:
+  assets:
+    - path: assets/software_architecture_t3_retry_sync/input/agent.js
+      source: "https://github.com/gothinkster/react-redux-realworld-example-app/blob/master/src/agent.js"
+      real_state: "Real API client file from the React/Redux RealWorld example app. It wraps superagent requests and exports Auth, Tags, Articles, Comments, Profile, and setToken."
+      preparation: |
+        Downloaded the raw file from the public GitHub repository without content changes.
+    - path: assets/software_architecture_t3_retry_sync/input/package.json
+      source: "https://github.com/gothinkster/react-redux-realworld-example-app/blob/master/package.json"
+      real_state: "Real package manifest from the same project snapshot. It already depends on superagent and superagent-promise."
+      preparation: |
+        Downloaded the raw file from the public GitHub repository without content changes.
+  tools_available:
+    - filesystem
+    - shell
+    - package_manager
+expected_trigger: true
+skill_constraints_tested:
+  - id: library_first_resilience
+    description: "The skill requires searching for existing solutions before writing custom code and using libraries instead of custom utilities, with retry logic explicitly cited as a case for an established library."
+    exclusive: "Without the skill, many models may default to a local hand-rolled retry wrapper because the API client is small and the request boundary is concentrated in `agent.js`; however some strong models may independently choose a retry library, so this constraint should be judged together with actual dependency usage and absence of custom retry logic."
+  - id: avoid_custom_generic_helpers
+    description: "The skill warns that every custom utility is a liability and rejects generic helper naming."
+    exclusive: "Without the skill, a model that chooses custom retry logic is more likely to add an inline retry helper directly in `agent.js`; if it creates a new wrapper module, it may use generic names such as `retry.js`, `utils.js`, or `helpers.js` rather than an API-client/domain-specific name."
+  - id: focused_small_functions
+    description: "The skill requires complex logic to be broken into small focused functions and avoiding deep nesting."
+    exclusive: "Without the skill, a model may add a local hand-rolled retry wrapper or duplicate catch/retry patterns around the request methods, rather than treating resilience as a single request-boundary concern implemented through a maintained dependency."
+notes: |
+  - Core test point: a model can satisfy the user symptom by custom retry code, but the skill specifically favors existing libraries for retry behavior.
+  - Expected correct behavior: add and actually use a maintained retry/resilience dependency through a single API-client request boundary, while preserving Auth/Tags/Articles/Comments/Profile exports and existing endpoint/token behavior.
+  - Common wrong behavior: the model adds `const retry = (fn, attempts) => ...` above `requests` in `agent.js:18` and manually loops through attempts with `setTimeout` or recursive promises.
+  - Common wrong behavior: the model edits every request method at `agent.js:19-26` to duplicate `.catch(...)` retry branches, creating custom duplicated logic.
+  - baseline_correctness_signals:
+      - The API client still exports Auth, Tags, Articles, Comments, Profile, and setToken.
+      - Existing endpoint strings and token behavior are preserved.
+  - skill_following_signals:
+      - A direct dependency is added in `package.json` for retry/resilience behavior, and that same dependency is imported and used by the API client implementation.
+      - Retry/resilience behavior is introduced at a single request-creation or request-transport boundary rather than duplicated inside multiple exported API groups.
+      - The implementation does not contain hand-written retry loops, retry counters, recursive custom Promise retry functions, or `setTimeout`-driven retry scheduling.
+      - If a new module is created, its name is specific to the API client/request transport domain rather than a generic catch-all name such as `utils.js`, `helpers.js`, `common.js`, or `retry.js`.
+      - Multiple mature retry/resilience libraries are acceptable; the rubric must not require `cockatiel` specifically.

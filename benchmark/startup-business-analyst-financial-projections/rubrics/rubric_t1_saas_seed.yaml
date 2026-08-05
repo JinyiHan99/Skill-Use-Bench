@@ -1,0 +1,150 @@
+rules:
+  - id: g1_observable_write_attempt
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable write attempt to the seed projection markdown artifact. The gate only confirms an attempt was made, not content correctness.
+    signal:
+      pattern: >-
+        (?is)(?:tool["']?:\s*["']?(?:Write|Edit|markdown_write)["']?.{0,500}file_path["']?:\s*["'][^"']*output/seed_financial_projection\.md["']|file_path["']?:\s*["'][^"']*output/seed_financial_projection\.md["'].{0,500}tool["']?:\s*["']?(?:Write|Edit|markdown_write)["']?)
+
+  - id: r1_cohort_based_revenue_model
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Revenue model must be cohort-based: for each period/cohort it should track new customers, retained customers after churn/retention, cohort revenue, and expansion/upsell revenue rather than using only an aggregate MRR growth line.
+      skill-exclusive reason: without reading the skill, a strong model facing a seed investor model typically makes aggregate assumptions about monthly MRR/ARR growth, churn, and expansion; the skill requires breaking revenue into cohort mechanics (new customers → retained after churn → cohort revenue → expansion). The conflict is aggregate top-down ramp vs cohort-level operating build.
+    signal:
+      query: |
+        Judge only the final contents of output/seed_financial_projection.md; ignore intermediate drafts, plans, tool-call descriptions, and self-description. Does the revenue model actually use a cohort/vintage structure (or equivalent logo/team/seat cohort mechanics) that includes new customers/teams, retained customers after churn or retention, cohort revenue, and expansion or upsell revenue as modeled components? Answer YES if those cohort mechanics are present in the final model/table/formulas; answer NO if revenue is only a top-down MRR/ARR growth ramp or if any core cohort component is missing.
+      acceptable: "A revenue table with columns such as Cohort Month, New Teams, Retained Teams after Churn, Cohort MRR, Expansion MRR; equivalent customer/logo/team cohort or vintage labels also count."
+      unacceptable: "A table with Month, MRR, ARR, Growth % only, even if churn is mentioned elsewhere."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_skill_projection_granularity
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.9
+    spec: |
+      [SKILL] Projection timing must follow the skill granularity: monthly detail for Years 1-2, quarterly detail for Year 3, and annual summaries for Years 4-5.
+      skill-exclusive reason: without reading the skill, a strong model often outputs a 12-month + 3-year annual model, or only gives a 3-year annual table; the skill explicitly specifies monthly for Years 1-2, quarterly for Year 3, and annual for Years 4-5 as a mixed granularity. The conflict is generic annual/3-year forecast vs skill-defined 3-5 year granularity schedule.
+    signal:
+      query: |
+        Judge only the final contents of output/seed_financial_projection.md; ignore intermediate drafts, plans, tool-call descriptions, and self-description. Is the projection schedule presented with monthly detail for both Year 1 and Year 2, quarterly detail for Year 3, and annual summaries for Years 4 and 5? Accept equivalent time labels such as M1-M24, specific month labels/dates, 2026-01 through 2027-12, FY2028 Q1-Q4, and FY2029/FY2030 annual rows. Answer YES only if all three granularity levels are present; answer NO if the output is only annual, only 12-month, or omits Years 4-5.
+      acceptable: "Sections/tables labeled Months 1-24, Year 3 quarters/Q1-Q4 or FY2028 Q1-Q4, and Years 4-5 annual summary such as FY2029/FY2030."
+      unacceptable: "A Year 1 / Year 2 / Year 3 annual table with no monthly Year 2 or no Years 4-5."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_driver_based_three_scenarios
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.9
+    spec: |
+      [SKILL] Scenario analysis must include conservative/base/optimistic cases that vary multiple SaaS operating drivers together, including customer acquisition, churn or retention, ARPU/pricing, and CAC.
+      skill-exclusive reason: without reading the skill, a strong model may only give qualitative downside/base/upside or only adjust a single revenue growth rate; the skill specifies three scenarios with linked sensitivity for acquisition, churn, pricing, and CAC. The conflict is single-variable scenario vs multi-driver SaaS scenario deltas.
+    signal:
+      query: |
+        Judge only the final contents of output/seed_financial_projection.md; ignore intermediate drafts, plans, tool-call descriptions, and self-description. Does the scenario analysis include three quantitative cases (conservative/base/optimistic, downside/base/upside, P10/P50/P90, or equivalent) that vary SaaS drivers together: acquisition volume, churn or retention, ARPU/pricing, and CAC or an explicit equivalent customer-acquisition-efficiency metric? Answer YES only if those driver changes are reflected as quantified scenario assumptions or modeled outputs across cases; answer NO if scenarios are qualitative, list assumptions without model linkage, or change only ARR/revenue growth.
+      acceptable: "Conservative: acquisition -30%, churn +20%, ARPU -15%, CAC +25%; Base/P50; Optimistic: acquisition +30%, churn -20%, ARPU +15%, CAC -25%, with corresponding modeled ARR/burn/runway outputs."
+      unacceptable: "Conservative/Base/Optimistic rows that only change ARR growth from 40% to 80%, or only list unmodeled scenario assumptions."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_skill_cash_flow_bridge
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Cash flow analysis must bridge beginning cash, cash collected, operating expenses, ending cash, monthly burn, runway, and funding-event impact.
+      skill-exclusive reason: without reading the skill, a strong model may only give a runway narrative or annual cash balance; the skill provides a cash-flow formula and funding-event impact, requiring a complete cash bridge. The conflict is qualitative runway estimate vs formula-based cash bridge with funding events.
+    signal:
+      query: |
+        Judge only the final contents of output/seed_financial_projection.md; ignore intermediate drafts, plans, tool-call descriptions, and self-description. Does the cash-flow section present a bridge from beginning cash/opening balance through cash collected/receipts/inflows and expenses/outflows/opex to ending cash, with burn, runway, and funding/financing-event impact included? Answer YES if the bridge/table/formulas contain these components; answer NO if it only states a runway estimate or cash balance without the bridge.
+      acceptable: "Quarter/Month table with Beginning Cash or Opening Balance, Cash Collected/Receipts/Inflows, Expenses/Opex, Net Burn, Funding Raised/Financing Inflow, Ending Cash, Runway."
+      unacceptable: "The company has 18 months runway, but no beginning/ending cash bridge or raise impact."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_role_level_loaded_headcount
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.65
+    spec: |
+      [SKILL] Headcount planning must be role-by-role and include title/department, start timing, base salary, fully-loaded cost using about 1.3-1.4x salary, and equity grant context.
+      skill-exclusive reason: without reading the skill, a strong model often gives department headcount or payroll totals; the skill requires per-role start timing, base salary, 1.3-1.4x fully-loaded cost, and equity grant. The conflict is aggregate payroll/headcount vs role-timed loaded compensation plan.
+    signal:
+      query: |
+        Judge only the final contents of output/seed_financial_projection.md; ignore intermediate drafts, plans, tool-call descriptions, and self-description. Is there a role-by-role hiring plan that includes role/title or department, start timing, base salary, fully-loaded cost using roughly a 1.3-1.4x salary multiplier or equivalent burden/benefits/taxes/payroll-load calculation, and equity grant context? Equity may appear in each role row or in a separate role/headcount assumptions section. Answer YES if the plan includes these role-level compensation mechanics; answer NO if it only gives departmental totals or a single payroll line.
+      acceptable: "Account Executive, S&M, starts M7, base salary $110k, loaded cost 1.35x/$149k, plus either row-level equity 0.15% or an equity-grant assumptions table for that role band."
+      unacceptable: "Engineering grows from 4 to 8 people with salaries included in one payroll row and no role-level loaded cost or equity context."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_modeled_startup_metrics_layer
+    type: lesson
+    provenance: skill
+    locus: final-output
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.65
+    spec: |
+      [SKILL] The model must compute key startup metrics from the operating model, including CAC, LTV, burn rate, and runway, rather than listing disconnected metrics.
+      skill-exclusive reason: without reading the skill, a strong model may report ARR, expenses, and cash but omit a calculated unit-economics layer; the skill explicitly requires CAC, LTV, burn/runway formulas and target comparisons. The conflict is financial statement summary vs modeled startup metrics derived from revenue/cost/cash drivers.
+    signal:
+      query: |
+        Judge only the final contents of output/seed_financial_projection.md; ignore intermediate drafts, plans, tool-call descriptions, and self-description. Are CAC, LTV, burn rate, and runway shown with numeric calculations or formula results that can be traced to revenue, cost, and cash-flow assumptions in the same file? Answer YES if formulas or table links show these metrics are derived from the model; answer NO if they are absent, listed as static standalone numbers, or only described in narrative without connection to model drivers.
+      acceptable: "CAC = S&M spend / new customers with a numeric result, LTV = ARPU × gross margin / churn with a numeric result, burn from expenses minus revenue, runway = cash / burn, all tied to model assumptions."
+      unacceptable: "Key metrics: CAC is healthy, LTV is strong, runway is sufficient, or static CAC/LTV values with no calculation or trace to revenue/cost/cash assumptions."
+      judge_context_window: [final_answer]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: final-output
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/seed_financial_projection.md exists and contains the core requested seed model facts: the developer-tools startup base, the provided GitLab public context, and the stated starting MRR/customer/headcount/cash inputs.
+    signal:
+      file: output/seed_financial_projection.md
+      file_must_contain: '(?is)^(?=.*(?:GitLab|gitlab_companyfacts|gitlab_s1))(?=.*(?:\$31\s?k|31,?000|31k))(?=.*(?:\b62\b.{0,60}(?:paying\s+)?(?:teams|customers)|(?:teams|customers).{0,60}\b62\b))(?=.*(?:\b7\b.{0,60}(?:employees|employee|headcount|FTEs?|people)|(?:employees|employee|headcount|FTEs?|people).{0,60}\b7\b))(?=.*(?:\$720\s?k|720,?000|720k))(?=.*(?:projection|revenue|cash\s*flow|scenario|assumptions))'

@@ -1,0 +1,116 @@
+rules:
+  - id: g1_observable_implementation_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    signal:
+      pattern: '"(tool|name)"\s*:\s*"(Write|Edit)"[^\n]{0,500}"file_path"|"recipient_name"\s*:\s*"functions\.(Write|Edit)"[^\n]{0,500}"file_path"|<tool_use[^>]{0,200}\b(Write|Edit)\b'
+    spec: "[GATE] The trace contains real Write/Edit tool calls with a file_path parameter, indicating the model has an observable implementation modification attempt; this is only a weak gate and is not counted toward SF."
+
+  - id: r1_hero_core_depends_on_storage_port
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The core use cases of hero add, paginated query, query by id, and delete must depend on an abstract storage port; SQLModel Session/engine/select may only appear in outer adapters.
+      Skill-exclusive rationale: without reading the skill, a strong model often splits routers/models/crud/database per FastAPI docs, or wraps Session with a CRUD layer; the skill requires Ports and Adapters, letting the core depend only on ports with swappable storage, and the conflict point is whether the use case still receives/imports Session, SQLModel, select, create_engine.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: does the hero core use case/service express create/list/get/delete capabilities through an abstract repository/storage port, and do these core files not import or receive SQLModel, Session, engine, select, create_engine, or a concrete SQLModel repository/adapter? Only judge this one thing. Answer YES if SQLModel persistence is implemented behind a concrete adapter and core use cases depend on an interface/protocol/ABC or equivalent port. Answer NO if the core use case imports SQLModel/Session/select, receives Session directly, imports a concrete SQLModel adapter, or has only a Protocol shell while the service still depends on the concrete adapter.
+      acceptable: "HeroRepository Protocol defines add/list/get/delete; HeroService depends on HeroRepository; SQLModelHeroRepository implements it using Session."
+      unacceptable: "HeroService(session: Session) calls session.exec(select(Hero)), or HeroService imports SQLModelHeroRepository directly despite a nominal Protocol existing."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_pure_domain_hero_separate_from_sqlmodel
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The core Hero business object should be a pure domain model, without SQLModel table=True, Field, FastAPI/Pydantic request-response responsibilities; SQLModel persistence models and API schemas should be mapped at the edge.
+      Skill-exclusive rationale: the default practice continues to reuse the official example's Hero(SQLModel, table=True) simultaneously as ORM, domain object, and response model; the skill explicitly requires the domain core to be framework-free, with ORM models placed in adapters/repositories and mapped, and the conflict point is whether the domain model is still SQLModel.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: do the use case/service and repository port actually use a pure Hero domain entity/data object that does not inherit SQLModel, does not use Field(table/primary_key/index), and does not carry FastAPI schema responsibilities, and is the SQLModel table model separated from it and mapped via an adapter? Do not judge YES merely because domain/hero.py or a pure Hero file exists. Only judge this one thing. Answer YES if domain Hero is a dataclass/plain class/Pydantic-free model actually used by the core and SQLModelHero or equivalent lives at the persistence edge. Answer NO if the same Hero(SQLModel, table=True) remains the core object passed through use cases and repository port.
+      acceptable: "domain/hero.py defines dataclass Hero used by HeroService and HeroRepository; adapters/sqlmodel_models.py defines HeroRecord(SQLModel, table=True) with to_domain/from_domain mapping."
+      unacceptable: "A plain Hero class exists but use_cases still import Hero from sql_app.py where class Hero(SQLModel, table=True) has Field(...) and is returned by the core service."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_api_adapter_keeps_fastapi_at_edge
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] FastAPI routes should act as a driving adapter, only handling Depends/Query/HTTPException/request-response mapping and calling core use cases; core logic should not know HTTP status codes or FastAPI dependency injection.
+      Skill-exclusive rationale: the default refactor often only splits path functions into routers and leaves business judgments in route functions; the skill requires interface adapters to translate external formats, with use cases independent of the delivery mechanism, and the conflict point is whether HTTP/FastAPI semantics leak into the core.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: does the FastAPI route only do dependency injection, parameter/response mapping, call the use case/service, and convert HTTP errors, while the business flow of add, paginated query, query by id, and delete is performed by the core use case/service, and the core use case does not import Depends, Query, HTTPException, FastAPI? Only judge this one thing. Answer YES if routers adapt HTTP to use-case calls and map not-found results to 404 at the edge. Answer NO if route handlers still directly execute session operations, contain substantive business branching beyond parsing/use-case call/error mapping, or core services raise/import HTTPException or Depends.
+      acceptable: "router.delete calls service.delete_hero(id) and converts a None/NotFound result to HTTPException(404)."
+      unacceptable: "delete_hero route still calls session.get/session.delete/session.commit, contains business decision branches, or HeroService raises fastapi.HTTPException."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_use_case_tests_in_memory_no_database
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Tests for the core behavior of add, query, and delete should directly drive the use case and inject an in-memory storage implementation, without starting FastAPI, TestClient, SQLModel engine, SQLite, or app startup.
+      Skill-exclusive rationale: the default test uses TestClient + sqlite:///:memory:, overrides get_session, or uses create_engine for interface/integration tests; the skill's signature is in-memory adapter unit tests, without database/Docker/network, and the conflict point is whether the test verifies the use case boundary or the outer integration.
+    signal:
+      query: >
+        Based on the test file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: is there at least one pure use-case test module/test class dedicated to covering create/query/delete, that directly instantiates the hero use case/service and injects an InMemory/Fake repository? Additional integration tests are allowed. Only judge this one thing. Answer YES if that pure test uses a pure in-memory implementation of the port and calls use-case methods for create/list/get/delete. Answer NO if the only coverage relies on TestClient, FastAPI app, HTTP requests, dependency overrides, create_engine, Session, sqlite://, SQLModel.metadata.create_all, startup events, or mock SQLModel session.
+      acceptable: "test_create_list_delete_hero uses InMemoryHeroRepository and HeroService without importing fastapi or sqlmodel; separate HTTP integration tests may also exist."
+      unacceptable: "The only tests create sqlite engine, override get_session, and call client.post/client.get/client.delete."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_storage_swap_mapping_at_adapter
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] SQLModel storage and in-memory storage should just be two adapters of the same port, and the conversion from SQLModel record to domain Hero should be done at the adapter edge.
+      Skill-exclusive rationale: the default implementation may only write a mock for tests or stuff an in-memory list into the same service, without a swappable adapter boundary; the skill emphasizes swapping implementations without touching the core, and the conflict point is whether switching SQLModel to an in-memory implementation requires changing core code.
+    signal:
+      query: >
+        Based on the file content finally written by actual Write/Edit tool calls, not the agent's self-description or explanation: do the SQLModel storage implementation and the in-memory test implementation implement the same abstract port, so that the core construction/injection point can switch between them without modification, and is the mapping between ORM records and domain objects only located in the SQLModel adapter and not in the use case/service? Both conditions must be satisfied to judge YES. Only judge this one thing. Answer YES if both adapters share the same protocol and mapping functions are outside the use case. Answer NO if in-memory code is unrelated test-only monkeypatching, core changes are required to switch storage, or use cases contain SQLModel-to-domain mapping/Session-specific branches.
+      acceptable: "SqlModelHeroRepository and InMemoryHeroRepository both implement HeroRepository; to_domain/from_domain live in SqlModelHeroRepository."
+      unacceptable: "HeroService has if isinstance(repo, Session) branches or test monkeypatches session.exec rather than using a second adapter."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether the hero service refactor is complete and preserves add, paginated query, query by id, delete semantics and core behavior tests."
+    signal:
+      query: >
+        Based on the final file content and actual Write/Edit tool calls, not the agent's self-description: is the task basically complete, i.e., the four capabilities of hero add, paginated query, query by id, and delete have been refactored and landed, the external request/response semantics are largely preserved, and tests covering the core behavior of add, query, and delete are included? Answer YES only if code and tests are actually written; Answer NO if it is only a plan, a major capability is missing, or core tests are missing.
+      acceptable: "Routes still provide /heroes/ and /heroes/{hero_id}, core service/repository has landed, tests cover create/read/delete."
+      unacceptable: "Only split files without adding tests, or only keeps create/list missing get/delete."

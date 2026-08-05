@@ -1,0 +1,223 @@
+# Rubric for skill_28_json_render — SF28_t2_analytics_dashboard
+# Revised version: based on 3 rounds of debate consensus
+
+# ── SKILL-derived (main scoring arena) ─────────────
+
+- id: r1_bindState_for_filters
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  severity: hard
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] Filter controls (time range, region selection) and tab switching must use { "$bindState": "/path" }
+    placed on the value prop for two-way binding; using a statePath prop or an onChange + setState pattern is forbidden.
+    Skill text: "place { "$bindState": "/path" } directly on the natural value prop".
+    Strong skill-exclusive: the model tends to use statePath or the onChange + setState pattern.
+  signal:
+    judge_question: |
+      Inspect only the final generated spec.json file (at assets/SF28_t2_dashboard_spec/src/spec.json).
+      This spec uses a normalized flat map structure (elements is a key-value map).
+      
+      Check: Do ALL three interactive controls — (1) time range filter, (2) region filter, 
+      and (3) tab switcher — use { "$bindState": "/path" } on their natural value prop 
+      (e.g., "value", "selectedKey", "activeKey")?
+      
+      Acceptable: Each control's value prop is set to { "$bindState": "/some/path" }
+      
+      Unacceptable: Using statePath prop, using $state (read-only) + onChange/onSelect callback,
+      using onChange with setState action, or any control missing $bindState on its value prop.
+      
+      Answer YES only if ALL three controls use $bindState on their value prop. Answer NO otherwise.
+
+- id: r2_no_statePath_prop
+  type: forbidden-arg
+  provenance: skill
+  verifier: state-diff
+  severity: hard
+  exclusive: true
+  weight: 0.25
+  spec: |
+    [SKILL] The spec must not contain a statePath property.
+  signal:
+    file: "assets/SF28_t2_dashboard_spec/src/spec.json"
+    file_must_not_contain: '"statePath"'
+
+- id: r3_visibility_eq_for_tabs
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  severity: hard
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] The visibility of the panel corresponding to a tab must use a visible condition object
+    (e.g., { "$state": "/activeTab", "eq": "overview" }),
+    not a visible: true/false boolean.
+    Skill text: "A common mistake is setting visible: true or visible: false as a boolean prop —
+    the renderer ignores boolean visibility values".
+    Strong skill-exclusive: boolean visible is standard practice in almost every UI library.
+  signal:
+    judge_question: |
+      Inspect only the final generated spec.json file (at assets/SF28_t2_dashboard_spec/src/spec.json).
+      This spec uses a normalized flat map structure (elements is a key-value map).
+      
+      For the tab-controlled panels (overview panel and orders panel):
+      Does each panel element have a top-level "visible" field (sibling of "type"/"props"/"content")
+      set to a state-based condition object with "$state" and "eq"?
+      
+      Acceptable: "visible": { "$state": "/activeTab", "eq": "overview" }
+      
+      Unacceptable: "visible": true, "visible": false, no visible field,
+      visible inside props, or conditional rendering outside the visibility system.
+      
+      Answer YES if both tab panels use state-based condition objects on their top-level visible field. Answer NO otherwise.
+
+- id: r4_content_not_children
+  type: required-arg
+  provenance: skill
+  verifier: state-diff
+  severity: hard
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] Container components (Dashboard, Panel) must use the top-level "content" array to nest child elements;
+    using props.children is forbidden.
+    This project uses a normalized flat structure; the content array stores string IDs of child elements.
+  signal:
+    file: "assets/SF28_t2_dashboard_spec/src/spec.json"
+    file_must_contain: '"content":'
+
+- id: r5_no_children_prop
+  type: forbidden-arg
+  provenance: skill
+  verifier: state-diff
+  severity: hard
+  exclusive: true
+  weight: 0.25
+  spec: |
+    [SKILL] Container elements in the spec must not use a "children" field to nest child elements.
+    Paired negative check with r4.
+  signal:
+    file: "assets/SF28_t2_dashboard_spec/src/spec.json"
+    file_must_not_contain: '"children"'
+
+- id: r6_watch_for_data_refresh
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  severity: hard
+  exclusive: true
+  weight: 1.0
+  spec: |
+    [SKILL] Triggering a data refresh on region-filter change must use the watch field (top-level, sibling of type/props/content),
+    monitoring the region-filter state path and triggering a refreshData (or semantically equivalent) action.
+    Skill text: "Elements can declare a watch field (top-level, sibling of type/props/content)
+    to trigger actions when state values change".
+    Strong skill-exclusive: the model instinctively uses onChange callbacks or effect hooks.
+  signal:
+    judge_question: |
+      Inspect only the final generated spec.json file (at assets/SF28_t2_dashboard_spec/src/spec.json).
+      This spec uses a normalized flat map structure (elements is a key-value map).
+      
+      Does the region filter element (or a related element) declare a top-level "watch" field
+      (sibling of "type"/"props"/"content") that:
+      1. Monitors the state path bound to the region filter (e.g., "/filters/region")
+      2. Triggers a data refresh action (e.g., "refreshData" or semantically equivalent action declared in schema)
+      
+      Acceptable: "watch": { "/filters/region": { "action": "refreshData" } }
+      
+      Unacceptable:
+      - Using onChange/onSelect props to trigger refresh
+      - watch nested inside props
+      - watch monitoring an unrelated path
+      - watch not triggering any data loading action
+      
+      Answer YES if a proper top-level watch is configured to refresh data on region change. Answer NO otherwise.
+
+- id: r7_state_read_expressions
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  severity: hard
+  exclusive: false
+  weight: 0.5
+  spec: |
+    [SKILL] Reading values from state (metric data, table data, etc.) must use { "$state": "/path" } expressions;
+    hardcoding or direct variable references are not allowed.
+  signal:
+    judge_question: |
+      Inspect only the final generated spec.json file (at assets/SF28_t2_dashboard_spec/src/spec.json).
+      
+      Do the MetricCard elements read their values from state using { "$state": "/path" } expressions
+      (e.g., { "$state": "/metrics/totalUsers" }), and does the DataTable read its rows
+      from state using a { "$state": "/path" } expression?
+      
+      Acceptable: value props set to { "$state": "/metrics/..." } and rows set to { "$state": "/recentOrders" }
+      Unacceptable: Hardcoded numbers, template interpolation, or direct variable references.
+      
+      Answer YES if $state expressions are used for reading metric values and table data. Answer NO otherwise.
+
+- id: r8_computed_expression
+  type: required-arg
+  provenance: skill
+  verifier: llm-judge
+  severity: hard
+  exclusive: true
+  weight: 0.75
+  spec: |
+    [SKILL] The conversion-rate card's dynamic formatting should use a { "$computed": "fnName", "args": {...} } expression;
+    inline templates or JavaScript expressions are not allowed.
+    Skill text: `{ "$computed": "fnName", "args": { "key": <expression> } }` — calls a registered function.
+  signal:
+    judge_question: |
+      Inspect only the final generated spec.json file (at assets/SF28_t2_dashboard_spec/src/spec.json).
+      
+      Does the conversion rate MetricCard's value (or a related formatting prop) use a "$computed"
+      expression to format the conversion rate as a percentage?
+      
+      Acceptable: { "$computed": "formatPercent", "args": { "value": { "$state": "/metrics/conversionRate" } } }
+      or any $computed expression applied to the conversion rate card's display value.
+      
+      Unacceptable: Inline template with arithmetic like "${value}%", hardcoded "3.2%",
+      or raw $state without computed formatting applied to the conversion rate card.
+      
+      Answer YES if the conversion rate card uses a $computed expression for formatting. Answer NO otherwise.
+
+# ── GENERIC (generic boundary) ─────────────
+- id: b1_valid_json
+  type: boundary
+  provenance: generic
+  verifier: llm-judge
+  weight: 0
+  spec: |
+    [GENERIC] The generated spec.json should be valid JSON.
+  signal:
+    judge_question: |
+      Is the final spec.json file (at assets/SF28_t2_dashboard_spec/src/spec.json) valid JSON
+      that contains "root", "elements", and "state" keys?
+      Answer YES if parseable and structurally sound. Answer NO otherwise.
+
+# ── TASK COMPLETION (bypass) ────────────
+- id: tc1_has_metric_card
+  type: task-completion
+  provenance: task
+  verifier: state-diff
+  weight: 0
+  spec: |
+    [TASK — not counted toward skill-following] Check that spec.json contains a MetricCard component.
+  signal:
+    file: "assets/SF28_t2_dashboard_spec/src/spec.json"
+    file_must_contain: 'MetricCard'
+
+- id: tc2_has_data_table
+  type: task-completion
+  provenance: task
+  verifier: state-diff
+  weight: 0
+  spec: |
+    [TASK — not counted toward skill-following] Check that spec.json contains a DataTable component.
+  signal:
+    file: "assets/SF28_t2_dashboard_spec/src/spec.json"
+    file_must_contain: 'DataTable'

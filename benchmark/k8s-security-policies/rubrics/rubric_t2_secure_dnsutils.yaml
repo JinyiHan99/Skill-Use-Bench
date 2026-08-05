@@ -1,0 +1,172 @@
+rubric_id: skill_54_k8s_security_t2_secure_dnsutils
+objective: Evaluate whether the model follows the k8s-security-policies skill, rather than counting ordinary task completion toward the SF score.
+rules:
+  - id: r1_no_default_namespace_with_restricted_labels
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] dnsutils must be migrated into a dedicated non-default Namespace whose labels simultaneously set enforce/audit/warn=restricted, and namespaced resources such as Pod/SA/RBAC/NetworkPolicy must not implicitly or explicitly remain in the default namespace.
+      Skill-exclusive rationale: Without reading the skill, the model may keep the dev Pod as-is in default or only change the namespace name; the skill requires the shared-cluster namespace to fully enable restricted Pod Security Admission. The conflict point is "ordinary / default namespace" vs "dedicated namespace + three restricted labels + same-namespace resource wiring."
+    signal:
+      query: |
+        Based only on the final contents of output/dnsutils-secure.yaml, does the manifest place dnsutils and all related namespaced resources in the same explicit non-default Namespace whose labels include pod-security.kubernetes.io/enforce, audit, and warn all set to restricted?
+        Answer YES only if the Namespace is not default, all three restricted labels are present on that Namespace, and the Pod, ServiceAccount, Role, RoleBinding, and NetworkPolicy explicitly use that same namespace or are clearly scoped to it without falling back to default.
+        Answer NO if any resource uses namespace: default, omits namespace in a way that would fall back to default, or the Namespace lacks any of the three restricted PSA labels.
+      acceptable: |
+        Namespace dnsutils-secure has enforce/audit/warn restricted labels, and Pod/SA/Role/RoleBinding/NetworkPolicy all specify namespace: dnsutils-secure.
+      unacceptable: |
+        A Namespace has restricted labels, but the Pod omits metadata.namespace or uses namespace: default.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_pod_restricted_runtime_context
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Pod.spec.securityContext must explicitly include runAsNonRoot:true, non-zero run user/group/fsGroup, and seccompProfile.type: RuntimeDefault.
+      Skill-exclusive rationale: Without reading the skill, a debug Pod usually only keeps the image and restartPolicy, at most adding runAsUser; the skill requires even troubleshooting tools to have a complete restricted runtime context. The conflict point is "lightweight debug Pod" vs "complete restricted runtime identity and seccomp."
+    signal:
+      query: |
+        Based only on the final contents of output/dnsutils-secure.yaml, does the dnsutils Pod set a complete pod-level spec.securityContext with runAsNonRoot: true, non-zero runAsUser, runAsGroup, fsGroup, and seccompProfile.type: RuntimeDefault?
+        Answer YES only if these fields are under Pod.spec.securityContext, not merely under a container securityContext.
+        Answer NO if any field is missing, zero/root, Unconfined, or only present at container level.
+      acceptable: |
+        Pod spec.securityContext contains runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000, and seccompProfile.type: RuntimeDefault.
+      unacceptable: |
+        The container has runAsNonRoot but Pod.spec.securityContext is absent or lacks seccompProfile.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_container_restricted_security
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The dnsutils container must drop ALL capabilities, set allowPrivilegeEscalation:false, readOnlyRootFilesystem:true, and must not be privileged or add ALL/SYS_ADMIN.
+      Skill-exclusive rationale: Without reading the skill, the model usually treats dnsutils as a troubleshooting tool and keeps loose default permissions; the skill requires every container to apply restricted container-level hardening. The conflict point is "debug convenience first" vs "restricted container for long-term shared-cluster retention."
+    signal:
+      query: |
+        Based only on the final contents of output/dnsutils-secure.yaml, does the dnsutils container have a restricted container securityContext with allowPrivilegeEscalation: false, capabilities.drop including ALL, readOnlyRootFilesystem: true, and no privileged: true or added ALL/SYS_ADMIN capabilities?
+        Answer YES only if all these requirements apply to the dnsutils container itself.
+        Answer NO if any required field is missing, if drop ALL is absent, or if privileged/add ALL/add SYS_ADMIN appears.
+      acceptable: |
+        The dnsutils container securityContext sets allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, and capabilities.drop: [ALL].
+      unacceptable: |
+        The Pod has securityContext fields but the dnsutils container omits capabilities.drop or sets add: [SYS_ADMIN].
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_tmp_emptydir_for_readonly_debug_tool
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] For the dnsutils tool container with a read-only root filesystem enabled, emptyDir should be configured for temporary write paths, such as /tmp.
+      Skill-exclusive rationale: Without reading the skill, the model easily sets readOnlyRootFilesystem:true mechanically without handling the debug tool's temporary writes; the skill requires mounting emptyDir only for the specific paths the application needs to write to. The conflict point is "read-only root makes the tool unusable" vs "read-only root + explicit temporary writable path."
+    signal:
+      query: |
+        Based only on the final contents of output/dnsutils-secure.yaml, if the dnsutils container has readOnlyRootFilesystem: true, does it mount an actually defined emptyDir volume at /tmp or an equivalent temporary writable path for the dnsutils container?
+        Answer YES only if the volumeMount name used by the dnsutils container references a volume with an emptyDir source.
+        Answer NO if /tmp is not mounted, the mount is on the wrong container, or the referenced volume is missing/not emptyDir.
+      acceptable: |
+        dnsutils volumeMounts includes mountPath: /tmp with name: tmp, and spec.volumes includes name: tmp with emptyDir: {} or emptyDir with options.
+      unacceptable: |
+        volumeMounts mentions /tmp but no matching emptyDir volume exists.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_default_deny_plus_dns_only_egress
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The namespace must first establish a default-deny NetworkPolicy, then allow only the UDP/TCP 53 egress traffic from dnsutils to cluster DNS.
+      Skill-exclusive rationale: Without reading the skill, the model often omits the NetworkPolicy, writes a full egress allow, or only writes a default-deny that makes DNS unavailable; the skill requires adding a minimal DNS exception after default-deny. The conflict point is "no policy / too loose / unusable" vs "default-deny + DNS-only allow."
+    signal:
+      query: |
+        Based only on the final contents of output/dnsutils-secure.yaml, does the manifest contain both a true default-deny NetworkPolicy and a minimal DNS-only egress allow policy for dnsutils?
+        Answer YES only if default-deny exists for the namespace and the only egress exception allows DNS to cluster DNS/CoreDNS/kube-dns or a reasonable DNS IP on both UDP 53 and TCP 53.
+        Answer NO if there is any additional broad non-DNS egress allow, egress: [{}], 0.0.0.0/0 all ports, all-port egress, missing TCP or UDP 53, or no DNS exception.
+      acceptable: |
+        A default-deny policy with podSelector: {} and policyTypes including Ingress/Egress, plus an allow-dns egress policy to kube-dns/CoreDNS on port 53 UDP and TCP only.
+      unacceptable: |
+        A policy with egress: [{}], ipBlock 0.0.0.0/0 allowing all ports, only UDP 53 without TCP 53, or only a default-deny policy with no DNS exception.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_service_account_empty_or_minimal_rbac
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] dnsutils must use a dedicated ServiceAccount with automountServiceAccountToken:false, bound to an empty-permission or strictly least-privilege Role/RoleBinding, with no wildcard or unjustified API permissions.
+      Skill-exclusive rationale: Without reading the skill, the model may continue using the default SA or grant overly broad read permissions to a troubleshooting Pod; the skill requires every workload to have explicit RBAC following least privilege. The conflict point is "default / broad-permission debug identity" vs "dedicated SA + token disabled + empty or minimal Role."
+    signal:
+      query: |
+        Based only on the final contents of output/dnsutils-secure.yaml, does dnsutils use a dedicated non-default ServiceAccount with automountServiceAccountToken: false, and is that same ServiceAccount bound by RoleBinding to an empty or strictly minimal Role with no wildcard or unjustified API permissions?
+        Answer YES only if the Pod's serviceAccountName references the ServiceAccount, RoleBinding.subjects references the same ServiceAccount, RoleBinding.roleRef references the defined Role, and Role rules are empty or narrowly justified without * verbs/resources.
+        Answer NO if default SA is used, automount is not false, the binding chain is incomplete, wildcard permissions appear, or broad read/list permissions are granted without need.
+      acceptable: |
+        Pod serviceAccountName: dnsutils-sa; ServiceAccount dnsutils-sa automountServiceAccountToken: false; Role has rules: [] or exact minimal rules; RoleBinding binds dnsutils-sa to that Role.
+      unacceptable: |
+        Pod uses default SA, RoleBinding binds a different SA, or Role contains verbs: ["*"] / resources: ["*"].
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r7_container_resource_governance
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK/AUX — not counted toward SF] The dnsutils container should declare CPU/memory requests and limits; this item records resource governance completeness and is not mixed into the skill-following main score.
+    signal:
+      file: output/dnsutils-secure.yaml
+      file_must_contain: >-
+        (?s)-\s*name:\s*dnsutils\b(?=(?:(?!\n\s*-\s*name:)[\s\S])*?resources:)(?=(?:(?!\n\s*-\s*name:)[\s\S])*?requests:(?:(?!\n\s*-\s*name:)[\s\S])*?cpu:)(?=(?:(?!\n\s*-\s*name:)[\s\S])*?requests:(?:(?!\n\s*-\s*name:)[\s\S])*?memory:)(?=(?:(?!\n\s*-\s*name:)[\s\S])*?limits:(?:(?!\n\s*-\s*name:)[\s\S])*?cpu:)(?=(?:(?!\n\s*-\s*name:)[\s\S])*?limits:(?:(?!\n\s*-\s*name:)[\s\S])*?memory:)
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The task requires generating a complete dnsutils deployment manifest that complies with the shared-cluster security baseline.
+    signal:
+      file: output/dnsutils-secure.yaml
+      file_must_contain: >-
+        (?s)^(?=[\s\S]*kind:\s*Namespace\b)(?=[\s\S]*kind:\s*Pod\b)(?=[\s\S]*name:\s*dnsutils\b)(?=[\s\S]*image:\s*registry\.k8s\.io/e2e-test-images/agnhost:2\.39)(?=[\s\S]*kind:\s*ServiceAccount\b)(?=[\s\S]*kind:\s*Role\b)(?=[\s\S]*kind:\s*RoleBinding\b)(?=[\s\S]*kind:\s*NetworkPolicy\b)

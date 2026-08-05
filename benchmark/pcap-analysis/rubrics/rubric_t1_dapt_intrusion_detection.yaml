@@ -1,0 +1,116 @@
+# Rubric for skill_44_pcap_analysis — SF44_t1_dapt_intrusion_detection
+
+rules:
+  # ── GATE ──
+  - id: g1_pcap_analysis_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace should contain an attempt to load or analyze the pcap file (using scapy/rdpcap or pcap_utils)."
+    signal:
+      pattern: '(?i)(rdpcap|load_packets|scapy|pcap_utils)'
+
+  # ── Must do: skill-derived ──
+  - id: r1_import_pcap_utils
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 2.0
+    spec: "[SKILL — headline] Must import and use the pcap_utils.py helper module. The skill explicitly requires 'Use these functions directly rather than reimplementing the logic yourself'. A model that does not read the skill will not know pcap_utils.py exists and will implement all logic directly with Scapy."
+    signal:
+      pattern: '(?i)(from\s+pcap_utils\s+import|import\s+pcap_utils|pcap_utils\.)'
+
+  - id: r2_syspath_skill_folder
+    type: required-arg
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: "[SKILL] Must add the skill folder /root/skills/pcap-analysis to sys.path (or an equivalent method such as PYTHONPATH, importlib) so that pcap_utils can be imported. The skill explicitly gives the code sys.path.insert(0, '/root/skills/pcap-analysis'). Without reading the skill, it is impossible to know this path."
+    signal:
+      pattern: '(?i)(sys\.path\.(insert|append)\([^)]*/root/skills/pcap[-_]analysis|PYTHONPATH=.*?/root/skills/pcap[-_]analysis|spec_from_file_location\([^)]*/root/skills/pcap[-_]analysis)'
+
+  - id: r3_use_graph_metrics
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 1.5
+    spec: "[SKILL] Must use pcap_utils.graph_metrics() to compute topology metrics (indegree/outdegree count unique IPs, not packet counts). The skill repeatedly emphasizes 'Use graph_metrics() from pcap_utils.py for correct results' and warns 'Common Mistake: Counting total packets instead of unique IPs'. A model that does not read the skill is very likely to make this mistake."
+    signal:
+      pattern: '(?i)(graph_metrics\s*\(|from\s+pcap_utils\s+import\s+.*graph_metrics)'
+
+  - id: r4_use_detect_port_scan
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 1.5
+    spec: "[SKILL] Must use pcap_utils.detect_port_scan() for port scan detection. This function internally implements the triple AND condition (port entropy>6.0, SYN-only ratio>0.7, unique ports>100); the skill explicitly requires using this function rather than implementing your own, because 'Implementing your own logic with different thresholds will likely produce incorrect results'."
+    signal:
+      pattern: '(?i)(detect_port_scan\s*\(|from\s+pcap_utils\s+import\s+.*detect_port_scan)'
+
+  - id: r5_use_detect_dos_pattern
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.75
+    spec: "[SKILL] Must use pcap_utils.detect_dos_pattern() for DoS pattern detection. The skill defines the threshold as max/avg > 20 to count as DoS, and emphasizes '5x, 10x, or even 15x are NORMAL traffic variations, NOT DoS'. A model that does not read the skill will use a lower threshold."
+    signal:
+      pattern: '(?i)(detect_dos_pattern\s*\(|from\s+pcap_utils\s+import\s+.*detect_dos_pattern)'
+
+  - id: r6_use_detect_beaconing
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.75
+    spec: "[SKILL] Must use pcap_utils.detect_beaconing() for C2 beacon detection (IAT CV < 0.5 threshold). The skill defines a specific CV threshold and recommends using the helper function to get accurate results."
+    signal:
+      pattern: '(?i)(detect_beaconing\s*\(|from\s+pcap_utils\s+import\s+.*detect_beaconing)'
+
+  # ── Must not do: skill boundary ──
+  - id: b1_no_reimpl_port_scan_logic
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: "[SKILL — boundary] Should not reimplement port scan detection logic (custom threshold checks); should use pcap_utils.detect_port_scan(). The skill explicitly warns 'Simple threshold-based detection is NOT robust' and repeatedly requires using the helper function."
+    signal:
+      judge_question: "Examine the agent's code/commands. Does the agent reimplement its OWN port scan detection logic by manually coding threshold comparisons (e.g., checking port entropy, SYN ratio, unique port counts with custom if-statements) as the final source of truth for the CSV value, INSTEAD of calling detect_port_scan() from pcap_utils? Note: if the agent imports and calls detect_port_scan() from pcap_utils as the final decision for the CSV, that is acceptable even if it also does some exploratory analysis. Answer YES if the agent reimplements detection logic from scratch as the final source of truth for the CSV (violation). Answer NO if the agent properly uses detect_port_scan() from pcap_utils for the final CSV value (acceptable)."
+      judge_expected: "NO"
+
+  - id: b2_no_reimpl_graph_metrics
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: "[SKILL — boundary] Should not implement graph/topology metric computation from scratch (especially degree calculation); should use pcap_utils.graph_metrics(). The skill warns that manual implementation easily miscomputes degree as packet count rather than unique IP count."
+    signal:
+      judge_question: "Examine the agent's code/commands. Does the agent manually build its own graph data structures (e.g., manually building indegree/outdegree dicts from scratch) as the final source of truth for the CSV values, INSTEAD of calling graph_metrics() from pcap_utils? Note: if the agent imports and calls graph_metrics() from pcap_utils as the final decision for the CSV, that is acceptable even if it also does some exploratory analysis. Answer YES if the agent reimplements graph metrics from scratch as the final source of truth for the CSV (violation). Answer NO if the agent properly uses graph_metrics() from pcap_utils for the final CSV values (acceptable)."
+      judge_expected: "NO"
+
+  # ── Task completion ──
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Binary record: whether network_stats.csv has been filled with reasonable values."
+    signal:
+      judge_question: |
+        Inspect the final contents of /root/network_stats.csv as the primary evidence source.
+
+        1. CSV FILLED: The value column is populated for the metric rows (not left empty or containing only placeholders).
+
+        2. REASONABLE VALUES: The filled values include numeric entries for protocol counts (protocol_tcp, protocol_udp, etc.), size statistics (total_bytes, avg_packet_size), entropy metrics, graph metrics, flow metrics, and boolean true/false for analysis flags (is_traffic_benign, has_port_scan, has_dos_pattern, has_beaconing).
+
+        3. VALUES DERIVED FROM ANALYSIS: The values appear consistent with actual pcap analysis (e.g., packet counts are positive integers, entropy values are non-negative floats, boolean flags are true/false) rather than fabricated placeholders.
+
+        Answer YES only if the CSV contains computed values consistent with actual pcap analysis. Answer NO if the CSV is empty, partially filled, or values appear fabricated without analysis.
+      judge_expected: "YES"

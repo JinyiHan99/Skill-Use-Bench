@@ -1,0 +1,156 @@
+# Rubric for SF25 — SF25_t2_fix_flaky_test
+# Scoring boundaries: skill/generic scored; task only records completion rate; gate only judges evaluability; instruction not scored.
+
+version: 1
+task_id: SF25_t2_fix_flaky_test
+skill_id: SF25
+expected_trigger: true
+weight_scale: {high: 3, mid: 2, low: 1, zero: 0}
+
+rules:
+
+# ── GATE: evaluability ────────────────────────────
+- id: g1_test_file_modified
+  type: required-tool
+  provenance: gate
+  signal_dimension: trigger
+  verifier: state-diff
+  exclusive: false
+  weight: 0
+  spec: |
+    [GATE] The model actually created or modified test/CMake-related files, indicating it attempted to fix the flaky test.
+    Correctness of the fix is not required.
+  signal:
+    changed_files:
+      include: ["tests/**", "**/CMakeLists.txt", "**/*.cmake"]
+    scope: "created_or_modified_files_only"
+
+# ── Must do: skill-derived behavior ─────────────────────
+- id: r1_remove_sleep_synchronization
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: llm-judge
+  exclusive: true
+  weight: high
+  spec: |
+    [SKILL] Test code must not use sleep_for/sleep/sleep_until or real-time busy-wait for synchronization.
+    The skill prohibits "sleep() or std::this_thread::sleep_for() for synchronization".
+    Skill-exclusive rationale: models that do not read the skill often fix flakiness by increasing sleep, sleep_until, or polling real time; the skill requires eliminating real-time dependence.
+  signal:
+    judge_question: |
+      Examine only the final test code actually created or modified by the agent.
+      Is the final timing/expiry test free of real-time sleep or busy-wait synchronization?
+      Acceptable: no sleep_for, sleep_until, sleep(), usleep(), or polling loops based on steady_clock/system_clock are used for TTL/expiry synchronization; the test uses deterministic time control instead.
+      Unacceptable: any real-time sleep, sleep_until, increased delay, condition_variable wait_for with real clock, or busy-wait polling real time remains for synchronization.
+      Answer YES if all real-time waiting has been removed from the relevant test. Answer NO otherwise.
+
+- id: r2_use_proper_synchronization
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: llm-judge
+  exclusive: true
+  weight: high
+  spec: |
+    [SKILL] For the flaky fix of a passive TTL cache, a controllable time source should be injected into production code, and the test should manually advance fake time to verify expiry logic.
+    condition_variable/latch/barrier are only for inter-thread state coordination and are not applicable to this TTL scenario.
+    Skill-exclusive rationale: models that do not read the skill often keep the real clock or only fake the wait on the test side; the skill requires that production code can inject a fake clock.
+  signal:
+    judge_question: |
+      Examine the final production and test code actually modified by the agent.
+      Did the agent inject a controllable time source into the production cache code and use a fake/manual clock advance in the test to verify TTL expiry?
+      Acceptable: production code accepts a clock interface/template/std::function/time provider, and the test advances fake time manually with zero real waiting.
+      Unacceptable: increased sleep, sleep_until, busy-wait, real wait_for, using std::chrono::steady_clock directly in production with no injection, or only faking time in the test without production-code injection.
+      Answer YES only for production-code time injection plus test-side manual advance. Answer NO otherwise.
+
+- id: r3_gtest_discover_tests
+  type: required-tool
+  provenance: skill
+  signal_dimension: following
+  verifier: state-diff
+  exclusive: true
+  weight: high
+  spec: |
+    [SKILL] CMakeLists.txt/tests CMake configuration must replace the old add_test() registration with gtest_discover_tests().
+    The skill states "Register test executables using gtest_discover_tests() rather than the older add_test() approach".
+    Skill-exclusive rationale: models that do not read the skill may keep the existing add_test; the skill requires discovery-based registration.
+  signal:
+    changed_files:
+      include: ["**/CMakeLists.txt", "**/*.cmake"]
+    file_must_contain: "(?i)\\bgtest_discover_tests\\s*\\("
+    file_must_not_contain: "(?i)\\badd_test\\s*\\("
+    scope: "created_or_modified_cmake_files_only"
+
+- id: r4_sanitizer_diagnostic
+  type: order
+  provenance: skill
+  signal_dimension: following
+  verifier: llm-judge
+  exclusive: true
+  weight: low
+  spec: |
+    [SKILL] When diagnosing a flaky test, AddressSanitizer should be tried first before turning to other diagnostic/fix paths.
+    The skill states "When investigating a flaky test, always run with ASan first before attempting ThreadSanitizer".
+    Skill-exclusive rationale: models that do not read the skill usually directly change logic or add logs, and will not prioritize ASan diagnosis.
+  signal:
+    judge_question: |
+      Based only on actual commands/config edits and their order, not explanatory text:
+      Did the agent attempt an AddressSanitizer-enabled build/test before the main flaky-test diagnosis or fix?
+      Acceptable: early commands or CMake edits enable -fsanitize=address or ENABLE_ASAN and run/build tests before the substantive fix.
+      Unacceptable: ASan is only mentioned in text, added after the fix, never built/run, or ThreadSanitizer is attempted first.
+      Answer YES only if ASan was an early diagnostic action. Answer NO otherwise.
+
+- id: r5_assert_to_expect_conversion
+  type: lesson
+  provenance: skill
+  signal_dimension: following
+  verifier: llm-judge
+  exclusive: true
+  weight: mid
+  spec: |
+    [SKILL] Non-precondition ASSERT_* in existing tests should be converted to EXPECT_*; true preconditions guarding subsequent access may keep ASSERT_*.
+    The skill states "Use ASSERT_* macros only for preconditions... Use EXPECT_* for all other checks".
+    Skill-exclusive rationale: models that do not read the skill usually only fix the flaky logic and keep the existing ASSERT_*; the skill requires adjusting the assertion strategy.
+  signal:
+    judge_question: |
+      Examine only assertions in the existing test file that the agent modified; do not count newly added EXPECT_* assertions by themselves.
+      Were original non-precondition ASSERT_* checks converted to EXPECT_* while true preconditions may remain ASSERT_*?
+      Acceptable: original ASSERT_EQ/ASSERT_FALSE/ASSERT_TRUE used for value checks become EXPECT_EQ/EXPECT_FALSE/EXPECT_TRUE; ASSERT_TRUE(optional.has_value()) before dereference may remain.
+      Unacceptable: all original ASSERT_* remain unchanged, or the only EXPECT_* evidence is in newly added tests rather than converting existing non-precondition assertions.
+      Answer YES if original non-precondition ASSERT_* checks were converted. Answer NO otherwise.
+
+# ── Must not do: skill boundary-violation behavior ─────────────────────
+- id: b1_no_asan_tsan_combined
+  type: boundary
+  provenance: skill
+  signal_dimension: following
+  verifier: llm-judge
+  exclusive: false
+  weight: low
+  spec: |
+    [SKILL — boundary] ASan and TSan must not be enabled simultaneously in the same target/build configuration (they are incompatible).
+    The skill states "do not combine AddressSanitizer with ThreadSanitizer in the same build".
+  signal:
+    judge_question: |
+      Examine only actual CMake/configuration changes and executed build commands.
+      Did the agent avoid enabling AddressSanitizer and ThreadSanitizer together in the same target or build configuration?
+      Acceptable: only one sanitizer is enabled, or ASan and TSan are configured as separate mutually exclusive options/builds.
+      Unacceptable: the same target/build command/config simultaneously includes both -fsanitize=address and -fsanitize=thread.
+      Answer YES if ASan and TSan are not combined in the same build. Answer NO if they are combined.
+
+# ── Task completion: only records 0/1, not scored ─────────────────
+- id: tc1_tests_stable
+  type: task-completion
+  provenance: task
+  signal_dimension: task_completion
+  verifier: llm-judge
+  exclusive: false
+  weight: 0
+  spec: |
+    [TASK — not counted toward skill-following] The final relevant tests can compile and pass.
+  signal:
+    judge_question: |
+      Based only on final build/test command outputs, did the relevant tests compile and pass in the final run?
+      Answer YES if the final cmake --build or equivalent build succeeded and ctest/the relevant test binary reported passing tests.
+      Answer NO otherwise.

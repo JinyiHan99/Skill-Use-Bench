@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ResizeMe (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "ResizeMe (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

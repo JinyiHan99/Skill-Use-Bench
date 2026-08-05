@@ -1,0 +1,108 @@
+rules:
+  - id: g1_observable_input_review
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable real tool-call attempt that reads the t1 input code `assets/app_store_review_t1_social_login/input/example/src/App.tsx`; this is only a soft gate and does not judge report quality."
+    signal:
+      pattern: >-
+        (?is)^(?:Read|Bash)\b[\s\S]{0,2000}?assets/app_store_review_t1_social_login/input/example/src/App\.tsx
+
+  - id: r1_google_login_requires_apple_alternative
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK-DIAGNOSTIC — not counted toward SF] The report can diagnose that `App.tsx` only provides `GoogleSigninButton` and lacks Sign in with Apple or an Apple-allowed non-social/equivalent compliant alternative login entry, which is an iOS/App Store Design login-compliance risk.
+      Downgrade rationale: with the skill masked, a strong model may also infer the risk of a missing Apple login alternative for third-party social login based solely on the App Store pre-submission risk-review task description; this item mainly records task/domain correctness.
+    signal:
+      query: >
+        Looking only at the actual report text in the final answer (do not treat tool calls, plans, or self-descriptions as report content), does it explicitly point out that this React Native iOS submission candidate has an App Store/App Review risk of "Google/third-party social login but missing Sign in with Apple or an Apple-allowed non-social/equivalent compliant alternative login entry"? Answer YES if it ties the GoogleSigninButton-only login to Apple/App Store review or Design/login compliance and accepts Sign in with Apple or an allowed compliant alternative. Answer NO if it only suggests adding more login options as a generic improvement, or does not connect the issue to App Store review.
+      acceptable: "`example/src/App.tsx:70` only renders GoogleSigninButton; for iOS App Store review, third-party social login should also provide Sign in with Apple or an allowed compliant alternative, so this is a submission blocker/risk."
+      unacceptable: "Consider adding another login provider for better UX."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B"]
+      consensus: low
+
+  - id: r2_tokens_clipboard_privacy_risk
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK-DIAGNOSTIC — not counted toward SF] The report can diagnose that after `GoogleSignin.getTokens()` the token is displayed in an alert and `Clipboard.setString(tokens.idToken)` copies the idToken to the clipboard, which is an App Store Privacy/Legal 5.1 or pre-submission data-security risk.
+      Downgrade rationale: token exposure and clipboard copying can be inferred from the App Store submission-review context and general security common sense, and is not a stable skill-exclusive signal; it is only kept as a weight=0 privacy/security baseline diagnostic.
+    signal:
+      query: >
+        Looking only at the actual report text in the final answer, does it explicitly name the token display after getTokens and/or `Clipboard.setString(tokens.idToken)` copying the idToken to the clipboard, and classify this behavior as App Store Privacy, Legal 5.1, submission privacy risk, pre-submission data-security risk, or release-build user-data leakage risk? Answer YES only if the report names the token display/clipboard behavior and connects it to App Store privacy/security review. Answer NO if it merely says tokens should be hidden without App Store/privacy review framing, or omits the token/clipboard behavior.
+      acceptable: "`App.tsx:107-135` displays Google tokens and copies the idToken to the clipboard; this exposes sensitive user data and should be removed before App Store submission under Privacy/Legal 5.1 data-security review."
+      unacceptable: "Do not print tokens because that is insecure."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B"]
+      consensus: medium
+
+  - id: r3_extra_gender_scope_data_minimization
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] The report must point out the extra request for Google `user.gender.read` / gender scope, which needs business-necessity or App Store privacy-disclosure consistency support, otherwise it will trigger an App Store Privacy / data minimization review risk.
+      Skill-exclusive rationale (medium confidence): without reading the skill, a strong model may treat the extra OAuth scope as a generic permission-minimization suggestion; the skill requires pre-submission checks that only necessary permissions are requested and that purpose strings/privacy disclosures are accurate, and the conflict point is "code permission optimization" vs "App Review data minimization/disclosure risk".
+    signal:
+      query: >
+        Looking only at the actual report text in the final answer, does it simultaneously contain three points: explicitly naming `https://www.googleapis.com/auth/user.gender.read` or the gender/profile extra scope; explaining the need for business-necessity or privacy-disclosure consistency support; and classifying it as an App Store Privacy/Data Minimization review risk? Answer YES only if all three elements are present. Answer NO if it only says scopes should be minimal generically, omits this scope, or omits the App Store privacy/data-minimization framing.
+      acceptable: "`App.tsx:91-103` requests `user.gender.read`; unless the app clearly needs and discloses this data, it violates App Store data minimization/privacy expectations."
+      unacceptable: "Review OAuth scopes and remove unused permissions."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B"]
+      consensus: medium
+
+  - id: r4_production_logging_user_data_review_risk
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK-DIAGNOSTIC — not counted toward SF] The report can diagnose that production-environment `console.log({ data })` and other sign-in user-data log output is an App Store privacy, data-security, submission privacy risk, pre-submission data-security risk, or release-build user-data leakage risk.
+      Downgrade rationale: production logs leaking user data are a natural risk in App Store pre-submission review and not a strong skill-exclusive signal; it is only kept as a weight=0 baseline diagnostic.
+    signal:
+      query: >
+        Looking only at the actual report text in the final answer, does it point out that console.log/production log output of sign-in user data would cause an App Store privacy, data-security, submission privacy risk, pre-submission data-security risk, or release-build user-data leakage risk? Answer YES if it connects logging user sign-in data to one of those review/submission privacy-security risks. Answer NO if it only says remove console.log for cleanliness/performance, or omits logging.
+      acceptable: "`App.tsx:164-180` logs the Google sign-in data; production submission should remove or guard this because App Store privacy review treats exposed user data as a data-security risk."
+      unacceptable: "Remove console.log statements before release."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: ["reviewer_A", "reviewer_B"]
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: "[TASK — not counted toward SF] Does the final answer provide a pre-submission risk review report for the t1 login example, covering at least 2 different App Store submission risk points, each with actual code location/line numbers and remediation recommendations?"
+    signal:
+      query: >
+        Looking only at the final answer, does it provide a pre-submission risk review report for `assets/app_store_review_t1_social_login/input/example/src/App.tsx`, containing at least 2 different App Store submission risk points, with each risk point including actual code location/line numbers and corresponding remediation recommendations? Answer YES if all these task-output elements are present; otherwise Answer NO.
+      acceptable: "Includes at least two different risk points such as App.tsx:70 missing a compliant login alternative and App.tsx:107-135 token exposure, each with remediation recommendations."
+      unacceptable: "Only lists one risk point, or only generic suggestions without code locations/remediation recommendations."

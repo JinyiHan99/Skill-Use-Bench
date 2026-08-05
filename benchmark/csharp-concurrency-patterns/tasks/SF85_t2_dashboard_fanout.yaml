@@ -1,0 +1,41 @@
+task_id: SF85_t2_dashboard_fanout
+skill_id: csharp-concurrency-patterns
+level: L2
+description: |
+  We connected a sample health-check fan-out logic to a Web API server entry point and want to refactor it into a version suitable for reuse on the live request path. The material is in `assets/SF85_t2_dashboard_fanout/input/`. Please preserve its behavior of simultaneously checking multiple external services and aggregating results, and handle the case where the request is cancelled.
+initial_state:
+  assets:
+    - path: assets/SF85_t2_dashboard_fanout/input/WhenAllPingExample.cs
+      source: "Microsoft Learn: Task.WhenAll Method example, https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task.whenall?view=net-10.0"
+      real_state: "A real Microsoft Learn C# sample that fans out ping attempts using Task.Run, synchronous Ping.Send, Interlocked.Increment, and Task.WhenAll."
+      preparation: |
+        Extracted the published C# example code block from Microsoft Learn and saved it unchanged as a standalone source file under this task's input directory.
+  tools_available: [read_file, write_file, edit_file, bash]
+expected_trigger: true
+skill_constraints_tested:
+  - id: io_bound_async_await_default
+    description: "For I/O-bound waits such as HTTP or network calls, the skill requires async/await as the default abstraction and says not to block on async or consume threads unnecessarily."
+    exclusive: "Without the skill, a model may only wrap the existing synchronous ping code in an async-looking API, keep Task.Run around Ping.Send, or treat the fan-out loop as a parallel collection-processing problem. The skill requires true async I/O for I/O-bound waits."
+  - id: coordinate_independent_async_operations
+    description: "For multiple independent async operations, the skill points to Task.WhenAll/Task.WhenAny rather than locks or shared mutable counters."
+    exclusive: "A generic fix may preserve Interlocked counters or replace them with ConcurrentBag/ConcurrentDictionary for aggregation. The skill favors composing independent Task results and aggregating after Task.WhenAll, avoiding shared mutable state when it is not needed."
+  - id: io_not_cpu_parallel_boundary
+    description: "The skill's decision tree routes I/O-bound waits such as network calls to async/await, while reserving Parallel.ForEachAsync for CPU-bound collection processing."
+    exclusive: "Without the skill, a model seeing collection-based fan-out in a server request path may choose Parallel.ForEachAsync to modernize or throttle the loop. A model following the skill should keep this as I/O-bound async composition with Task.WhenAll, not a CPU-bound parallel loop abstraction."
+notes: |
+  - Core test point: this is an I/O fan-out in a server request path; keep simple async/await, and use composition waits to coordinate independent calls, rather than throwing synchronous I/O into the thread pool.
+  - Expected correct behavior: the refactored interface accepts `CancellationToken`, each external call is an async wait, multiple independent calls are awaited together and results aggregated; library/server-side code may use `ConfigureAwait(false)`.
+  - Common model mistakes (code-level counter-examples):
+      - Keep the `Task.Run` wrapping synchronous work at `WhenAllPingExample.cs:19`, only adding a cancellation check at the outer layer.
+      - Keep the synchronous network call `png.Send(url)` at `WhenAllPingExample.cs:21`.
+      - Continue to rely on `Interlocked.Increment(ref failed)` at `WhenAllPingExample.cs:23` and `WhenAllPingExample.cs:28` to aggregate shared state, rather than letting each task return a result.
+      - Change the loop to `Parallel.ForEachAsync`, ignoring the skill's boundary that "pure I/O operations should not use CPU parallel abstractions."
+  - baseline_correctness_signals:
+      - The output contains a server-callable method, not just a console `Main`.
+      - The result can represent each target's success or failure, and can handle cancellation.
+  - skill_following_signals:
+      - External network I/O uses a real async API, or is clearly verifiable as a non-Task.Run-wrapped async client call; merely exposing an async method signature but wrapping synchronous I/O with Task.Run internally does not count as skill-following.
+      - Uses Task.WhenAll to coordinate independent requests, and lets each task return an independent result object before aggregating.
+      - Does not use Parallel.ForEachAsync for this pure I/O fan-out.
+      - Does not use Task.Run to wrap synchronous network calls.
+      - Does not continue to rely on Interlocked, ConcurrentBag, or other shared mutable state to aggregate results that could be expressed by task return values.

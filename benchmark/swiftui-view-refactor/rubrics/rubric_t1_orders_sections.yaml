@@ -1,0 +1,110 @@
+# Rubric for skill_67_swiftui_view_refactor — t1: orders sections
+
+rules:
+  - id: g1_observable_output
+    type: required-tool
+    provenance: gate
+    verifier: state-diff
+    weight: 0
+    spec: "[GATE] OrdersView output file exists and defines OrdersView."
+    signal:
+      file: "assets/swiftui_view_refactor_t1_orders_sections/output/OrdersView.swift"
+      file_must_contain: 'struct\s+OrdersView\s*:\s*View'
+
+  - id: r1_extract_real_order_sections_as_dedicated_views
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Non-trivial order page regions should be extracted into dedicated View types with explicit inputs/bindings/callbacks, not hidden behind computed some View helpers.
+      skill-exclusive reason: looking only at the task "easier to maintain", a strong model often retains or adds some View helpers like list, toolbarButtons, orderRows; the skill requires dedicated small View types to carry non-trivial regions. The conflict is that "computed helper cleanup" is not the same as the skill's required dedicated subview boundary.
+    signal:
+      query: |
+        In the final file assets/swiftui_view_refactor_t1_orders_sections/output/OrdersView.swift, did the actual written code extract meaningful order UI regions (such as list/sections/rows/table switch/toolbar actions) into dedicated SwiftUI View structs with explicit inputs, bindings, or callbacks? Base the answer only on the final file content written by Write/Edit tools, not on the agent's narration. Answer YES only if BOTH conditions hold: non-trivial regions are represented by dedicated View structs, AND those structs receive explicit needed data/bindings/callbacks rather than broad parent state. Answer NO if the screen is mainly organized through computed some View properties/functions or large helper functions, regardless of helper names, even if one small struct was added.
+      acceptable: "e.g. private struct OrdersListView/OrderSectionsView: View { let orderSections: ...; @Binding var selection: ... } and private struct OrdersToolbarView: View { let selection: Set<Order.ID>; let onCompleteSelectedOrders: () -> Void }; equivalent names are fine."
+      unacceptable: "var list: some View { ... }, @ViewBuilder var toolbarButtons: some View { ... }, func orderRows(_:) -> some View { ... }, or other large computed helpers carrying the main screen structure with no meaningful dedicated subview structs."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_keep_root_view_tree_stable_across_list_table_mode
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Keep a stable outer view tree and localize the list/table difference instead of creating two complete root branches.
+      skill-exclusive reason: without reading the skill, the most natural approach is to continue keeping `ZStack { if displayAsList { list } else { OrdersTable(...) } }` or splitting into two complete root view branches; the skill requires avoiding top-level conditions that swap completely different root trees. The conflict is root-level identity churn vs stable outer structure.
+    signal:
+      query: |
+        In the final file assets/swiftui_view_refactor_t1_orders_sections/output/OrdersView.swift, does the actual code avoid a top-level body/root helper that switches between two complete root views for list mode and table mode? Base the answer only on final file content, not narration. Answer YES if the outer structure remains stable and the displayAsList conditional is localized inside a contained section/subview. Answer NO if body or a major computed view returns `if displayAsList { <whole list> } else { <whole table> }` as root-level branch swapping. A thin wrapper or extracted subview whose body is entirely `if displayAsList { full list } else { full table }` still counts as NO.
+      acceptable: "body has one stable container and delegates to an OrdersContent view that localizes the list/table choice inside a section."
+      unacceptable: "body contains `ZStack { if displayAsList { list } else { OrdersTable(...) } }`, a computed `content` with the same root-level if/else, or a thin extracted subview that only wraps the same full-list/full-table root swap."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_do_not_introduce_orders_view_model
+    type: forbidden-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Do not introduce a view model just to organize this SwiftUI view; split UI and keep existing model/service data flow.
+      skill-exclusive reason: facing a page refactor for "easier maintenance", the default engineering reaction may add an OrdersViewModel wrapping filtering, selection, and order completion; the skill defaults to MV over MVVM, requiring splitting subviews first and using existing model/environment/state. The conflict is that adding a VM layer is not the default solution.
+    signal:
+      file: "assets/swiftui_view_refactor_t1_orders_sections/output/OrdersView.swift"
+      file_must_not_contain:
+        - '\bOrdersViewModel\b'
+        - '\bclass\s+\w*ViewModel\b'
+        - '@StateObject\s+(?:private\s+)?var\s+\w*ViewModel'
+        - '@State\s+(?:private\s+)?var\s+\w*[Vv]iew[Mm]odel\b'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_order_view_members_by_skill_sequence
+    type: order
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Reorder the main OrdersView members top-to-bottom as environment, let/stored state, non-view computed vars, init if any, body, view helpers, then helper/action functions.
+      skill-exclusive reason: default local cleanup retains the original file's `@ObservedObject`/`@State` before `@Environment` and interleaved helpers; the skill explicitly specifies view ordering. The conflict is that member ordering itself is a skill-specific refactor discipline.
+    signal:
+      query: |
+        In the final file assets/swiftui_view_refactor_t1_orders_sections/output/OrdersView.swift, is the main OrdersView organized in the skill's top-to-bottom order: environment properties before stored state, non-view computed properties before init/body, body before view helpers, and action/helper functions after view helpers? Base the answer only on the main OrdersView declaration in the final file, not on external or nested private subview structs and not on narration. Do not penalize missing init/view-helper categories. If OrdersView became short because regions were reasonably extracted, answer YES as long as the remaining members are not materially out of order. Answer NO if environment/state/computed/body/helper/action members remain materially interleaved like the input.
+      acceptable: "Within the main OrdersView, environment values are grouped before @State; displayAsList/orders/orderSections appear before body; completeSelectedOrders appears after body or after small view helpers."
+      unacceptable: "Within the main OrdersView, @State precedes @Environment and a toolbar/view helper appears before body, or action methods are embedded before computed data properties."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: "[TASK — not counted toward SF] OrdersView output preserves search, navigation, list/table display, order sections, and complete-order sheet behavior."
+    signal:
+      file: "assets/swiftui_view_refactor_t1_orders_sections/output/OrdersView.swift"
+      file_must_contain:
+        - '\.navigationTitle\s*\(\s*"Orders"\s*\)'
+        - '\.navigationDestination\s*\(\s*for\s*:\s*Order\.ID\.self'
+        - '\.searchable\s*\(\s*text\s*:\s*\$searchText'
+        - '\.sheet\s*\(\s*item\s*:\s*\$completedOrder'
+        - 'OrdersTable\s*\('
+        - 'OrderDetailView\s*\(\s*order\s*:'
+        - '\.placed'
+        - '\.preparing'
+        - '\.ready'
+        - '\.completed'

@@ -1,0 +1,106 @@
+rules:
+  - id: g1_observable_code_write
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: '[GATE] The trace must contain an observable write or edit attempt on the C# files related to the order callback concurrency boundary.'
+    signal:
+      pattern: |-
+        (?:^|\n)\s*(?:tool\s*[:=]\s*["']?(?:Write|Edit|write_file|edit_file)["']?|(?:Write|Edit|write_file|edit_file)\b)[\s\S]{0,1500}?file_path\s*[:=]\s*["']?(?:[^"'\n]*/)?assets/SF85_t3_order_state_races/input/[^"'\s]+\.cs
+
+  - id: r1_entity_per_actor_order_isolation
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] For concurrent state management of many independent order entities, an actor/entity-per-actor or explicitly equivalent per-order independent processing-unit model should be adopted, isolating each order's state in its own long-lived, serial, stateful message handler.
+      Skill-exclusive rationale: without reading the skill, a strong model may implement keyed locks, per-order SemaphoreSlim, a simple keyed queue, or add optimistic retry at the repository layer; the skill requires Akka.NET Actors/entity-per-actor for "many independent entities". The conflict point is "local synchronization/keyed-lock patch" vs "one isolated message-processing entity per order".
+    signal:
+      query: |
+        Based on the final written content of the C# files under assets/SF85_t3_order_state_races/input/, not the agent's self-description, answer YES/NO: does the implementation define or use an independent, long-lived stateful actor/entity/processor instance for each orderId, owned or managed by that instance for the order's state boundary, and process callbacks through its own serial message-processing loop?
+        Answer YES only if each order ID maps to a long-lived stateful actor/entity/processor that owns or manages the order state boundary and serial message handling.
+        Answer NO if the code only uses keyed locks, SemaphoreSlim, Monitor, repository optimistic retry, ConcurrentDictionary of shared Order objects, or stateless per-order Channel/queue/ActionBlock wrappers that merely forward messages to Order.Set*Status() without owning stateful actor/entity behavior.
+      acceptable: 'An OrderCallbackDispatcher uses a registry to GetOrCreate(orderId) an OrderActor/OrderProcessor that owns state for that order and receives StockConfirmed/Paid/Shipped messages.'
+      unacceptable: 'A ConcurrentDictionary<int, Channel<Message>> forwards to a shared repository/Order.Set*Status(), or a ConcurrentDictionary<int, SemaphoreSlim> locks around loading, mutating, and saving each order.'
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: high
+
+  - id: r2_same_order_messages_serialized_by_mailbox
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The stock, payment, shipping, and other callbacks of the same order must be fully serialized, rather than directly modifying Order concurrently from multiple callback threads.
+    signal:
+      query: |
+        Based on the final written content of the C# files under assets/SF85_t3_order_state_races/input/, not the agent's self-description, answer YES/NO: are all callbacks of the same orderId encapsulated as messages and delivered to that order's exclusive single-consumer processing loop/mailbox/actor receive, or is same-order state update fully serialized in an equivalent way, rather than directly loading Order and calling Set*Status methods concurrently in HandleStockConfirmedAsync, HandlePaymentPaidAsync, HandleOrderShippedAsync?
+        Answer YES if callback handlers enqueue/tell/send callback messages to a per-order actor/mailbox/processor, and status transition calls occur only inside that processor's sequential message processing loop.
+        Answer NO if any public callback handler still directly loads an order and calls SetStockConfirmedStatus/SetPaidStatus/SetShippedStatus in the handler's execution context.
+      acceptable: 'HandlePaymentPaidAsync calls dispatcher.DispatchAsync(orderId, new PaymentPaid(...), ct); OrderProcessor.ProcessAsync reads messages one at a time and calls order.SetPaidStatus().'
+      unacceptable: 'HandlePaymentPaidAsync loads the order and calls order.SetPaidStatus() directly, even if Order.cs has lock or semaphore guards.'
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: high
+
+  - id: r3_no_global_synchronization_bottleneck
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Different orders must be able to advance in parallel via different processing units; no global lock, global single-thread queue, or single global actor serializing all orders may be used.
+    signal:
+      query: |
+        Based on the final written content of the C# files under assets/SF85_t3_order_state_races/input/, not the agent's self-description, answer YES/NO: does the implementation avoid a global synchronization bottleneck and allow different orderIds to be processed in parallel by different actors/mailboxes/processors or equivalent processing units?
+        Answer YES if there is a registry/sharding/keyed dispatcher that creates or finds independent per-order processing units, and no global lock/single global queue/single actor serializes all callbacks.
+        Answer NO if all callbacks go through one lock, one SemaphoreSlim, one single-reader global Channel/BlockingCollection, or a single actor that processes every order serially.
+      acceptable: 'ConcurrentDictionary<int, IActorRef> or GetOrCreate(orderId) returns independent order actors/processors.'
+      unacceptable: 'A static lock wraps all order status updates, or one background worker processes every callback for every order.'
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: high
+
+  - id: r4_explicit_state_lifecycle_behavior
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Complex order lifecycles should explicitly express state advancement or behavior switching (e.g., Become/state-specific handlers) in actor/state-machine behavior, rather than just piling more if-checks inside Order.cs or only forwarding by message type.
+      Skill-exclusive rationale: without reading the skill, a model may only add domain-object state validation or use a plain dispatcher to call existing methods in order; the skill points to Akka.NET Actors/Become pattern for state machines with complex transitions. The conflict point is "conditional patches inside domain methods" vs "explicit lifecycle behavior in the processing unit".
+    signal:
+      query: |
+        Based on the final written content of the C# files under assets/SF85_t3_order_state_races/input/, not the agent's self-description, answer YES/NO: does the per-order actor/processor perform state-specific handling, accept/reject/delay/transition, or behavior switching based on the current order lifecycle state, rather than just switching on message type and unconditionally calling Order.Set*Status(), or leaving state logic only inside Order.cs?
+        Answer YES if the per-order actor/processor explicitly tracks current state and contains state-specific message handling, behavior transitions, or lifecycle accept/reject/delay decisions for order events.
+        Answer NO if serialization exists but state transitions are only opaque, unconditional calls to existing Order methods; if the processor only switches on message type; or if lifecycle checks exist only inside Order.cs.
+      acceptable: 'OrderActor has Become(AwaitingValidation) or switch on current lifecycle state to decide how StockConfirmed/Paid/Shipped messages advance, reject, delay, or transition.'
+      unacceptable: 'A per-order queue simply switches on message type and calls order.SetStockConfirmedStatus(), order.SetPaidStatus(), order.SetShippedStatus() unconditionally with no state behavior in the processor.'
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: '[TASK — not counted toward SF] Whether the callback dispatch structure, single-order processing-unit creation/lookup logic, and state-advancement core code skeleton are provided in detail.'
+    signal:
+      query: |
+        Based on the final written content of the C# files under assets/SF85_t3_order_state_races/input/, not the agent's self-description, answer YES/NO: does the artifact contain callback dispatch by orderId, creation/lookup of the single-order processing unit, same-order sequential processing, different-order parallel processing, and the state-advancement core code skeleton, and are the dispatcher/processor/message types actually wired into and reachable from OrderCallbackHandler.cs or an equivalent entry method?
+        Answer YES if those structural elements are present in code, and are wired into OrderCallbackHandler.cs or an equivalent callback entry point.
+        Answer NO if the output only edits Order.cs guards, contains only prose/comments, lacks per-order routing/creation logic, or if dispatcher/processor/message classes exist only as disconnected, non-integrated skeletons.
+      acceptable: 'Dispatcher + registry + OrderActor/OrderProcessor + message types + status transition handling, wired into OrderCallbackHandler or equivalent callback entry.'
+      unacceptable: 'Only adding lock statements in Order.cs, or having dispatcher/processor classes that are completely unused and disconnected.'

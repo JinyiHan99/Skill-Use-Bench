@@ -1,0 +1,154 @@
+# Rubric for skill_15_docx — SF15_t1_docx_edit
+
+rules:
+  - id: g1_docx_edit_attempted
+    type: required-tool
+    provenance: gate
+    verifier: llm-judge
+    weight: 0
+    spec: "[GATE] The trace must contain an actual DOCX editing attempt, not merely DOCX keywords appearing in the prompt/skill text."
+    signal:
+      judge_question: |
+        Based only on actual tool calls, command outputs, and file writes in the trace, did the agent attempt to edit a DOCX/OOXML document?
+        Answer YES if there is concrete behavior such as reading/writing a .docx file, unpacking a DOCX, modifying word/document.xml, running a Python/OOXML script, or packing a DOCX.
+        Answer NO if the only evidence is the user prompt, copied skill instructions, a plan, or self-claims without an actual tool call or file operation.
+      judge_expected: "YES"
+
+  - id: r1_read_ooxml_reference
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Before editing an existing DOCX, must fully read the ooxml.md reference document, without truncation via offset/limit.
+      skill-exclusive rationale: without reading the skill, a model may directly manipulate DOCX/XML; the skill explicitly requires fully reading ooxml.md first.
+    signal:
+      judge_question: |
+        Based only on actual file-read tool calls or shell commands in the trace, did the agent read the entire ooxml.md reference file before editing the DOCX, without setting offset, limit, ranges, head/tail, sed line ranges, or other truncation/sampling?
+        Answer YES only if the evidence shows an actual full read of a file named ooxml.md with no range limits before DOCX/XML editing began.
+        Answer NO if ooxml.md is only mentioned in the prompt/skill text/self-claims, if the read used offset/limit or partial ranges, or if it happened only after editing.
+      judge_expected: "YES"
+
+  - id: r3_minimal_edits
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Tracked changes should mark only the text that actually changes; unchanged content should not be repeated.
+      skill-exclusive rationale: default OOXML edits may replace entire sentences/paragraphs; the skill requires splitting a replacement into unchanged-text + deletion + insertion + unchanged-text.
+    signal:
+      judge_question: |
+        Based only on the actual XML/scripts/file writes produced by the agent, did the tracked-change edits mark only the substrings or field values that actually changed, rather than deleting and reinserting unchanged surrounding text?
+        Answer YES if replacements such as dates, amounts, durations, or notice periods are limited to the changed value/substrings while unchanged sentence/paragraph text remains outside w:ins/w:del. Full-paragraph w:ins is acceptable for the entirely new Non-Solicitation clause.
+        Answer NO if a replacement deletes and reinserts a whole sentence, paragraph, section, or large run that includes unchanged text, or if the judgment relies only on the agent's stated plan.
+      acceptable: "For '30 days' -> '60 days': unchanged surrounding text remains as normal runs, with only '30' in w:del and '60' in w:ins. For the new Non-Solicitation clause: the whole new clause may be wrapped in w:ins."
+      unacceptable: "Deleting and reinserting an entire Term, Compensation, Confidentiality, or Termination paragraph just to change one value."
+      judge_expected: "YES"
+
+  - id: r4_unpack_pack_workflow
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.5
+    spec: |
+      [SKILL] Must use the skill-provided unpack.py / pack.py workflow to handle DOCX XML.
+      skill-exclusive rationale: the default approach may directly zip/unzip or use a generic library to write DOCX; the skill specifies using ooxml/scripts/unpack.py to unpack and ooxml/scripts/pack.py to pack.
+    signal:
+      judge_question: |
+        Based only on actual executed shell/tool calls and their outputs, did the agent run both skill-provided scripts: unpack.py to unpack the source DOCX and pack.py to create the final DOCX?
+        Answer YES only if there is concrete execution evidence for both scripts, not merely mentions in copied instructions, comments, plans, or self-claims.
+        Answer NO if either unpack.py or pack.py was not executed, if only generic unzip/zip was used, or if the trace only contains the script names in prompt/skill text.
+      acceptable: "Actual commands such as `python .../ooxml/scripts/unpack.py assets/.../consulting_agreement.docx <dir>` and later `python .../ooxml/scripts/pack.py <dir> consulting_agreement_reviewed.docx`."
+      unacceptable: "The trace contains the text `python ooxml/scripts/unpack.py ...` only inside the skill documentation, or runs only unzip/zip without the skill scripts."
+      judge_expected: "YES"
+
+  - id: r5_no_markdown_line_numbers
+    type: forbidden-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Do not use line numbers from markdown/pandoc rendered output to locate positions inside word/document.xml.
+      skill-exclusive rationale: default analysis may locate by markdown line number; the skill explicitly states that markdown line numbers do not map to XML structure, and one should use sections, unique text, grep/XML structure, and similar methods.
+    signal:
+      judge_question: |
+        Based only on actual locating/editing behavior in tool calls and scripts, did the agent use line numbers from a markdown or pandoc-rendered file to locate positions inside word/document.xml?
+        Answer YES if markdown-derived line numbers were used as coordinates for XML editing or for selecting document.xml locations.
+        Answer NO if the agent merely converted/read markdown for review, or used headings, unique text grep patterns, XPath/DOM traversal, paragraph identifiers, or document.xml grep results to locate XML nodes.
+      acceptable: "Reading current.md to understand content, then locating XML with unique text grep or DOM/XPath."
+      unacceptable: "Using a line number from current.md or pandoc output as the basis for editing a corresponding line in word/document.xml."
+      judge_expected: "NO"
+
+  - id: r6_tracked_change_attributes
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] All generated tracked changes' w:ins/w:del elements must include w:id, w:author, w:date.
+      skill-exclusive rationale: when writing XML by default, only w:ins/w:del tags may be generated; the skill requires Word-recognizable standard revision attributes.
+    signal:
+      judge_question: |
+        Based only on the actual generated OOXML or scripts that write revision markup, do all generated w:ins and w:del elements include all three revision attributes: w:id, w:author, and w:date?
+        Answer YES only if tracked changes were actually generated and every generated w:ins and w:del has non-empty w:id, w:author, and w:date attributes.
+        Answer NO if no tracked changes were generated, if only one of w:ins/w:del exists for replacements that require both, or if any generated revision element lacks any of w:id, w:author, or w:date.
+      judge_expected: "YES"
+
+  - id: r7_batch_strategy
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: soft
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Multiple redlining edits should be applied in reasonable batches with verification between batches, rather than packing after each of the six items or applying all at once without verification.
+      skill-exclusive rationale: the default implementation may modify everything at once or process items one by one; the skill explicitly requires grouping related changes into batches of 3-10 items and testing each batch.
+    signal:
+      judge_question: |
+        Based only on actual editing and verification tool calls, did the agent group the required DOCX tracked-change edits into one or more reasonable batches and perform verification between or after batches before final packing?
+        Answer YES if related changes were implemented in grouped batches, with evidence of checking document.xml, command output, markdown verification, or other validation after a batch before continuing/finalizing.
+        Answer NO if the agent blindly applied all six changes in one unverified operation, packed after each individual change, or only described a batching plan without actual batch implementation/verification behavior.
+      judge_expected: "YES"
+
+  - id: b1_output_saved
+    type: boundary
+    provenance: generic
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK boundary — not counted toward SF] The output file consulting_agreement_reviewed.docx has actually been saved."
+    signal:
+      judge_question: |
+        Based only on actual tool calls, command outputs, and file writes, was consulting_agreement_reviewed.docx actually created or written to disk?
+        Answer YES if there is evidence such as pack.py producing that file, a successful write/copy to that exact path, or a filesystem listing/check showing the file exists.
+        Answer NO if the filename appears only in the prompt, plan, self-claims, or copied instructions.
+      judge_expected: "YES"
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] consulting_agreement_reviewed.docx exists; all six specified edits are complete; edits are presented as tracked changes.
+      Accept any actual XML modification evidence such as Python/OOXML scripts, DOM operations, Write/Edit XML writes, pack.py output; not limited to sed/replace/edit.
+    signal:
+      judge_question: |
+        Based only on concrete tool calls, command outputs, generated XML/scripts, and final artifact evidence in the trace (not the agent's self-claims), were all task requirements completed?
+        Required evidence:
+        1. consulting_agreement_reviewed.docx was actually created or written.
+        2. The final document/XML includes tracked-change markup for all six requested changes: Effective Date April 1, 2024 -> July 1, 2024; Term 12 months -> 24 months; hourly rate $150 -> $175; confidentiality period 2 years -> 5 years; termination notice 30 days -> 60 days; and insertion of the Non-Solicitation clause text.
+        3. Existing-value replacements are represented with tracked changes (w:del/w:ins or equivalent Word revision markup), and the new clause is represented as an insertion revision.
+        Answer YES only if all three conditions are met. Answer NO if the output file is missing, any of the six changes is missing, modifications are direct replacements without tracked changes, or evidence is only a plan/self-report.
+      judge_expected: "YES"

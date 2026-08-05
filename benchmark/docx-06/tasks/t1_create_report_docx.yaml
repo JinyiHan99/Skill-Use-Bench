@@ -1,0 +1,69 @@
+task_id: SF06_t1_create_report_docx
+level: L2
+skill_id: skill_06_docx
+description: |
+  Help me generate a Word document for a quarterly sales report. It must include:
+  - Title "Q4 2024 Sales Report"
+  - A table containing regional sales data (4 columns: Region, Revenue, Units, Growth%); regional sales data is in assets/SF06_t1_report/data/sales_q4.json
+  - The header row must have a blue background with white text
+  - A horizontal separator line after the table
+  - A summary paragraph at the end: "Overall quarterly growth exceeded projections across all regions."
+
+  Output as report_q4_2024.docx, using US Letter page size.
+
+initial_state:
+  files:
+    - path: assets/SF06_t1_report/data/sales_q4.json
+      content: |
+        {
+          "quarter": "Q4 2024",
+          "regions": [
+            {"name": "North America", "revenue": 2100000, "units": 8400, "growth": 12},
+            {"name": "Europe", "revenue": 1500000, "units": 6200, "growth": 8},
+            {"name": "Asia Pacific", "revenue": 980000, "units": 4100, "growth": 22},
+            {"name": "Latin America", "revenue": 420000, "units": 1800, "growth": 15}
+          ]
+        }
+    - path: package.json
+      content: |
+        {"name":"sf06-task","version":"1.0.0","private":true}
+    - path: validate.py
+      content: "# Provided helper script for validating .docx structure (see skill docs)"
+  tools_available: [bash, read, edit, grep]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: use_docx_js
+    description: "Must use the JavaScript/Node ecosystem library mandated by the skill, not a Python or pandoc-based generator"
+    exclusive: "Model defaults to python-docx since Python is more common for scripting tasks"
+  - id: dxa_units
+    description: "All measurements must use the low-level integer unit required by the skill, not high-level wrappers like inches/cm/points"
+    exclusive: "Model uses inches, cm, or points directly as numeric values"
+  - id: table_dual_width
+    description: "Table widths must be specified at BOTH the table level and on every individual cell, as required by the skill"
+    exclusive: "Model sets only columnWidths or only cell width, not both"
+  - id: shading_type_clear
+    description: "Table header solid fill must use the shading type that produces a clean solid color without pattern overlay"
+    exclusive: "Model uses ShadingType.SOLID which applies a pattern overlay darkening colors unpredictably"
+  - id: width_type_dxa
+    description: "Table and cell widths must use the absolute-unit width type required by the skill, not percentage or auto"
+    exclusive: "Model often omits the type field entirely or uses WidthType.AUTO/PERCENTAGE, causing renderer-dependent column widths"
+  - id: horizontal_rule_border
+    description: "Horizontal separator must be implemented via the paragraph-border mechanism mandated by the skill, not via a one-row table or underline characters"
+    exclusive: "Model creates a one-row empty table with borders to simulate a separator line"
+  - id: page_size_explicit
+    description: "Must explicitly configure US Letter page size with margins, not rely on the library default"
+    exclusive: "Model omits page.size configuration, falling back to the docx-js default A4 page (which differs from the requested US Letter)"
+  - id: validate_output
+    description: "Must run the structural validation step required by the skill on the generated document before delivery"
+    exclusive: "Model delivers the document without running structural validation"
+  - id: cell_children_paragraph
+    description: "Table cell content must be wrapped in the paragraph object required by the skill, not placed as raw text runs"
+    exclusive: "Model places TextRun directly in TableCell.children, which is invalid in docx-js"
+
+notes: |
+  Validation goal (for evaluator use only; must not be exposed to the model under test):
+  - Check whether the output .docx OOXML structure conforms to the implementation specified in skill_06_docx
+  - Use structural validation to determine whether table widths, header shading, horizontal separator, page size, etc. are generated per skill requirements
+  - The validation script is run independently on the evaluator side

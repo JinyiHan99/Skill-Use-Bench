@@ -1,0 +1,134 @@
+task_id: rust_mcp_server_t2_workspace_inspector
+skill_id: rust-mcp-server-generator
+# Scoring notes (V3):
+#   - All skill rules use regex (based on real Write/Edit/Bash tool calls in the trace, including written file contents)
+#     or llm-judge verification, robust to the model's self-chosen nested project directories, and do not require the project to compile/run.
+#   - No longer uses unimplemented state-check fields like files_any/file_must_contain_all.
+#   - "Must not" total weight (0.5) <= "Must do" total weight (3.5).
+rules:
+  # ── GATE ──────────────────────────────────────────────────────────────
+  - id: g1_observable_rust_mcp_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trajectory contains a real tool call writing Rust MCP project files (Cargo.toml / src/*.rs), ensuring evaluability."
+    signal:
+      pattern: '(?is)"file_path"\s*:\s*"[^"]*(?:Cargo\.toml|src/[^"]*\.rs)"|(?:cat|tee)\b[^"]{0,80}(?:Cargo\.toml|src/[^"]*\.rs)'
+
+  # ── Skill-Following (scored) ─────────────────────────────────────────
+  - id: r1_rmcp_stdio_server_stack
+    type: required-arg
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] Cargo.toml must use the rmcp crate as the MCP stack, with server and transport-stdio features enabled.
+      Skill-exclusive rationale: without reading the skill, strong models often hand-write stdin/stdout JSON-RPC, switch to other MCP SDKs, or only write a manifest parsing library/CLI;
+      the skill explicitly mandates rmcp + server + transport-stdio, and the conflict point is "self-chosen transport/SDK" vs. "rmcp stdio server stack".
+    signal:
+      pattern: 'Cargo\.toml[\s\S]{0,1200}?rmcp\s*=\s*\{[^}\n]{0,240}features\s*=\s*\[[^\]]{0,160}(?:"server"[^\]]{0,80}"transport-stdio"|"transport-stdio"[^\]]{0,80}"server")'
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  - id: r2_tool_modules_separated
+    type: lesson
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — headline] Each manifest-inspection action must be placed in a separate tool file under src/tools/ (rather than a monolithic main.rs/handler.rs).
+      Skill-exclusive rationale: without reading the skill, models often stuff all Cargo.toml parsing and command logic into main.rs/handler.rs; the skill mandates the src/tools/<name>.rs module boundary.
+    signal:
+      pattern: '(?is)(?:"file_path"\s*:\s*"[^"]*src/tools/(?!mod\.rs)[A-Za-z0-9_]+\.rs"|(?:cat|tee|>)\s*[^"\n]{0,80}src/tools/(?!mod\.rs)[A-Za-z0-9_]+\.rs)'
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  - id: r3_tool_router_macro_dispatch
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The handler's impl block uses the #[tool_router] macro for automatic routing; hand-written match/if-else dispatch is forbidden.
+      Skill-exclusive rationale: without reading the skill, models commonly use match tool_name for manual dispatch; the skill requires #[tool_router] macro routing.
+    signal:
+      pattern: '#\s*\[\s*tool_router\s*[\]\(]'
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  - id: r4_stdio_serve_bootstrap
+    type: required-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The entry point starts via the tokio async runtime and uses rmcp::serve_stdio(handler) to start the stdio transport, rather than a hand-written stdin/stdout loop.
+      Skill-exclusive rationale: without reading the skill, models often hand-write a std::io stdin loop or self-manage transport; the skill mandates rmcp serve_stdio + tokio.
+    signal:
+      pattern: '(?:rmcp::)?serve_stdio\s*\('
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: high}
+
+  - id: r5_async_typed_tool_boundary
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Each action is exposed as an async fn annotated with #[tool(name=snake_case, description=...)], with parameters as a derive(Deserialize) typed struct,
+      returning the rmcp-specified tool result type (e.g. Result<ToolCallResult, anyhow::Error> or an equivalent rmcp result type). Equivalent rmcp annotations/result types are all accepted.
+      Skill-exclusive rationale: without reading the skill, models often write ordinary async/sync functions, untyped serde_json::Value parameters, or return Vec/String.
+    signal:
+      query: >
+        Based on the Rust source code actually written to src/tools/*.rs or the handler in the trace (not the agent's self-statements),
+        are both the package metadata and list workspace members actions annotated with rmcp's tool macro (e.g. #[tool(name="...", description="...")]), as async fn,
+        with parameters as a derive(Deserialize) typed struct, and returning rmcp's tool result type (Result<ToolCallResult, anyhow::Error> or equivalent)? Answer only YES or NO.
+      acceptable: '#[derive(Deserialize)] struct P{...}; #[tool(name="get_package_metadata", description="...")] pub async fn get_package_metadata(p: P) -> Result<ToolCallResult, anyhow::Error>. Equivalent rmcp tool annotations and result types are also accepted.'
+      unacceptable: 'fn get_package_metadata(s:&str)->String; async fn call(v: serde_json::Value); returning a bare String; missing tool macro annotation.'
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: medium}
+
+  - id: r6_tests_file_present
+    type: termination
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL — weak signal] The project contains an integration-test file under tests/, with tests for the exposed actions (success/error paths).
+      Only checks that the test file was written and references the action; does not require actual compilation/running (the sandbox cannot fetch rmcp dependencies to compile).
+      Skill-exclusive rationale: without reading the skill, models often stop at compiling or only write parser unit tests, without writing a tool-level integration-test file.
+    signal:
+      pattern: '(?is)"file_path"\s*:\s*"[^"]*tests/[^"]*\.rs"|(?:cat|tee|>)\s*[^"\n]{0,80}tests/[^"\n]{0,40}\.rs'
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: medium}
+
+  # ── MUST NOT (boundary) ──────────────────────────────────────────────
+  - id: r7_no_println_logging
+    type: forbidden-tool
+    provenance: skill
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — boundary] Server-lifecycle/tool-call logging must use tracing macros; println!/eprintln! or the log crate are forbidden.
+      Skill-exclusive rationale: Rust examples default to using println! to print startup info; the skill requires tracing exclusively.
+    signal:
+      # Any println!/eprintln!/log:: logging appearing in a written Rust source file is a violation.
+      must_not_match: '(?is)\.rs"[\s\S]{0,6000}?(?:\beprintln!\s*\(|\bprintln!\s*\(|\blog::(?:info|debug|warn|error|trace)!\s*\()'
+    review: {proposed_by: ["drafter"], challenged_by: [], consensus: medium}
+
+  # ── Task completion (bypass, not counted toward SF) ──────────────────
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether a Rust MCP server source implementing the two manifest-inspection actions was generated."
+    signal:
+      query: >
+        Based on the file contents actually written in the trace (not the agent's self-statements), was a Rust MCP server source project generated,
+        capable of parsing the manifest from assets/rust_mcp_server_t2_workspace_inspector/input/ripgrep-Cargo.toml,
+        and exposing two assistant-callable actions: "return package metadata (name/version/edition)" and "list workspace members"? Answer only YES or NO.
+      acceptable: "Includes Cargo.toml and src source, can parse the sample manifest (e.g. package name ripgrep, workspace members list), and implements the two actions."
+      unacceptable: "Only wrote a parser function without an MCP server; missing one of the two actions; hardcoded ripgrep metadata instead of parsing the manifest; only wrote pseudocode."

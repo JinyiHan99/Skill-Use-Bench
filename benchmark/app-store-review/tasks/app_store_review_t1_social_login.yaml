@@ -1,0 +1,35 @@
+task_id: app_store_review_t1_social_login
+skill_id: app-store-review
+description: |
+  We are preparing to package this login demo as a TestFlight candidate version for App Store submission. Please read the code under `assets/app_store_review_t1_social_login/input/` from the release owner's perspective and provide a pre-submission risk review report, pointing out locations that need changes where feasible. Do not modify the code; only output review conclusions and recommendations.
+initial_state:
+  assets:
+    - path: assets/app_store_review_t1_social_login/input/example/src/App.tsx
+      source: "https://github.com/react-native-google-signin/google-signin/blob/aa1074e32666225a84d3597fcac38243dbdd186d/example/src/App.tsx"
+      real_state: "Real open-source React Native Google Sign-in example file; contains demo code such as GoogleSigninButton, addScopes requesting user.gender.read, getTokens, Alert displaying the token, Clipboard copying the idToken, console.log outputting sign-in data, and does not include a Sign in with Apple option."
+      preparation: |
+        Shallow-cloned https://github.com/react-native-google-signin/google-signin.git at commit aa1074e32666225a84d3597fcac38243dbdd186d, then copied example/src/App.tsx unchanged into the task input directory.
+  tools_available:
+    - read_file
+    - shell
+expected_trigger: true
+skill_constraints_tested:
+  - id: social-login-apple-alternative
+    description: "The skill's Design 4.x check requires: if an iOS app uses third-party social login, it should also provide a compliant alternative such as Sign in with Apple."
+    exclusive: "Without reading the skill, a model may also point out the missing Sign in with Apple based on App Store common sense; this constraint does not use 'whether Apple login is mentioned' as the sole criterion, but requires the model to explicitly place it in the iOS/App Store submission Design login-compliance context, characterize it as a submission risk that may affect review approval, and distinguish it from general feature-improvement suggestions."
+  - id: privacy-token-exposure-and-console-production
+    description: "The skill's Legal 5.1 and high-risk pattern requirements: before submission, identify sensitive user data/token display, copying, and production log leakage, and request only necessary permissions."
+    exclusive: "Without reading the skill, a model may sporadically point out token display/copying, console.log outputting sign-in data, extra scopes, and other security or release-quality issues; this constraint requires the model to group these points into the App Store Review Legal 5.1 / Privacy / data minimization / disclosure consistency context, as an overall pre-submission compliance-risk judgment, rather than scattered generic security advice."
+notes: |
+  - Core test point: the model should identify this task as an iOS/React Native App Store pre-submission review and enable the app-store-review skill's Design and Legal/Privacy perspectives, rather than a generic code-quality review.
+  - Expected correct behavior: the report should explicitly point out that `example/src/App.tsx:70-75` only renders a Google Sign-in button and lacks an Apple login alternative entry for iOS submission; `example/src/App.tsx:95-97` requests an extra gender scope that needs necessity justification; `example/src/App.tsx:107-136` fetching and alerting/copying tokens and `example/src/App.tsx:167-170` production logging of user sign-in data pose privacy and data-minimization risks.
+  - Common model mistakes: only suggesting converting the class component to hooks, improving error handling or styling; treating `example/src/App.tsx:158-159` Log out/Revoke access as full account-deletion capability; missing the App Store review-specific requirement for the single Google login entry at `example/src/App.tsx:70-75`.
+  - baseline_correctness_signals:
+      - The output contains a pre-submission risk review report for the input code.
+      - It cites actual file paths and relevant code locations.
+      - The input assets are not modified.
+  - skill_following_signals:
+      - Explicitly escalate the single Google third-party login without an Apple alternative entry to an iOS/App Store submission review risk, rather than only "feature incomplete" or "suggest supporting more login methods."
+      - Explicitly place the `example/src/App.tsx:70-75` issue in the Design / login alternative / App Review submission risk context, or use equivalent wording to indicate it is a review-compliance issue.
+      - Discuss `example/src/App.tsx:95-97`, `example/src/App.tsx:112-118`, and `example/src/App.tsx:167-170` together in the App Store Review privacy/data-minimization/disclosure-consistency context, rather than giving scattered generic security advice.
+      - Clearly distinguish ordinary demo-code issues, general release-quality issues, and risks that may cause App Review rejection or remediation requests.

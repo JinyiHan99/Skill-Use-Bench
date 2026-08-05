@@ -1,0 +1,24 @@
+task_id: vercel_ai_sdk_v6_t3_structured_workflow
+skill_id: vercel-ai-sdk
+description: |
+  The product review endpoint in `assets/vercel_ai_sdk_v6_t3_structured_workflow/input/review-service/` needs to be updated to follow the current Vercel AI SDK v6 implementation patterns. Preserve the existing validation behavior and keep the caller-facing JSON contract unchanged.
+initial_state:
+  assets:
+    - path: assets/vercel_ai_sdk_v6_t3_structured_workflow/input/review-service/app/api/review/route.ts
+      source: "Adapted from real Vercel AI repository example https://github.com/vercel/ai/blob/main/examples/next-openai-pages/app/api/generate-object/route.ts"
+      real_state: "Two-step review endpoint where the second step uses an older structured object generation API."
+      preparation: |
+        Started from the public Vercel AI structured output route example, then transformed it into a product-review workflow fixture with an intentionally older structured-result call.
+  tools_available: [Read, Write, Edit, Glob, Grep, Bash, WebFetch]
+expected_trigger: true
+skill_constraints_tested:
+  - id: output_helpers_for_structured_data
+    description: "The skill requires structured results to be produced through current output helpers on text generation rather than the deprecated object-generation path."
+    exclusive: "Without the skill, a model may preserve or introduce the older object-generation API because it is widely represented in historical examples."
+  - id: current_provider_model_spec
+    description: "The skill requires current provider-function model specification and current model IDs for the chosen provider."
+    exclusive: "Without the skill, a model is likely to leave the older model identifier unchanged because the prompt does not ask for a model upgrade and the old identifier appears semantically valid."
+notes: |
+  - Positive trigger: this is a Vercel AI SDK v6 structured-output update for an AI route.
+  - Observable correct behavior: the endpoint uses the current SDK structured-output pattern, preserves the existing staged review behavior from the source code, and keeps the caller-facing response JSON shape stable.
+  - Common failure modes: keeping the obsolete structured-output API, returning free-form text, changing the staged data flow, changing the public response contract, or leaving outdated provider/model configuration in place.

@@ -1,0 +1,55 @@
+task_id: using_git_worktrees_t1_native_preferred
+level: L2
+skill_id: skill_88_using-git-worktrees
+description: |
+  I need to start making a small change in `assets/using_git_worktrees_t1_native_preferred/input/repo/`: make the date parsing error messages more user-friendly. The current workspace may still be used by me for comparison, so please first prepare the development environment, then confirm whether the existing tests are clean. Once ready, just tell me I can start making changes; there is no need to implement this change for now.
+initial_state:
+  assets:
+    - path: assets/using_git_worktrees_t1_native_preferred/input/repo/
+      source: "https://github.com/arrow-py/arrow (open-source Arrow Python library snapshot reused from ./assets/SF22_t1_setup_fuzzing/repo)."
+      real_state: "Normal Git checkout on branch main, containing pyproject.toml, requirements files, tests/, and an ignored project-local .worktrees/ directory."
+      preparation: |
+        Copied the real Arrow Python library snapshot from ./assets/SF22_t1_setup_fuzzing/repo, initialized a Git repository on main, committed all files, appended .worktrees/ to .gitignore, and created the ignored .worktrees/ directory.
+  tools_available: [bash, read, edit, grep]
+expected_trigger: true
+skill_constraints_tested:
+  - id: announce_skill_at_start
+    description: "The skill requires an explicit startup announcement before doing the isolation workflow."
+    exclusive: "A model that treats this as ordinary setup work will silently inspect or run commands without the required announcement."
+  - id: detect_existing_isolation_first
+    description: "Before creating any isolated workspace, the model must inspect Git directory/common-directory state and branch state to determine whether it is already isolated."
+    exclusive: "A model without the skill usually jumps straight to creating a branch, editing in place, or making a workspace without first checking whether the current checkout is already isolated."
+  - id: prefer_native_worktree_tool
+    description: "When the runtime exposes a native worktree mechanism, the model must prefer it over manually creating a linked checkout with raw Git commands; raw Git worktree fallback is only acceptable when no native mechanism is available."
+    exclusive: "A model without the skill is unlikely to check for or prefer a platform-native worktree mechanism and may use `git worktree add`, create a branch in place, or work directly in the original checkout."
+  - id: run_setup_and_baseline
+    description: "After isolation is established, project setup must be auto-detected from repository files and a baseline test command must be run before implementation begins; setup/testing should not happen in the original checkout."
+    exclusive: "A default model may run setup or tests directly in the original checkout, stop after branch creation, or proceed despite baseline failures; the skill-specific behavior is isolation first, then setup, then baseline, with failure reported before any implementation."
+notes: |
+  Core test points:
+  - This is a positive example; the user wants to "start making a small change" and explicitly states the current workspace needs to be preserved for comparison, triggering isolated workspace preparation.
+  - The asset is a normal Git checkout, and the project already has an ignored .worktrees/ directory; correct behavior should first detect existing isolation state, then prepare the isolated workspace following the skill's native-first / fallback order.
+
+  Expected correct behavior:
+  - Output the isolation workspace announcement required by the skill at the start.
+  - In `assets/using_git_worktrees_t1_native_preferred/input/repo/`, first check Git directory/common-directory/branch state, and do a submodule guard to confirm whether already in an isolated workspace.
+  - If the runtime provides a native isolation/worktree mechanism, prefer the native mechanism to enter the isolated workspace.
+  - If the runtime has no native mechanism, only then fall back to raw Git worktree; before fallback, must confirm that the project-local `.worktrees/` is Git-ignored.
+  - After the isolated workspace is ready, auto-detect the Python project setup from `pyproject.toml`/requirements, and run baseline tests.
+  - If tests fail, report the failure and ask whether to continue, rather than directly implementing the feature.
+
+  Common model error behaviors:
+  - Directly modifying the error message in `assets/using_git_worktrees_t1_native_preferred/input/repo/arrow/parser.py` without first establishing an isolated workspace.
+  - Running `git worktree add assets/using_git_worktrees_t1_native_preferred/input/repo/.worktrees/...` before confirming no native mechanism is available.
+  - Only running `git checkout -b ...` or `git switch -c ...`, working in the original checkout.
+  - Seeing `pyproject.toml` and directly saying "ready", without running baseline tests.
+
+  baseline_correctness_signals:
+    - The model did not modify functional code, because the user only asked to prepare the environment.
+    - The report states the repository is ready or reports baseline test failure and waits for user decision.
+  skill_following_signals:
+    - The conversation starts with the startup announcement required by the skill.
+    - The tool trace shows Git isolation detection first, then isolated workspace preparation.
+    - If the runtime provides a native worktree/isolated-workspace mechanism, it should be preferred; in this case, `git worktree add` should not be used to manually create the workspace.
+    - Only when confirming no native mechanism is available is fallback to raw `git worktree add` allowed, and the project-local worktree directory must be verified as ignored first.
+    - After isolation, execute project setup/test-related commands and report test results.

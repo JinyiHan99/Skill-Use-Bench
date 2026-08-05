@@ -1,0 +1,143 @@
+rubric_id: skill_75_power_platform_mcp_connector_suite_t3_oauth_certification_hardening
+objective: Evaluate whether the model follows the Power Platform MCP Connector Suite skill to elevate the Salesforce connector to agent-mediated OAuth hardening and certification preparation standards.
+rules:
+  - id: g1_observable_certification_package_write
+    type: required-arg
+    provenance: gate
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [GATE] output/salesforce_certification_ready/apiDefinition.swagger.json should actually exist and be non-empty, indicating an evaluable certification-ready connector package artifact.
+    signal:
+      file: output/salesforce_certification_ready/apiDefinition.swagger.json
+      file_must_contain: >-
+        (?s)\S
+
+  - id: r1_agent_audience_binding_or_anti_confused_deputy_logic
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] OAuth hardening must add concrete audience-binding or equivalent anti-confused-deputy protection for agent-mediated MCP calls, either in script.csx/policy guidance or submission artifacts.
+      Skill-exclusive rationale: without reading the skill, strong models will stop at generic Salesforce OAuth configuration, scope hygiene, or "use HTTPS/refresh token" guidance; the skill explicitly requires MCP security practices, token audience validation, and confused-deputy prevention. Default behavior X = generic OAuth settings/documentation, skill requires Y = bind token audience/issuer/client/connector context to prevent agent-mediated confused deputy, conflict point Z = sign-in works but agent-mediated calls may be wrongly authorized.
+    signal:
+      query: |
+        Based only on the actual content of files finally written under output/salesforce_certification_ready/ such as script.csx, apiProperties.json, readme/security note/settings, not the trace, plans, or the agent's self-statements: is a concrete token audience-binding or equivalent anti-confused-deputy hardening added, and is it explained/implemented for the agent-mediated MCP flow?
+        Answer YES if final output files contain concrete validation or reviewer-ready guidance binding OAuth tokens/claims to an expected aud, iss, client_id, tenant, connector-specific audience, callback, or MCP agent context, with a rejection condition or review action that prevents confused-deputy use.
+        Answer NO if final files only keep SalesforceV2 OAuth, scopes, HTTPS, client secret guidance, or generic "validate tokens" wording without concrete audience/claim/connector-context binding tied to agent use.
+      acceptable: |
+        script/security note validates aud/iss/client_id/tenant or connector-specific audience before processing /mcp requests and explains this prevents an agent-mediated confused deputy attack.
+      unacceptable: |
+        "Use OAuth 2.0 with api refresh_token scopes and store client secret securely" with no audience/claim binding or confused-deputy explanation.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_state_and_return_path_protection_for_oauth_flow
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] OAuth flow must include state parameter / return-path protection guidance or validation that binds request and callback state and rejects mismatched, stale, or replayed returns.
+      Skill-exclusive rationale: without reading the skill, the model may only mention generic CSRF or secure OAuth, or omit state because Power Platform provider OAuth often hides callback details; the skill specifically calls for secure state parameter protection for CSRF prevention. Default behavior X = generic OAuth/CSRF statement, skill requires Y = state/return-path binding and stale/replay rejection in the connector handoff, conflict point Z = the pilot reviewer cannot verify agent-mediated callback integrity from generic docs.
+    signal:
+      query: |
+        Based only on the actual content of files finally written under output/salesforce_certification_ready/ such as security note/readme/script/settings, not the trace, plans, or the agent's self-statements: are both (1) state/nonce/return-path binding of the initiating request to the callback context, and (2) handling/guidance for rejecting mismatched, expired, stale, replayed, or non-one-time state on callback provided?
+        Answer YES only if both request/callback binding and rejection of mismatch/expiry/replay/one-time reuse are present.
+        Answer NO if it only says "protect against CSRF", only says "use state", only describes state generation, or only describes generic callback validation without replay/expiry/mismatch rejection.
+      acceptable: |
+        "Generate a nonce-backed state for each connector authorization, bind it to redirect URI and tenant/session, validate it on callback, expire it after one use, and reject mismatches/replays."
+      unacceptable: |
+        "OAuth includes CSRF protection" or "generate a state value" with no callback binding and no mismatch/expiry/replay rejection details.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_submission_metadata_settings_file_present
+    type: required-arg
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Certification Preparation mode expects complete submission metadata, including a settings.json-style artifact with product/service/publisher metadata for certification review.
+      Skill-exclusive rationale: without reading the skill, the model usually only edits apiProperties.json/readme.md because the task says connector package and OAuth hardening; the skill adds certification-side metadata requirements beyond functional import. Default behavior X = only connector runtime files, skill requires Y = settings.json metadata artifact, conflict point Z = the connector may run but the submission package is not reviewer-ready.
+    signal:
+      file: output/salesforce_certification_ready/settings.json
+      file_must_contain: >-
+        (?is)^(?=.*"(?:publisher|publisherDisplayName|stackOwner)"\s*:)(?=.*"(?:privacy|privacyPolicyUrl|privacyPolicy)"\s*:)(?=.*"(?:support|supportUrl|supportEmail)"\s*:)(?=.*"(?:description|summary)"\s*:)(?=.*"(?:icon|iconPath|iconBrandColor)"\s*:).+$
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_icon_compliance_artifact_or_evidence
+    type: required-arg
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] Certification package must include text evidence for icon compliance: PNG format, 230x230 or 500x500 dimensions, and an icon file location or placeholder swap instruction.
+      Skill-exclusive rationale: without reading the skill, the model focused on OAuth security may omit icons entirely because they do not affect sign-in or runtime; the skill's Certification Preparation mode explicitly calls out icon compliance. Default behavior X = security-only package, skill requires Y = icon artifact/evidence, conflict point Z = the managed pilot submission can fail review despite working auth.
+    signal:
+      file: output/salesforce_certification_ready/settings.json
+      file_must_contain: >-
+        (?is)(?=.*\bPNG\b)(?=.*\b(?:230\s*x\s*230|500\s*x\s*500)\b)(?=.*\b(?:icon|placeholder|swap|file|path)\b)
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_security_note_ties_hardening_to_agent_mediated_mcp
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The concise security note must connect at least one concrete OAuth hardening control to agent-mediated MCP use, not just generic web OAuth or Salesforce app setup.
+      Skill-exclusive rationale: without reading the skill, the model will write a normal OAuth security note about scopes, secrets, HTTPS, and refresh tokens; the skill requires OAuth 2.0 enhanced with MCP security best practices for Copilot Studio/agent context. Default behavior X = generic OAuth reviewer prose, skill requires Y = explain why audience/state/confused-deputy controls matter for MCP agent calls, conflict point Z = the reviewer cannot see that agent-mediated risk was addressed.
+    signal:
+      query: |
+        Based only on the actual content of the security note/handoff/readme finally written under output/salesforce_certification_ready/, not the trace, plans, or the agent's self-statements: does the security note explicitly connect at least one concrete control measure (e.g. audience validation, state validation/replay rejection, confused-deputy prevention) to the risk model of Copilot Studio/MCP/agent-mediated use?
+        Answer YES if the note names a concrete control and explains why an AI agent/connector invoking /mcp changes the OAuth risk model.
+        Answer NO if the note only gives generic Salesforce OAuth setup, scope, HTTPS, or secret-storage advice without tying a concrete control to MCP/agent-mediated use.
+      acceptable: |
+        "Because Copilot Studio agents invoke the /mcp endpoint on behalf of users, validate token audience and one-time state to prevent confused deputy and replay during agent-mediated calls."
+      unacceptable: |
+        "Use OAuth 2.0, HTTPS, minimal scopes, and rotate secrets."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/salesforce_certification_ready/ should contain a submission-ready complete Salesforce connector package, reviewer handoff artifacts, and a concise security note.
+    signal:
+      query: |
+        Based only on the final filesystem artifacts and actually written content, not the trace, plans, or the agent's self-statements: does output/salesforce_certification_ready/ contain the four core non-empty connector files apiDefinition.swagger.json, apiProperties.json, script.csx, readme.md, plus at least one settings/security/handoff/reviewer artifact; are the JSON files parseable and do they preserve Salesforce connector coverage, and is the content not mock or empty shell?
+        Answer YES if the four core files are present and substantive, at least one reviewer/security/certification handoff artifact exists, JSON files are parseable, and Salesforce host/API schema/business operations remain.
+        Answer NO if key connector files are missing or empty, only documentation was produced, output is not a Salesforce connector package, JSON is unparseable, or the package is mock/minimal with no Salesforce coverage.
+      acceptable: |
+        Complete connector files plus settings.json and security_note.md/reviewer_handoff.md exist under output/salesforce_certification_ready/; apiDefinition.swagger.json still contains Salesforce host/API schema and business operations.
+      unacceptable: |
+        Only readme.md is edited, there is no output package, or apiDefinition.swagger.json is a mock/minimal connector without Salesforce API coverage.

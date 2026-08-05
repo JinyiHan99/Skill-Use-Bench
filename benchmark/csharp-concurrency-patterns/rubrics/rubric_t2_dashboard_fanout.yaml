@@ -1,0 +1,129 @@
+rules:
+  - id: g1_observable_code_write
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: '[GATE] The trace must contain an observable write or edit attempt on the fan-out example C# file.'
+    signal:
+      pattern: |-
+        (?:^|\n)\s*(?:tool\s*[:=]\s*["']?(?:Write|Edit|write_file|edit_file)["']?|(?:Write|Edit|write_file|edit_file)\b)[\s\S]{0,1500}?file_path\s*[:=]\s*["']?(?:[^"'\n]*/)?assets/SF85_t2_dashboard_fanout/input/WhenAllPingExample\.cs
+
+  - id: r1_true_async_io_not_taskrun_sync_ping
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Network I/O fan-out in a server request path should use real async/await I/O calls, rather than Task.Run wrapping synchronous Ping.Send or other blocking calls.
+      Skill-exclusive rationale: without reading the skill, a strong model may keep the Task.Run + Ping.Send from the Microsoft Learn example and only add an async method or cancellation check at the outer layer; the skill classifies HTTP/network waits as I/O-bound and defaults to async/await and avoiding blocking in async code. The conflict point is "thread-pool wrapping synchronous I/O" vs "real async I/O".
+    signal:
+      file: 'assets/SF85_t2_dashboard_fanout/input/WhenAllPingExample.cs'
+      file_must_contain:
+        - 'async\s+(Task|ValueTask)'
+        - '(SendPingAsync|GetAsync|SendAsync|GetFromJsonAsync)'
+        - 'await\s+'
+      file_must_not_contain:
+        - 'Task\.Run\s*\('
+        - '\.Wait\s*\('
+        - '\.Result\b'
+        - 'GetAwaiter\s*\(\)\.GetResult\s*\('
+        - '\b(?:ping|png)\s*\.\s*Send\s*\('
+        - 'new\s+Ping\s*\([\s\S]{0,500}?\.Send\s*\('
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: high
+
+  - id: r2_whenall_composes_independent_results
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Multiple independent external checks should create independent async Task results and aggregate via Task.WhenAll, rather than letting tasks concurrently modify shared counters or shared collections.
+      Skill-exclusive rationale: without reading the skill, a model may keep the Interlocked failed counter, or switch to ConcurrentBag/ConcurrentDictionary for aggregation; the skill emphasizes coordinating multiple async operations with Task.WhenAll and avoiding shared mutable state where possible. The conflict point is "shared mutable aggregation" vs "task return-value composition".
+    signal:
+      file: 'assets/SF85_t2_dashboard_fanout/input/WhenAllPingExample.cs'
+      file_must_contain: 'Task\s*\.\s*WhenAll'
+      file_must_not_contain:
+        - '\bInterlocked\b'
+        - 'Concurrent(?:Bag|Dictionary|Queue|Stack)'
+        - '\block\s*\('
+        - '\bshared\s+List\b'
+        - 'List\s*<[^>]+>\s+\w+\s*=\s*new'
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: high
+
+  - id: r3_not_parallel_foreach_for_io_fanout
+    type: forbidden-tool
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] This pure network I/O fan-out should not be changed to Parallel.ForEachAsync; the skill reserves Parallel.ForEachAsync for CPU-bound/throttled parallel collection processing.
+      Skill-exclusive rationale: without reading the skill, seeing "check multiple URLs simultaneously" makes it easy to modernize the loop with Parallel.ForEachAsync; the skill's decision tree routes HTTP/network waits to async/await and excludes Parallel.ForEachAsync from pure I/O operations. The conflict point is "parallel collection-processing abstraction" vs "I/O async composition".
+    signal:
+      file: 'assets/SF85_t2_dashboard_fanout/input/WhenAllPingExample.cs'
+      file_must_not_contain: 'Parallel\s*\.\s*ForEachAsync\s*(?:<|\()'
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: high
+
+  - id: r4_cancellation_token_flows_into_io
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Request cancellation should be passed into the service method via CancellationToken and flow into each async external call or equivalent per-target check chain, rather than only being checked at the start or end.
+    signal:
+      query: |
+        Based on the final written content of assets/SF85_t2_dashboard_fanout/input/WhenAllPingExample.cs, not the agent's self-description, answer YES/NO: is the CancellationToken passed from the service/API method parameter to each actual async external I/O call, or passed to each per-target CheckAsync and then used by that method (including SendPingAsync/GetAsync/SendAsync/GetFromJsonAsync, WaitAsync(ct), linked CTS, and equivalent cancellation patterns), rather than only declared at the entry or manually checked?
+        Answer YES if the token is accepted by the public/service method and reaches each external check through a direct I/O API, WaitAsync(ct), linked cancellation source, or a per-target CheckAsync that applies it.
+        Answer NO if the token is only declared, only checked with ThrowIfCancellationRequested, or only used around Task.WhenAll without reaching each external check.
+      acceptable: 'CheckAllAsync(..., CancellationToken ct) calls CheckOneAsync(url, ct), and CheckOneAsync passes ct to SendPingAsync/GetAsync/SendAsync or applies WaitAsync(ct) to the external operation.'
+      unacceptable: 'CheckAllAsync has CancellationToken ct but each ping/http call ignores it.'
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: medium
+
+  - id: r5_library_style_await_without_context_capture
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL] Awaits in reusable library/server-side code on the live request path should use ConfigureAwait(false), avoiding copying the sample console Main style into a service library.
+      Skill-exclusive rationale: without reading the skill, a model usually just async-ifies the code and keeps plain await; the skill's async/await key principles specifically require library code to use ConfigureAwait(false). The conflict point is "plain await sample code" vs "context-capture discipline for reusable library/server-side code".
+    signal:
+      file: 'assets/SF85_t2_dashboard_fanout/input/WhenAllPingExample.cs'
+      file_must_contain: 'await\s+[^;]+?\.ConfigureAwait\s*\(\s*false\s*\)'
+    review:
+      proposed_by: ['drafter']
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: '[TASK — not counted toward SF] Whether the fan-out health check was refactored into a server-reusable version, preserving simultaneous multi-service checks, result aggregation, and request cancellation handling.'
+    signal:
+      file: 'assets/SF85_t2_dashboard_fanout/input/WhenAllPingExample.cs'
+      query: |
+        Based on the final written content of assets/SF85_t2_dashboard_fanout/input/WhenAllPingExample.cs, not the agent's self-description, answer YES/NO: does the file contain a server-reusable health-check fan-out method that can simultaneously check multiple targets, return or form an aggregated result, and handle CancellationToken cancellation? It does not require using a specific skill-preferred abstraction; only judge whether the task is complete.
+        Answer YES if the code has a non-console service/API-style async method, starts multiple checks before awaiting their combined completion, produces per-target or aggregate results, and accepts/uses cancellation.
+        Answer NO if it remains mainly the original console sample, lacks aggregation, runs checks sequentially only, or ignores cancellation.
+      acceptable: 'A HealthCheckService.CheckAllAsync(IEnumerable<string> targets, CancellationToken ct) that returns results after awaiting all checks.'
+      unacceptable: 'The original Main method with Task.Run Ping.Send and no request cancellation handling.'

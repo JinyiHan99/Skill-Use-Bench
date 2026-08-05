@@ -1,0 +1,87 @@
+rubric_id: skill_101_git_workflows_t2_find_bad_change
+objective: Evaluate whether the model uses the git-workflows bisect/checker-driven history verification to locate the earliest bad commit, and restores the repository state at the end.
+rules:
+  - id: g1_observable_history_investigation
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace contains an observable history investigation or checker-script execution.
+    signal:
+      pattern: >-
+        (?is)\b(?:Bash\b.{0,800}\bgit\s+(?:bisect|log|show|checkout|switch|diff|rev-list|blame)\b|Bash\b.{0,800}check_release_gate\.sh\b)
+
+  - id: r1_use_git_bisect_workflow
+    type: required-tool
+    provenance: skill
+    locus: trace
+    verifier: regex
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] For "find the commit that introduced the bug", the git bisect workflow should be used; whether the checker is used for historical-state verification is separately evaluated by r4.
+      skill-exclusive rationale: looking only at the task description and short history, a strong model will likely use git log/show or manual diff to directly see release_status going from green to red; git-workflows explicitly provides bisect for binary-search localization. Default practice X = manually inspect commit/file diffs, skill requires Y = git bisect workflow, conflict point Z = the task can be done manually but the skill requires the history-search workflow.
+    signal:
+      pattern: >-
+        (?is)\bBash\b.{0,1500}\bgit\s+bisect\s+(?:start|run|good|bad)\b
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_use_checker_for_candidate_state_evidence
+    type: lesson
+    provenance: skill
+    locus: trace
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Bad-change localization should use an executable checker script to give good/bad evidence for historical states, rather than only inferring from commit titles, current README, or diff.
+      skill-exclusive rationale: without reading the skill, the diff of release_status=red in the short history is very intuitive, and the model will directly read the diff to conclude; the git-workflows bisect-run lesson emphasizes using automated tests to eliminate manual misjudgment. Default practice X = infer from commit content, skill requires Y = actually run the checker to judge historical states, conflict point Z = the report's verification evidence must come from script execution rather than static inference.
+    signal:
+      query: |
+        Based on actual Bash tool calls and command outputs — not the agent's self-description: did the model run check_release_gate.sh on candidate historical commits / historical checkout states, and use its exit status or output as good/bad evidence to locate the first bad commit?
+        Answer YES if the checker is executed by git bisect run across historical commits, or manually after checking out candidate historical commits before reporting the first bad commit.
+        Answer NO if check_release_gate.sh only runs at initial HEAD, or the conclusion is based only on git log/show/diff/README contents without checker evidence on historical states.
+      acceptable: "git bisect run .../check_release_gate.sh, or checking out candidate historical commits and running ./check_release_gate.sh one by one, then marking good/bad accordingly."
+      unacceptable: "Only runs the checker once at initial HEAD, then uses git show/diff to infer b92245b is the bad commit."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_report_content
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The regression report exists and contains the first bad commit, the failure reason, and before/after verification explanation.
+    signal:
+      file: output/regression_report.md
+      query: |
+        Based only on the actual content written to output/regression_report.md, not the agent's self-description: does the report simultaneously satisfy three items: identify the actual commit corresponding to b92245b or the commit title "Update release status wording" as the first bad commit; explain that release_status going from green to red is the reason; and describe the gate/checker verification result of the previous commit and this commit? Answer YES only if all three are present.
+      acceptable: "The report lists the first bad commit as b92245b or Update release status wording, explains release_status=red caused the gate to fail, and states that the previous commit was green and this commit was red."
+      unacceptable: "The report only says some README change caused failure, without giving the first bad commit or before/after verification."
+
+  - id: tc2_repo_restored
+    type: task-completion
+    provenance: task
+    locus: trace
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] At the end, the repository returns to the starting branch, not detached, with no active bisect/cherry-pick/merge state, and a clean working tree.
+    signal:
+      judge_context_window:
+        - serialized_steps
+        - tool_results_first_n: 8
+      query: |
+        Based on actual Bash tool calls and outputs — not the agent's self-description: has the final repository state been restored? If the model entered git bisect or a detached historical checkout, there must be evidence of git bisect reset or switch/checkout back to the starting branch; if it never left the starting branch, YES can also be judged. There should also be no active bisect state and the final state should be clean.
+        Answer YES if the final evidence shows the repo is back on the starting branch, not detached, no active bisect remains, and the worktree is clean. Answer NO if a temporary state remains or no cleanup/status evidence supports restoration after entering one.
+      acceptable: "After git bisect run, executes git bisect reset; final git status shows on stable/master/main and clean; or never left the starting branch via checkout/bisect and final state is clean."
+      unacceptable: "After git bisect run finds the bad commit, directly writes the report without reset/status; or is still in detached HEAD/bisect state at the end."

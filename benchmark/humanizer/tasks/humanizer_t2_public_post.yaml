@@ -1,0 +1,41 @@
+task_id: humanizer_t2_public_post
+skill_id: humanizer
+description: |
+  I want to keep using this WeChat public account post, but it currently reads a bit stiff and template-like. Please help me process `assets/humanizer_t2_public_post/input/public_post_excerpt.md`, preserving the original meaning and order as much as possible, making it read like a real author talking to the reader about this topic. Save the result to `output/public_post_polished.md`.
+initial_state:
+  assets:
+    - path: assets/humanizer_t2_public_post/input/public_post_excerpt.md
+      source: "https://github.com/op7418/Humanizer-zh#场景-3改写博客文章 and https://github.com/op7418/Humanizer-zh#关键原则"
+      real_state: "Chinese article excerpts taken from the Humanizer-zh README's blog post input example, project introduction, and key principles sections, containing abstract judgments, list-style tone, and double quotes."
+      preparation: |
+        Visit the public GitHub repository op7418/Humanizer-zh README, extract the input text from "场景 3：改写博客文章" (Scenario 3: Rewriting a Blog Post), along with relevant paragraphs from the project introduction and key principles, and organize them in original order into a single markdown file; no fictional content was generated.
+  tools_available: [Read, Write, Edit, Grep, Glob]
+expected_trigger: true
+skill_constraints_tested:
+  - id: soul_injection_without_outline
+    description: "Pull the text back from neutral explanation toward concrete, colloquial, personal-perspective expression, allowing moderate first-person usage, rhythm breaks, and a sense of imperfection."
+    exclusive: "Without reading the skill, strong models may do conventional colloquial polishing but may not systematically add rhythm breaks, deliberately break rigor, or introduce moderate imperfection, and will not reliably produce a corresponding L1-L4 quality inspection report."
+  - id: banned_punctuation_and_structure_cleanup
+    description: "The body must clean up colons, double quotes, negation-style parallelism, and consecutive lists of three or more items, as explicitly required by the skill."
+    exclusive: "General-purpose polishing may make expressions more natural but will not reliably perform systematic scanning and cleanup of colons, double quotes, negation-style parallelism, and consecutive lists."
+  - id: l1_l4_self_check_artifact
+    description: "The deliverable must include a quality inspection report completed following the skill's four-layer system, and the fix conclusions in the report must be consistent with the actual changes in the body."
+    exclusive: "Ordinary polishing tasks do not proactively generate L1-L4 hard rules, style, content quality, and human-likeness checks."
+notes: |
+  - Core test point: This is a positive example. The user asks for it to "read like a real author talking," which should trigger the de-AI-flavor process and cover the skill's branches of "soul injection," "structure breaking," and "de-elevating the ending."
+  - Expected correct behavior: Read the input file, preserve the topic order, and rewrite into a more natural public account post excerpt; save `output/public_post_polished.md`; the L1-L4 quality inspection report may be written into the output file or appear in the assistant's final reply, but must be verifiable against the actual changes in the body.
+  - Common model error behaviors:
+      - Retaining negation-style parallelism like "人工智能不仅仅是一种技术，它是……革命" (AI is not just a technology, it is... a revolution) in `assets/humanizer_t2_public_post/input/public_post_excerpt.md:3`.
+      - Continuing to use manual-style tone like "用于去除文本中 AI 生成痕迹的工具，帮助你……" (a tool for removing AI-generated traces from text, helping you...) in `assets/humanizer_t2_public_post/input/public_post_excerpt.md:5`.
+      - Retaining the consecutive list skeleton "有观点、变化节奏、承认复杂性、适当使用……" (have viewpoints, vary rhythm, acknowledge complexity, appropriately use...) verbatim in `assets/humanizer_t2_public_post/input/public_post_excerpt.md:7`.
+  - baseline_correctness_signals:
+      - `output/public_post_polished.md` exists and contains the complete rewritten Chinese article.
+      - The rewritten text still revolves around AI writing, human voice, and text naturalness, without deviating from the original topics.
+  - skill_following_signals:
+      - The deliverable includes a verifiable L1-L4 quality inspection report, which may appear in `output/public_post_polished.md` or in the assistant's final reply.
+      - If the report claims "banned punctuation has been fixed" or L1/L2 passed, then the corresponding issues in the body must actually be zero hits; otherwise it fails.
+      - The body has zero hits for colons `：`, double quotes `""` / `""`, and em dashes `——`.
+      - The body must not retain negation-style parallelism like "不仅仅是……它是……" (not only... it is...) or "不是 A 而是 B" (not A but B).
+      - The body must not contain consecutive lists of three or more items using enumeration commas or bullet points.
+      - The body must have at least one single-sentence short paragraph to create a rhythm break.
+      - The body must contain at least one instance of natural first-person, colloquial interruption, or self-deprecating expression, and it must not be a mechanical cliché.

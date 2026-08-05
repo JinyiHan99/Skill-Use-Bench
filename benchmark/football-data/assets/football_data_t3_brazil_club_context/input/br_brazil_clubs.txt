@@ -1,0 +1,225 @@
+#################################################
+#  Campeonato Brasileiro Série A | Brasileirão
+#################################################
+
+# 2016 - 20 clubs
+
+corinthians,Corinthians|SC Corinthians Paulista|Corinthians SP|Corinthians São Paulo|Sport Club Corinthians Paulista,COR,city:saopaulo
+saopaulo,São Paulo|São Paulo FC|FC São Paulo|São Paulo SP|São Paulo Futebol Clube,SAO,city:saopaulo
+santossp,Santos|Santos SP|Santos FC|FC Santos|Santos Futebol Clube,SAN,city:santos ## nb: santos key taken by Santos Laguna - liga mx - thus,use santossp for now
+palmeiras,Palmeiras|Palmeiras SP|SE Palmeiras|SE Palmeiras São Paulo|Sociedade Esportiva Palmeiras,PAL,city:saopaulo
+pontepreta,Ponte Preta|AA Ponte Preta|Associação Atlética Ponte Preta,PON,city:campinas
+botafogo,Botafogo|Botafogo RJ|Botafogo FR|Botafogo de Futebol e Regatas,BOT,city:riodejaneiro
+flamengo,Flamengo|CR Flamengo|Flamengo RJ|Flamengo Rio de Janeiro|Clube de Regatas do Flamengo,FLA,city:riodejaneiro
+fluminense,Fluminense|Fluminense FC|Fluminense RJ|Fluminense Rio de Janeiro|Fluminense Football Club,FLU,city:riodejaneiro
+atleticomg,Atlético Mineiro|C Atlético Mineiro|Atlético MG|Atlético/MG|Clube Atlético Mineiro,CAM,city:belohorizonte
+cruzeiro,Cruzeiro|Cruzeiro EC|Cruzeiro MG|Cruzeiro Esporte Clube|Cruzeiro Belo Horizonte,CRU,city:belohorizonte
+americamg,América Mineiro|América MG|América FC|América Futebol Clube,AMG,city:belohorizonte
+gremio,Grêmio|Grêmio RS|Grêmio Porto Alegre|Grêmio FBPA|Grêmio Foot-Ball Porto Alegrense,GRE,city:portoalegre
+interrs,Internacional|SC Internacional|Internacional RS|Internacional Porto Alegre|Sport Club Internacional,INT,city:portoalegre
+atleticopr,Atlético Paranaense|C Atlético Paranaense|Atlético PR|Atlético/PR|Clube Atlético Paranaense,CAP,city:curitiba
+coritiba,Coritiba|Coritiba FC|Coritiba PR|Coritiba FC|Coritiba Football Club,CTB,city:curitiba
+figueirense,Figueirense|Figueirense FC|Figueirense SC|Figueirense Futebol Clube,FIG,city:florianopolis
+chapecoense,Chapecoense|Associação Chapecoense de Futebol,CHA,city:chapeco
+sportrecife,Sport|Sport Recife|Sport PE|Sport Club do Recife, SPT, city:recife
+santacruzpe,Santa Cruz|Santa Cruz FC|Santa Cruz Futebol Clube, SAN, city:recife
+vitoria,Vitória|EC Vitória|Esporte Clube Vitória,VIT,city:salvador
+
+# 2015
+# 2014
+# 2013
+
+#################################################
+#  Campeonato Brasileiro Série B | Brasileirão
+#################################################
+# 2016 - 20 clubs
+
+criciuma,Criciúma|Criciúma EC|Criciúma Esporte Clube,CRI,city:criciuma
+avai, Avai|Avaí FC|Avaí Futebol Clube, AVA, city:florianopolis
+joinvile, Joinvile|Joinvile EC|Joinville Esporte Clube, JOI, city:joinvile
+goias,Goiás|Goiás EC|Goiás Esporte Clube,GOI,city:goiania
+atleticogo,Atlético GO|Atlético Goianiense|,ACG,city:goiania
+vilanovago, Vila Nova|Vila Nova GO|Vila Nova de Goias|Vila Nova FC|Vila Nova Futebol Clube, VIL, city:goiania
+bragantino, Bragantino|CA Bragantino|Clube Atlético Bragantino, BRA, city:bragancapaulista
+oeste,  Oeste|Oeste SP}Oeste FC|Oeste Futebol Clube, OES, city:itapolis
+londrina, Londrina|Londrina EC|Londrina Esporte Clube, LON, city:londrina
+parana, Parana|Paraná Clube, PAR, city:curitiba
+vascodagama,Vasco|CR Vasco da Gama|Vasco RJ|Vasco da Gama|Vasco da Gama Rio de Janeiro|Club de Regatas Vasco da Gama,VAS,city:riodejaneiro
+bahia,Bahia|Bahia BA|EC Bahia|Esporte Clube Bahia,BAI,city:salvador
+nautico,Náutico|C Náutico Capibaribe|Náutico PE|Clube Náutico Capibaribe,NAU,city:recife
+tupi, Tupi|Tupi MG|Tupi FC|Tupi Football Club, TUP, city:juizdefora
+brasilrs, Brasil de Pelotas|Brasil RS|GE Brasil|Grêmio Esportivo Brasil|Grêmio Esportivo Brasil de Pelotas, GEB, city:pelotas
+ceara, Ceará|Ceára SC|Ceará Sporting Club, CEA, city:fortaleza
+paysandu, Paysandu|Paysandu SC|Paysandu Sport Club, PAY, city:belem
+crb, CRB|CRB AL|Clube de Regatas Brasil, CRB, city:maceio
+luverdense, Luverdense|Luverdense EC|Luverdense Esporte Clube, LUV, city:lucasdorioverde
+sampaiocorrea, Sampaio Corrêa|Sampaio Corrêa FC|Sampaio Corrêa Futebol Clube, SAC, city:saoluis
+
+# 2015
+# 2014
+# 2013
+
+
+#################################################
+#  Campeonato Brasileiro Série C | Brasileirão
+#################################################
+# 2016 - 20 clubs
+
+portuguesa,Portuguesa|A Portuguesa de Desportos|Portuguesa SP|Portuguesa São Paulo|Associação Portuguesa de Desportos,POR,city:saopaulo
+guaranisp, Guarani|Guarani de Campinas|Guarani SP|Guarani Futebol Clube, GFC, city:campinas
+guaratingueta, Guaratingueta|Guara|Guaratinguetá Futebol Ltda, GUA, city:guaratingueta
+mogimirim, Mogi Mirim|Mogi Mirim EC|Mogi Mirim Esporte Clube, MOG, city:mogimirim
+botafogosp, Botafogo SP|Botafogo de Ribeirão Preto|Botafogo SP|Botafogo FC|Botafogo Futebol Clube, BSP, city:ribeiraopreto
+boaesportemg, Boa Esporte|Boa Esporte MG|Boa Esporte Clube, BOA, city:varginha
+tombense, Tombense|Tombense Futebol Clube, TOM, city:tombos
+juventuders, Juventude|Juventude de Caxias|Juventude RS|EC Juventude|Esporte Clube Juventude, JUV, city:caxiasdosul
+ypirangars, Ypiranga|Ypiranga de Erechim|Ypiranga Futebol Clube, YPI, city:erechim
+abcrn, ABC|ABC de Natal|ABC Futebol Clube, ABC, city:natal
+americanatal, América de Natal|América RN|América|América Futebol Clube, AME, city:natal
+macae, Macaé|Macaé Esporte Futebol Clube, MAC, city:macae
+salgueirope, Salgueiro|Salgueiro Atlético Clube, SAL, city:salgueiro
+fortaleza, Fortaleza|Fortaleza Esporte Clube, FOR, city:fortaleza
+remo, Remo|Clube do Remo|, REM, city:belem
+asaal, ASA|ASA de Alagoas|ASA de Arapiraca|Agremiação Sportiva Arapiraquense, ASA, city:Arapiraca
+cuiaba, Cuiaba|Cuiabá Esporte Clube, CUI, city:cuiaba
+botafogopb, Botafogo da Paraiba|Botafogo PB|Botafogo Futebol Clube, BPB, city:joaopessoa
+riverpb, River da Paraiba|River PI|River Atlético Clube, RIV, city:teresina
+
+# 2015
+# 2014
+# 2013
+
+
+##########
+# other clubs from other leagues
+
+# state championship of RS (Gauchão)
+aimore, Aimore|Clube Esportivo Aimoré, AIM, city:saoleopoldo
+cruzeiropoa, Cruzeiro RS|Esporte Clube Cruzeiro, CRU, city:cachoeirinha
+gloriars, Glória|Glória de Vacaria|Grêmio Esportivo Glória, GLO, city:vacaria
+lajeadense, Lajeadense|Clube Esportivo Lajeadense, LAJ, city:lajeado
+novohamburgo, Novo Hamburgo|EC Novo Hamburgo|Esporte Clube Novo Hamburgo, ECN, city:novohamburgo
+passofundo, Passo Fundo|Esporte Clube Passo Fundo, PFU, city:passofundo
+saojosepoa, São José de Porto Alegre|São José POA|São José RS|EC São José|Esporte Clube São José, SJO, city:portoalegre
+saopaulors, São Paulo de Rio Grande|São Paulo RS|Sport Club São Paulo, SRG, city:riogrande
+veranopolis, Veranópolis|Veranópolis Esporte Clube Recreativo e Cultural, VEC, city"veranopolis
+
+# lower division of RS (Gauchão - Divisão de acesso)
+santoangelo, Santo Ângelo|Associação Esportiva e Recreativa Santo Ângelo, SAN, city:santoangelo
+esportivors, Esportivo|Esportivo de Bento|Clube Esportivo Bento Gonçalves, EBG, city:bentogoncalves
+avenida, Avenida|Avenida de Santa Cruz|Esporte Clube Avenida, AVE, city:santacruzdosul
+intersm, Inter de SM|Inter de Santa Maria|Esporte Clube Internacional, ISM, city:santamaria
+guaraniva, Guarani de Venâncio|Guarani de Venâncio Aires|Esporte Clube Guarani, GVA, city:venancioaires
+ecpelotas, Pelotas|Esporte Clube Pelotas, ECP, city:pelotas
+saogabriel, São Gabriel|Esporte Clube São Gabriel, SGA, city:saogabriel
+saoluizijui, São Luiz de Ijui|São Luiz|Esporte Clube São Luiz, SLU, cityïjui
+marau, Marau|Futebol Clube Marau, MAR, city:marau
+santacruzrs, Santa Cruz|Futebol Clube Santa Cruz, SCZ, city:santacruzdosul
+riograndensesm, Riograndense|Riograndense Futebol Clube, RIO, city:santamaria
+brasilfarroupilha, Brasil de Farroupilha|Sociedade Esportiva Recreativa e Cultural Brasil, BRA, city:farroupilha
+sercaxias, Caxias|SER Caxias|Sociedade Esportiva e Recreativa Caxias do Sul, CAX, city:caxiasdosul
+panambi, Panambi|SER Panambi|Sociedade Esportiva Recreativa Panambi, PAN, city:panambi
+tupyrs, Tupy|Tupy RS|Tupy Futebol Clube, TUP, city:crissiumal
+uniaofrederiquense, União Frederiquense|União Frederiquense de Futebol, UFF, city:fredericowestphalen
+
+
+
+# state championship of SP (Paulistão)
+aguasantasp, Agua Santa|Agua Santa SP|Esporte Clube Água Santa, AGS, city:diadema
+audaxsp, Audax|Audax SP|Grêmio Osasco Audax , AUD, city:osasco
+capivarianosp, Capivariano|Capivariano Futebol Clube, CPV, city:capivarisp
+ferroviariasp, Ferroviária|Associação Ferroviária de Esportes, FER, city:araraquara
+ituano, Ituano|Ituano Futebol Clube, ITU, city:itu
+linense, Linense|Clube Atlético Linense, LIN, city:Lins
+novorizontino, Grêmio Novorizontino, NOV, city:novohorizonte
+redbullsp, Red Bull SP|Red Bull Brasil|RBB, RBB, city:campinas
+rioclarosp, Rio Claro|Rio Claro Futebol Clube, RIO, city:rioclarosp
+saobentosp, São Bento|Esporte Clube São Bento, SBE, city:saobentosp
+saobernardosp, São Bernardo|São Bernardo Futebol Clube, SBF, city:saobernardodocampo
+xvdepiracicaba, XV de Piracicaba|Esporte Clube XV de Novembro, XVP, city:piracicaba
+
+# state championship of RJ (Campeonato Carioca)
+americarj, América|América RJ|America Football Club, AME, city:riodejaneiro
+bangu, Bangu|Bangu Atlético Clube, BAN, city:riodejaneiro
+boavistarj, Boa Vista RJ|, BOA, city:riodejaneiro
+bonsucessorj, Bonsucesso|Bonsucesso Futebol Clube, BON, city:riodejaneiro
+cabofriense, Cabofriense|Associação Desportiva Cabofriense, CAB, city:cabofrio
+friburguense, Friburguense|Friburguense Atlético Clube, FRI, city:novafriburgo
+madureira, Madureira|Madureira Esporte Clube, MAD, city:riodejaneiro
+portuguesarj, Portuguesa RJJ|Associação Atlética Portuguesa RJ, POR, city:riodejaneiro
+resende, Resende|Resende Futebol Clube, RES, city:resende
+tigresrj, Tigres|Esporte Clube Tigres do Brasil, TIG, city:duquedecaxias
+voltaredonda, Volta Redonda|Volta Redonda Futebol Clube, VOL, city:voltaredonda
+
+
+# state championship of MG (Campeonato Mineiro)
+uberlandia, Uberlandia|Uberlândia Esporte Clube, UBE, city:uberlandia
+urt, URT|União Recreativa dos Trabalhadores, URT, city:patosdeminas
+tricordiano, Tricordiano|Clube Atlético Tricordiano, TRI, city:trescoracoes
+caldense, Caldense|Associação Atlética Caldense, CAL, city:pocodecaldas
+guaranimg, Guarani MG|Guarani Esporte Clube, GUA, city:divinopolis
+vilanovamg, Vila Nova MG|Vila Nova|Villa Nova Atlético Clube, VIL, city:novalima
+
+
+# state championship of PR (Campeonato Paranaense)
+jmalucelli, JMalucelli|J.Malucelli Futebol S/A, JMA, city:curitiba
+fozdoiguacu, Foz do Iguaçu|Foz do Iguaçu Futebol Clube, FOZ, city:fozdoiguacu
+toledopr, Toledo|Toledo PR|Toledo Colônia Work, TCW, city:toledopr
+pstc, PSTC|PSTC Procopense, PST, city:cornelioprocopio
+riobrancopr, Rio Branco|Rio Branco PR|Rio Branco Sport Club, RIO, city:paranagua
+cascavelpr, Cascavel|Futebol Clube Cascavel, FCC, city:cascavel
+maringa, Maringa|Maringá Futebol Clube, MFC, city:maringa
+operariopr, Operário PR|Operário Ferroviário Esporte Clube| OFC, city:pontagrossa
+
+
+# state championship of SC (Campeonato Catarinense)
+brusque, Brusque|Brusque Futebol Clube, BRU, city:brusque
+metropolitanosc, Metropolitano|Clube Atlético Metropolitano, MET, city:blumenau
+guaranisc, Guarani de Palhoça|Guarani de Palhoça Futebol Ltda, GUA, city:palhoca
+intersc, Inter de Lages|Esporte Clube Internacional de Lages, INT, city:lages
+camboriu, Camboriu|Camboriú Futebol Clube, CAM, city:camboriu
+
+
+# state championship of BA (Campeonato Baiano)
+flamengoba, Flamengo de Guanambi|Clube Esportivo Flamengo de Guanambi, FLA, city:guanambi
+galiciaba, Galícia|Galícia Esporte Clube, GAL, city:salvador
+juazeirense, Juazeirense|Sociedade Desportiva Juazeirense, JUA, city:juazeiro
+bahiadefeira, Bahia de Feira|Associação Desportiva Bahia de Feira, BAH, city:feiradesantana
+colocoloba, Colo Colo da Bahia|Colo Colo de Futebol e Regatas, COL, city:ilheus
+jacobina, Jacobina|Jacobina Esporte Clube, JAC, city:jacobina
+fluminenseba, Fluminense de Feira|Fluminense de Feira de Santana|Fluminense de Feira Futebol Clube, FLU, city:feiradesantana
+feirenseba, Feirense|Feirense Futebol Clube, FEI, city:feiradesantana
+vitoriadaconquista, Vitória da Conquista|Esporte Clube Primeiro Passo Vitória da Conquista, VIT, city:vitoriadaconquista
+jacuipense, Jacuipense|Esporte Clube Jacuipense, JAC, city:riachaodojacuipe
+
+
+# state championship of GO (Campeonato Goiano)
+anapolisgo, Anapolis|Anápolis Futebol Clube, AFC, city:anapolis
+cracgo, CRAC|CRAC GO|Clube Recreativo e Atlético Catalano, CRA, city:catalaogo
+itumbiara, Itumbiara|Itumbiara Esporte Clube, ITB, city:itumbiara
+trindade, Trindade|Trindade Atlético Clube, TRI, city:trindadego
+aparecidense, Aparecidense|Associação Atlética Aparecidense, APA, city:aparecidadegoiania
+anapolina, Anapolina|Anapolina GO|Associação Atlética Anapolina, AAA, city:anapolis
+goianesia, Goianésia|Goianésia Esporte Clube, GNS, city:goianesia
+
+
+# state championship of CE (Campeonato Cearense)
+uniclinic, Uniclinic|Uniclinic Atlético Clube, UNI, city:fortaleza
+maranguape, Maranguape|Maranguape Futebol Clube, MAR, city:maranguape
+icasace, Icasa|Icasa CE|Associação Desportiva Recreativa Cultural Icasa, ICA, city:juazeirodonorte
+itapipoca, Itapipoca|Itapipoca Esporte Clube, ITP, city:itapipoca
+guaranice, Guarani CE|Guarani de Juazeiro|Guarani Esporte Clube CE, GJZ, city:juazeirodonorte
+guaranyce, Guarany de Sobral|Guarani CE|Guarany Sporting Club, GSO, city:sobral
+tiradentesce, Tiradentes CE|Associação Esportiva Tiradentes, TIR, city:fortaleza
+quixada, Quixadá|Quixadá Futebol Clube, QUI, city:quixada
+
+
+# state championship of PE (Campeonato Pernambucano)
+americape, América Pe|América Futebol Clube, AME, city:recife
+atleticope, Atlético PE|Clube Atlético Pernambucano, CAP, city:carpina
+belojardim, Belo Jardim|Belo Jardim Futebol Clube, BJD, city:belojardim
+centralpe, Central PE|Central Sport Club, CEN, city:caruaru
+pesqueira, Pesqueira|Pesqueira Futebol Clube, PES, city:pesqueira
+portodecaruaru, Porto PE|Porto de Caruaru|Clube Atlético do Porto, POR, city:caruaru
+serra talhada, Serra Talhada|Serra Talhada Futebol Clube, STL, city:serratalhada
+vitoriadastabocas, Vitória PE|Associação Acadêmica e Desportiva Vitória das Tabocas, VPE, city:vitoriadesantoantao

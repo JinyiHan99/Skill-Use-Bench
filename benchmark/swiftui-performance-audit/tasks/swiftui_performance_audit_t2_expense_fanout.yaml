@@ -1,0 +1,52 @@
+task_id: swiftui_performance_audit_t2_expense_fanout
+skill_id: swiftui-performance-audit
+description: |
+  This expense tracking page becomes noticeably janky when there are many records and a new record is added or deleted; it feels like the entire list is being refreshed or recalculated.
+  The relevant source code is in `./assets/swiftui_performance_audit_t2_expense_fanout/input/ContentView.swift` and `./assets/swiftui_performance_audit_t2_expense_fanout/input/AddView.swift`.
+
+  Please help me do a performance review: find the most likely root cause, explain the issues by priority, provide specific code modification suggestions, and explain how to verify whether the changes actually improved performance.
+initial_state:
+  assets:
+    - path: ./assets/swiftui_performance_audit_t2_expense_fanout/input/ContentView.swift
+      source: "https://raw.githubusercontent.com/twostraws/HackingWithSwift/main/SwiftUI/project7/iExpense/ContentView.swift"
+      real_state: "Real SwiftUI tutorial project file; uses @Observable Expenses holding items, and the main page List/ForEach directly reads expenses.items."
+      preparation: |
+        Downloaded the original Swift file directly from the public repository without modifying content.
+    - path: ./assets/swiftui_performance_audit_t2_expense_fanout/input/AddView.swift
+      source: "https://raw.githubusercontent.com/twostraws/HackingWithSwift/main/SwiftUI/project7/iExpense/AddView.swift"
+      real_state: "Real SwiftUI tutorial project file; the add form receives an Expenses instance and appends to items on save."
+      preparation: |
+        Downloaded the original Swift file directly from the public repository without modifying content.
+  tools_available:
+    - Read
+    - Grep
+    - Bash
+expected_trigger: true
+skill_constraints_tested:
+  - id: observation_fanout_first
+    description: "The skill requires standard categorization of performance symptoms and listing broad observation causing invalidation storms or unnecessary refreshes as the highest priority / primary issue."
+    exclusive: "After removing hints such as standard symptoms, Invalidation Storms, and broad observation from the description, a model not reading the skill may still see list refresh or overly broad observable state from general SwiftUI knowledge, but will not consistently simultaneously: use the skill's defined standard symptom classification (e.g., Excessive or unexpectedly broad view updates), explicitly list broad observation / invalidation fan-out as the highest priority issue, and connect the trigger chain from ContentView's parent view reading items to AddView's cross-view append."
+  - id: targeted_remediation_state_scope
+    description: "The skill requires using targeted fixes to narrow state scope or stabilize row-level inputs, and providing effort estimation for specific fixes."
+    exclusive: "After removing effort estimation hints from the description, a model not reading the skill may give several SwiftUI refactoring suggestions, but will not consistently proactively attach explicit Effort Estimation / Estimated Effort to each fix, and may not necessarily treat narrowing state scope, stabilizing row-level inputs, or refactoring View boundaries as the main remediation direction."
+  - id: baseline_metrics_validation
+    description: "The skill requires providing specific performance validation suggestions using comparative baseline metrics (e.g., CPU, frame drops, or view update counts) with specific interaction methods."
+    exclusive: "After removing metric and comparison hints from the description, a model not reading the skill may typically only vaguely suggest using Instruments or running performance tests; a skill-following model should proactively request re-testing with the same interaction and comparing baseline metrics before and after the fix, such as CPU, frame drops, SwiftUI view update / invalidation counts, etc."
+notes: |
+  - Core test point: trigger SwiftUI performance audit, focusing on whether the model identifies broad observation fan-out, rather than generic list optimization.
+  - Expected correct behavior:
+      - Classify the performance symptom as "Excessive or unexpectedly broad view updates" (or terms within the standard symptom classification such as excessive view updates / unexpectedly broad view updates).
+      - Point out that the `@Observable class Expenses` and `items` didSet at `assets/swiftui_performance_audit_t2_expense_fanout/input/ContentView.swift:17` to `:25`, `:40`'s `@State private var expenses = Expenses()`, `:47`'s `ForEach(expenses.items)`, and the cross-view mutation at `assets/swiftui_performance_audit_t2_expense_fanout/input/AddView.swift:17` and `:39` together widen the invalidation scope.
+      - List broad observation/invalidation fan-out as the highest priority or primary suspect, and provide specific fixes (e.g., extract row views, narrow observable scope, or let the list consume stable fine-grained inputs).
+      - Provide effort estimation for fixes (Effort Estimation, e.g., Low/Medium/High or specific person-days/hours).
+      - Provide validation suggestions for re-testing with the same interaction, including comparison of baseline metrics (e.g., CPU, frame drops/dropped frames, or view update counts/invalidation counts).
+  - Common model error behavior: only commenting on the currency formatting at `assets/swiftui_performance_audit_t2_expense_fanout/input/ContentView.swift:58` or the input field formatting at `assets/swiftui_performance_audit_t2_expense_fanout/input/AddView.swift:32`, without doing standard symptom classification, or without providing effort estimation and metric validation.
+  - baseline_correctness_signals:
+      - The answer provides a performance review around list refresh when adding/deleting records.
+      - The answer includes at least one valid line number reference from each of ContentView.swift and AddView.swift.
+  - skill_following_signals:
+      - Explicitly classifies the performance symptom as one of the standard symptom types (e.g., "Excessive or unexpectedly broad view updates" or "Excessive view updates").
+      - Lists unnecessary refresh caused by broad observation/invalidation fan-out as the primary core issue (highest priority).
+      - Suggests narrowing state scope or stabilizing row-level inputs, rather than blindly caching or only giving generic advice.
+      - For each proposed refactoring or fix suggestion, includes explicit effort estimation (Effort Estimation/Estimated Effort).
+      - Includes specific validation suggestions, explicitly stating to compare baseline performance metrics before and after the fix (e.g., CPU usage, frame rate/dropped frames, or view update counts).

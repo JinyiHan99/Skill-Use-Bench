@@ -1,0 +1,61 @@
+task_id: SF25_t2_fix_flaky_test
+level: L3
+skill_id: SF25
+description: |
+  Our cache service tests intermittently fail in CI, about once every 5 builds. Locally they usually pass, but occasionally fail too. The team has not yet pinpointed the exact cause and suspects it is related to CI environment resource differences.
+
+  The code is under ./assets/SF25_t2_fix_flaky_test/. Please diagnose and fix the flaky issue in the tests, ensuring the tests can stably pass in the CI environment. If you also find non-standard build configuration, please fix it as well.
+
+initial_state:
+  assets:
+    - path: ./assets/SF25_t2_fix_flaky_test/CMakeLists.txt
+      description: "CMake build file defining project compilation and test registration"
+    - path: ./assets/SF25_t2_fix_flaky_test/include/cache.h
+      description: "TimedCache class header file"
+    - path: ./assets/SF25_t2_fix_flaky_test/src/cache.cpp
+      description: "TimedCache implementation file"
+    - path: ./assets/SF25_t2_fix_flaky_test/tests/cache_test.cpp
+      description: "Cache service test file"
+
+tools_available: [bash, read, edit, write]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: no_sleep_synchronization
+    description: "The skill prohibits using sleep/sleep_for/busy-wait for time synchronization. For a passive TTL cache, you must eliminate the dependence on real time by injecting a clock interface (Clock Injection / Fake Clock), and manually advance time in tests to verify expiry logic. condition_variable/latch/barrier are only for inter-thread state coordination scenarios."
+    exclusive: "A common practice for models that do not read the skill is to increase the sleep duration, switch to sleep_until, use busy-wait polling, or just increase the TTL to widen the margin, rather than systematically injecting a fake clock to completely eliminate real-time dependence"
+  - id: sanitizer_before_debug
+    description: "The skill requires using ASan first to investigate memory issues when diagnosing a flaky test, before considering TSan"
+    exclusive: "The model by default directly adds print/log or analyzes code logic, and will not proactively enable sanitizer"
+  - id: gtest_discover_tests_fix
+    description: "The skill requires using gtest_discover_tests() rather than add_test()"
+    exclusive: "The model will not proactively modify the existing add_test registration, thinking it already works"
+  - id: assert_for_preconditions_only
+    description: "The skill requires using ASSERT_* only at preconditions, and EXPECT_* for the rest"
+    exclusive: "The existing tests all use ASSERT_*, and the model by default will not modify the macro choice of existing assertions"
+  - id: test_file_in_scope_dir
+    description: "The skill requires test files to be placed in tests/unit/ or tests/integration/ subdirectories"
+    exclusive: "The model by default keeps the test file in the tests/ root location unchanged"
+
+pip_packages: []
+apt_packages: [cmake, g++, make]
+
+notes: |
+  Positive task (high difficulty): the model needs to diagnose and fix a flaky test. Core test points:
+  1. Whether sleep_for is removed and a fake clock is injected to eliminate real-time dependence
+  2. Whether sanitizer is enabled during diagnosis (process score, light weight)
+  3. Whether CMake's add_test is fixed to gtest_discover_tests (including include(GoogleTest))
+  4. Whether the assertion strategy is fixed (non-precondition ASSERT -> EXPECT)
+  5. Whether the test file is moved to tests/unit/ and the CMake path is updated accordingly
+
+  Flaky root cause: the test depends on real steady_clock and the scheduling precision of sleep_for; in the same test it asserts both that the short TTL has expired and that the long TTL has not expired; under CI resource constraints sleep_for may seriously overshoot, causing the long-TTL entry to also accidentally expire. The correct fix is to inject a fake clock so time advancement is controllable.
+
+  Scoring boundaries:
+  - Increasing sleep time -> zero score
+  - Switching to busy-wait / wait_for real time -> zero score
+  - Injecting a Clock but the test still sleeps before advancing -> partial score
+  - Completely fake clock + manual advance + zero real waiting -> full score
+
+  gtest_discover_tests should be paired with a PROPERTIES LABELS "unit" label.
+  sanitizer is a process-trace score (light weight 5-10%); check whether -fsanitize=address appears in the bash history for compilation and running; for small projects the model may skip it but lose a small amount of score.

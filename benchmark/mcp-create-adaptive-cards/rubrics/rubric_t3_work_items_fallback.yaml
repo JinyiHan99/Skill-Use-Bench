@@ -1,0 +1,148 @@
+# Rubric for skill_77 mcp-create-adaptive-cards — t3_work_items_fallback
+
+rubric_id: skill_77_mcp_create_adaptive_cards_t3_work_items_fallback
+task_id: mcp_adaptive_cards_t3_work_items_fallback
+skill_id: mcp-create-adaptive-cards
+rules:
+  - id: g1_work_items_manifest_evaluable
+    type: required-tool
+    provenance: gate
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The work-items plugin manifest must remain present so combined template behavior is evaluable.
+    signal:
+      file: "assets/mcp_adaptive_cards_t3_work_items_fallback/input/work-items-plugin/ai-plugin.json"
+      file_must_contain:
+        - '"functions"\s*:\s*\['
+        - '"name"\s*:\s*"ListRepositoryIssues"'
+
+  - id: r1_combines_selector_with_static_fallback
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] For mixed items where some rows may lack a selector, configure both a dynamic
+      properties.template_selector and a response_semantics.static_template fallback in the same function.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to pick one: only a static_template or only a dynamic selector; the skill
+      requires Y to use the static_template default card when the selector fails to resolve/is missing; the conflict point Z is "single path" vs "dynamic template + static fallback combination."
+    signal:
+      judge_context_window:
+        - serialized_steps
+      query: >
+        Based on the final written ai-plugin.json file content inside the Write/Edit tool calls in the trace, does the response_semantics block of the ListRepositoryIssues function contain both properties.template_selector and static_template?
+        Do NOT rely on conversational claims or planning text. Answer YES only if both are defined in the same response_semantics block for that function. Answer NO if either one is absent, placed outside response_semantics, or if they are only mentioned in the agent's explanation.
+      acceptable: '"response_semantics": { "data_path": "$.items", "properties": { "title": "...", "template_selector": "$.cardTemplate" }, "static_template": { "type": "AdaptiveCard" } }'
+      unacceptable: 'The manifest configures template_selector under properties but lacks a static_template inside response_semantics, or only defines static_template but no template_selector.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_selector_under_properties_preserves_citations
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] template_selector belongs under response_semantics.properties alongside existing title,
+      subtitle, and url mappings, without replacing citation mappings.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to put the selector at the response_semantics root level or replace properties with card config; the skill
+      requires Y to keep it inside properties while preserving citation mappings; the conflict point Z is "wrong mount / replacing citation properties" vs
+      "selector coexisting with citation properties."
+    signal:
+      file: "assets/mcp_adaptive_cards_t3_work_items_fallback/input/work-items-plugin/ai-plugin.json"
+      file_must_contain:
+        - '"properties"\s*:\s*\{[\s\S]{0,1500}"title"\s*:\s*"\$\.title"'
+        - '"properties"\s*:\s*\{[\s\S]{0,1500}"subtitle"\s*:\s*"\$\.state"'
+        - '"properties"\s*:\s*\{[\s\S]{0,1500}"url"\s*:\s*"\$\.html_url"'
+        - '"properties"\s*:\s*\{[\s\S]{0,1500}"template_selector"\s*:\s*"\$\.[A-Za-z0-9_]+"'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_fallback_template_handles_selectorless_nullable_body
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The static fallback card should render fields available on selectorless imported rows and
+      guard nullable body/secondary text with if(...), $when, or equivalent template safeguards.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to design templates only for new issue/PR rows or bind ${body} raw; the skill
+      requires Y to have selector-missing rows fall back to static_template with null-safe fields; the conflict point Z is "old data loss / raw null binding"
+      vs "static fallback + nullable guard."
+    signal:
+      judge_context_window:
+        - serialized_steps
+      query: >
+        Based on the final written ai-plugin.json file inside the Write/Edit tool calls in the trace, does the static_template provide a safe rendering path for selectorless rows?
+        Answer YES if the static_template displays common fields (e.g., title, state, url) and either (1) does NOT render the body field, or (2) renders the body field using a template safeguard (such as the "if(body, ...)" function, a "$when": "body != null" condition, or equivalent Adaptive Card null-safe template syntax).
+        Answer NO if the static_template binds the nullable body field raw (e.g., "${body}") without any conditional guard, or if no static_template is configured. Do NOT rely on conversational claims.
+      acceptable: 'The static_template has a TextBlock displaying title and a TextBlock displaying body with "${if(body, body, ''No description'')}", or the static_template does not reference body at all.'
+      unacceptable: 'The static_template references body raw as "${body}" without any if() or $when guard.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_sample_retains_selectorless_item_and_embedded_dynamic_templates
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The response/sample should retain older selectorless rows while providing selector references
+      and embedded templates for issue-like and pull-request-like rows.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to normalize all rows by adding selectors or drop old rows; the skill requires Y to
+      provide dynamic templates for typed rows plus static fallback when the selector is missing; the conflict point Z is "eliminating data that lacks a selector" vs
+      "retaining selector-missing rows and relying on fallback."
+    signal:
+      judge_context_window:
+        - serialized_steps
+      query: >
+        Based on the final written sample-response.json file inside the Write/Edit tool calls in the trace, does the sample response preserve at least one selectorless item while referencing and defining embedded templates for issue-like and pull-request-like items?
+        Answer YES only if: (1) at least one item remains in the list without any template selector property (e.g., no cardTemplate or displayTemplate field), (2) other items contain a template selector pointing to dynamic templates, and (3) the referenced dynamic templates are actually defined within the response object.
+        Answer NO if all items are modified to have a template selector, if the selectorless item is removed, or if the embedded templates themselves are not defined in the JSON file. Do NOT rely on conversation.
+      acceptable: 'The "items" array contains one item with no "cardTemplate" property, while other items have "cardTemplate": "$.templates.issue" and "$.templates.pullRequest", and the "templates" object defining "issue" and "pullRequest" is present.'
+      unacceptable: 'All items are given "cardTemplate" fields, or the older selectorless item has been deleted from the array, or templates are not embedded in the response.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: llm-judge
+    severity: info
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The work-items plugin visually distinguishes issues and pull requests without
+      changing ListRepositoryIssues or dropping older imported rows.
+    signal:
+      judge_context_window:
+        - serialized_steps
+      query: >
+        Based on the final written ai-plugin.json and sample-response.json files inside the Write/Edit tool calls in the trace, does the solution keep ListRepositoryIssues unmodified, preserve the older selectorless imported row, and add visual adaptive card templates to distinguish issues and pull requests?
+        Answer YES only if: (1) the function operation ID remains ListRepositoryIssues, (2) the selectorless third item in sample-response.json is preserved, and (3) appropriate Adaptive Card templates are defined to visually distinguish issues and pull requests.
+        Answer NO otherwise. Do NOT rely on conversational claims.
+      acceptable: "Operation remains ListRepositoryIssues, the selectorless imported row is still in the sample response, and adaptive card definitions are added for visual triage."
+      unacceptable: "The operation name is changed, the selectorless row is dropped, or no adaptive card templates are implemented."

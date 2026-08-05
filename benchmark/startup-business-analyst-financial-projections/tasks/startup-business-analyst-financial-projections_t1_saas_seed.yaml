@@ -1,0 +1,56 @@
+task_id: startup-business-analyst-financial-projections_t1_saas_seed
+skill_id: startup-business-analyst-financial-projections
+description: |
+  We are preparing for a seed investor meeting for a developer-tools subscription startup. We have 62 paying teams, about $31k monthly recurring revenue, 7 employees, and $720k in the bank. The founders expect a board-ready planning model that is credible against a public developer-tools company, using the filing materials in `assets/startup-business-analyst-financial-projections_t1_saas_seed/input/gitlab_companyfacts.json` and `assets/startup-business-analyst-financial-projections_t1_saas_seed/input/gitlab_s1.html` as outside context.
+
+  Please produce the model and investor-facing write-up in `output/seed_financial_projection.md`. If any assumptions are missing, make reasonable explicit assumptions and flag them as assumptions rather than stopping.
+initial_state:
+  assets:
+    - path: assets/startup-business-analyst-financial-projections_t1_saas_seed/input/gitlab_companyfacts.json
+      source: "https://data.sec.gov/api/xbrl/companyfacts/CIK0001653482.json"
+      real_state: "SEC companyfacts JSON for GitLab Inc., downloaded from the SEC data API; valid JSON, 1,271,422 bytes."
+      preparation: |
+        Downloaded directly with a SEC-compliant User-Agent and validated as JSON with python3 -m json.tool. No content was synthesized.
+    - path: assets/startup-business-analyst-financial-projections_t1_saas_seed/input/gitlab_s1.html
+      source: "https://www.sec.gov/Archives/edgar/data/1653482/000162828021018818/gitlab-sx1.htm"
+      real_state: "GitLab Inc. S-1 registration statement HTML from SEC EDGAR, 2,910,802 bytes."
+      preparation: |
+        Downloaded directly from SEC EDGAR with a SEC-compliant User-Agent. No content was synthesized.
+  tools_available:
+    - file_read
+    - markdown_write
+    - spreadsheet_creation
+expected_trigger: true
+skill_constraints_tested:
+  - id: cohort_based_revenue_projection
+    description: "The skill requires revenue to be modeled by cohorts, tracking new customers, retained customers after churn, cohort revenue, and expansion rather than using a single top-down growth line."
+    exclusive: "Without the skill, a strong model may include churn and expansion assumptions in an aggregate monthly MRR ramp, but is less likely to explicitly track customer cohorts, retained customers by cohort, cohort revenue, and expansion revenue as separate modeled components."
+  - id: projection_granularity_by_year
+    description: "The skill requires monthly detail for years 1-2, quarterly detail for year 3, and annual summaries for years 4-5."
+    exclusive: "Without the skill, a model will often provide only annual 3-year projections or a flat 12-month forecast."
+  - id: scenario_multipliers
+    description: "The skill requires conservative/base/optimistic scenario modeling. Scenarios should vary the core SaaS operating drivers together, such as customer acquisition, churn/retention, pricing or ARPU, and customer acquisition cost, rather than changing only a single top-line growth rate."
+    exclusive: "Without the skill, scenarios may remain qualitative or adjust only a single revenue growth assumption. Skill-following behavior should build conservative/base/optimistic cases by systematically varying multiple SaaS drivers such as acquisition volume, churn/retention, ARPU/pricing, and CAC."
+  - id: key_metrics_targets
+    description: "The skill calls for key startup metrics including CAC, LTV, burn rate, and runway. A strong skill-following output should connect these metrics back to the revenue, cost, and cash-flow model rather than listing them separately."
+    exclusive: "Without the skill, outputs may include revenue, expenses, and cash flow but omit a clearly modeled startup metric layer. Skill-following behavior should derive CAC, LTV, burn rate, and runway from the operating model and use them to assess fundraising readiness."
+notes: |
+  - Core test: the task should trigger a full startup financial projection workflow, not a generic fundraising memo.
+  - Expected correct behavior: create a 3-5 year model and write-up in `output/seed_financial_projection.md`, grounded in the provided GitLab public materials while clearly separating benchmark context from the startup's own assumptions.
+  - Common incorrect behavior examples:
+      - The model creates only `Year 1`, `Year 2`, and `Year 3` rows and omits the skill-required monthly detail for the first two years and annual years 4-5 summary.
+      - The revenue table uses `MRR = prior month MRR * growth_rate` only, with no rows or columns for new teams, retained teams after churn, expansion revenue, or cohort retention.
+      - Scenario output labels cases as "downside/base/upside" but changes only a single revenue growth rate, instead of varying acquisition, churn/retention, pricing or ARPU, and CAC as linked operating drivers.
+      - The investor write-up reports ARR but does not derive CAC, LTV, burn rate, or runway from the model, or treats these metrics as disconnected narrative claims.
+  - baseline_correctness_signals:
+      - `output/seed_financial_projection.md` exists and is non-empty.
+      - The output uses the two declared asset paths to reference GitLab public filing context, such as margin structure or scaling benchmarks, while keeping the startup's own starting MRR ($31k), customer count (62), headcount (7), and cash balance ($720k) as the projection base.
+      - The output contains coherent revenue, expense, cash, and funding assumptions for the stated startup.
+  - skill_following_signals:
+      - Revenue model is cohort-based with churn and expansion applied to retained customers.
+      - Projection granularity covers monthly years 1-2, quarterly year 3, and annual years 4-5.
+      - Cost structure is broken into COGS, Sales & Marketing, R&D, and G&A.
+      - Headcount plan includes role/department timing and fully-loaded compensation assumptions.
+      - Cash-flow section includes beginning cash, cash collected, expenses, ending cash, burn, runway, and funding event impact.
+      - Conservative/base/optimistic scenarios vary multiple SaaS operating drivers together, including acquisition, churn/retention, pricing or ARPU, and CAC.
+      - Key metrics include CAC, LTV, burn rate, and runway, with calculations tied to the modeled revenue, cost, and cash-flow assumptions.

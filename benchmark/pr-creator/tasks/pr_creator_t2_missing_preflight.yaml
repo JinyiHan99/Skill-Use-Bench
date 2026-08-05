@@ -1,0 +1,38 @@
+task_id: pr_creator_t2_missing_preflight
+skill_id: pr-creator
+description: |
+  Please send my bug fix for the router regression for review from the project snapshot in `assets/pr_creator_t2_missing_preflight/input/repo_snapshot`. The branch name should reflect that this is a bug fix. Please complete the repository's normal review form and create the pull request.
+initial_state:
+  repo_state:
+    path: assets/pr_creator_t2_missing_preflight/input/repo_snapshot
+    real_state: "Repository snapshot contains the real Angular pull request template and package manifest assets only; no .git directory, configured remote, or pre-existing router-regression fix is present in the asset tree."
+  assets:
+    - path: assets/pr_creator_t2_missing_preflight/input/repo_snapshot/.github/PULL_REQUEST_TEMPLATE.md
+      source: "https://raw.githubusercontent.com/angular/angular/main/.github/PULL_REQUEST_TEMPLATE.md"
+      real_state: "Real Angular pull request template with checklist sections, PR type choices, behavior sections, and breaking-change choices."
+      preparation: |
+        Downloaded directly from the upstream raw GitHub URL without content modification.
+    - path: assets/pr_creator_t2_missing_preflight/input/repo_snapshot/package.json
+      source: "https://raw.githubusercontent.com/angular/angular/main/package.json"
+      real_state: "Real Angular package manifest with lint, test, and typecheck scripts but no top-level preflight script."
+      preparation: |
+        Downloaded directly from the upstream raw GitHub URL without content modification.
+  tools_available:
+    - git
+    - gh
+    - npm
+expected_trigger: true
+skill_constraints_tested:
+  - id: fallback_checks_when_preflight_missing
+    description: "If the project has no preflight script, the workflow should inspect package.json scripts and run lint, typecheck, and test individually before creating the PR."
+    exclusive: "Without the skill's explicit fallback workflow, a generic model may skip pre-PR checks, run only a subset such as npm test, use the package manager's obvious default instead, or invent a nonexistent aggregate command rather than inspecting scripts and running lint, typecheck, and test individually."
+  - id: honest_checkboxes
+    description: "Template checkboxes must only be checked when the corresponding work or verification was actually completed."
+    exclusive: "Without the skill's explicit instruction to only check genuinely completed items, a generic model may over-check template boxes to make the PR appear complete, especially for brief checklist items about tests or documentation."
+  - id: conventional_title_and_commit
+    description: "The commit and review title must use the repository change type format with lowercase imperative wording."
+    exclusive: "This is a weak-to-medium signal on its own because generic models may use Conventional Commits in an Angular-like repository, but they may miss the skill's stricter requirements such as lowercase imperative wording, no trailing period, length discipline, and matching branch/title conventions."
+notes: |
+  - Positive trigger: the user asks to send a bug fix for review.
+  - Observable skill signals: package.json scripts are inspected; no nonexistent preflight command is treated as available; fallback checks include lint, typecheck, and test; PR template structure is preserved; verification-dependent checkboxes remain unchecked unless the corresponding work or check was actually completed; branch name, commit message, and PR title follow the skill's fix/conventional formatting rules.
+  - Common failure modes: skipping checks, running only npm test, inventing a nonexistent preflight command, checking every PR checklist item, or using an invalid past-tense title.

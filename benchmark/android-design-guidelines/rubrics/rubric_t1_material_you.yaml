@@ -1,0 +1,130 @@
+# Rubric for skill_66_android_design_guidelines_material — t1_material_you
+
+rules:
+  # ── GATE ────────────────────────────
+  - id: g1_observable_theme_output
+    type: required-tool
+    provenance: gate
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [GATE] The final artifacts should contain an evaluable output/Theme.kt theme implementation.
+    signal:
+      file: "output/Theme.kt"
+      file_must_contain: 'fun\s+NiaTheme\s*\('
+
+  # ── SKILL-FOLLOWING ─────────────────
+  - id: r1_dynamic_color_default_enabled
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The non-brand theme path should enable Android 12+ dynamic color by default, rather than disabling it.
+      Skill-exclusive rationale: looking only at the task description, a strong model may conservatively keep disableDynamicTheming=true
+      to reduce reuse risk; the skill explicitly requires Dynamic Color to be the default primary theme strategy on Android 12+, and the conflict point is that the default parameter must switch to enabling dynamic color.
+    signal:
+      file: "output/Theme.kt"
+      file_must_contain: '(disableDynamicTheming\s*:\s*Boolean\s*=\s*false|(?:dynamicColor|enableDynamicColor|enableDynamicTheming)\s*:\s*Boolean\s*=\s*true)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_static_fallback_below_android_12
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Dynamic color can only be used on supported Android 12+ devices; on lower versions or when explicitly disabled, it must fall back to the static light/dark palettes.
+      Skill-exclusive rationale: without reading the skill, a model may simply change the theme to always use dynamicLightColorScheme/dynamicDarkColorScheme,
+      or only flip the default parameter; the skill requires dynamic theming to coexist with static fallback, and the conflict point is that dynamic color must not become the sole unconditional path.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/Theme.kt, ignoring the agent's self-description: does NiaTheme's colorScheme selection use dynamicLightColorScheme/dynamicDarkColorScheme when the dynamic theming toggle is enabled and the device supports Android S+, and fall back to the static light/dark palettes on lower versions, unsupported dynamic color, or when dynamic theming is disabled? Helpers, different variable names, and equivalent if/when control flow are allowed. Answer YES or NO.
+      acceptable: "dynamicColor/enableDynamicTheming toggle defaults to enabled; only when Build.VERSION.SDK_INT >= S and the toggle is enabled does it use the dynamic scheme; otherwise it selects LightDefaultColorScheme/DarkDefaultColorScheme or an equivalent static scheme based on darkTheme."
+      unacceptable: "Unconditionally calling dynamicLightColorScheme/dynamicDarkColorScheme, or removing the LightDefaultColorScheme/DarkDefaultColorScheme static fallback for lower versions or when dynamic theming is disabled."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_android_theme_override_preserved
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    severity: hard
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] Preserve the task semantics that when androidTheme=true the brand palette explicitly overrides dynamic theming.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/Theme.kt, ignoring the agent's self-description: when androidTheme is true, does the code select LightAndroidColorScheme/DarkAndroidColorScheme instead of entering the dynamicLightColorScheme/dynamicDarkColorScheme branch? Answer YES or NO.
+      acceptable: "The colorScheme when/if branch handles androidTheme first -> if (darkTheme) DarkAndroidColorScheme else LightAndroidColorScheme."
+      unacceptable: "When androidTheme=true it may still use dynamic color, or the androidTheme parameter/brand palette is removed."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: low
+
+  - id: r4_no_pure_black_brand_dark_surfaces
+    type: forbidden-arg
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Large-area backgrounds, containers, and gradient extensions in the brand dark path should not use Color.Black or #000000 pure-black surfaces.
+      Skill-exclusive rationale: without reading the skill, a model may only fix the default theme path, or treat Color.Black as a common dark-theme choice; the skill explicitly prohibits pure-black large-area surfaces in Material 3 dark themes,
+      and the conflict point is that extensions such as DarkAndroidGradientColors/DarkAndroidBackgroundTheme must also avoid pure black.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/Theme.kt, ignoring the agent's self-description: do all brand dark large-area surface/container/background/gradient extensions avoid using Color.Black or #000000 pure black? This rule only checks whether pure black is still used; it does not require these colors to be derived from colorScheme. Answer YES or NO.
+      acceptable: "DarkAndroidGradientColors, DarkAndroidBackgroundTheme, and other brand dark large-area colors are no longer Color.Black/#000000."
+      unacceptable: "DarkAndroidGradientColors(container = Color.Black), DarkAndroidBackgroundTheme(color = Color.Black), or equivalent #000000 still exist."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_theme_extensions_follow_color_roles
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Theme extensions such as GradientColors and BackgroundTheme should derive from semantic roles of the current Material colorScheme, staying consistent with dynamic themes, dark themes, and brand themes.
+      Skill-exclusive rationale: looking only at the task description, a model may only modify MaterialTheme.colorScheme or replace extension constants with another static color; the skill requires components and extensions to avoid hardcoded colors and use semantic color roles,
+      and the conflict point is that custom CompositionLocals must also follow the current scheme rather than retaining detached constants.
+    signal:
+      query: |
+        Judge based on the actual content of the final output/Theme.kt, ignoring the agent's self-description: across all theme paths, especially the androidTheme=true brand path, are the large-area container/background colors provided to GradientColors/BackgroundTheme derived from the currently selected colorScheme or corresponding Material color roles, rather than continuing to reference hardcoded constant objects such as Color.Black and DarkGreenGray95? Answer YES or NO.
+      acceptable: "GradientColors/BackgroundTheme in the default, dynamic fallback, and androidTheme branches use semantic roles such as colorScheme.surface, surfaceVariant, surfaceColorAtElevation, primaryContainer, or values derived from the currently selected colorScheme."
+      unacceptable: "MaterialTheme.colorScheme is changed but LocalGradientColors/LocalBackgroundTheme in the androidTheme brand path still use fixed black or fixed gray-green large-area background constants."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  # ── TASK COMPLETION (bypass, not counted toward skill-following) ────
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/Theme.kt produces reusable theme modifications, and output/review.md briefly describes the user-perceivable theme issues.
+    signal:
+      query: |
+        Judge based only on the final file contents: does output/Theme.kt contain the NiaTheme theme implementation with actual modifications to dynamic theming/brand theme/light-dark theme paths, and does output/review.md exist and describe these user-perceivable theme changes? Answer YES or NO.
+      acceptable: "Theme.kt contains NiaTheme with dynamic theme/fallback modifications; review.md mentions dynamic color, dark surfaces, or brand theme consistency."
+      unacceptable: "Only writes review.md without modifying Theme.kt, or Theme.kt is missing the core theme function."

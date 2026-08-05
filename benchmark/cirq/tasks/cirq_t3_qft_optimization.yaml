@@ -1,0 +1,28 @@
+task_id: cirq_t3_qft_optimization
+skill_id: cirq
+description: |
+  I need a review artifact for the Fourier-transform circuit in `assets/cirq_t3_qft_optimization/input/quantum_fourier_transform.py`. Please create `output/qft_review.py` and `output/qft_review.json` that capture the original circuit along with a cleaner equivalent version suitable for review, with evidence that the rewrite is correct and a summary of what changed.
+
+  Do not edit the input file. The JSON should contain enough detail for a reviewer to evaluate the rewrite.
+initial_state:
+  assets:
+    - path: assets/cirq_t3_qft_optimization/input/quantum_fourier_transform.py
+      source: "https://raw.githubusercontent.com/quantumlib/Cirq/main/examples/quantum_fourier_transform.py"
+      real_state: "Official Cirq Quantum Fourier Transform Python example for a 2x2 grid of qubits."
+      preparation: |
+        Downloaded the raw example file without modifying its contents.
+  tools_available:
+    - python
+    - package_manager
+expected_trigger: true
+skill_constraints_tested:
+  - id: transformation_with_validation
+    description: "Circuit simplification/optimization should be followed by a correctness check against the original circuit, such as comparing final states or equivalent observables."
+    exclusive: "Without the skill, a model asked for evidence that a rewrite is correct may rely on qualitative reasoning, circuit diagrams, or sampling-style checks. The skill guides the model toward rigorous simulation-based validation, such as comparing final states or equivalent observables."
+  - id: depth_and_gate_count_tracking
+    description: "Optimization work should report depth and operation-count changes before and after transformation."
+    exclusive: "Without the skill, a model asked for a summary of what changed may describe the rewrite narratively. The skill directs the model to quantify circuit changes with before/after depth and operation-count metrics."
+notes: |
+  - Positive task: circuit review and transformation for a Cirq Quantum Fourier Transform example should trigger the skill.
+  - Observable signals should be checked in the produced review artifacts, not spelled out in the user-facing description.
+  - Common failure: producing only subjective review comments or an unvalidated rewrite.

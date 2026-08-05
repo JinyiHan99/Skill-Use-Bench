@@ -1,0 +1,5 @@
+account_code,description,debit,credit,posting_date
+5000,Salaries & Wages - Regular,21890.77,0,2024-12-31
+2100,Employee Deductions Payable,0,5472.83,2024-12-31
+1010,Payroll Clearing Account,0,16417.94,2024-12-31
+5000,Salaries & Wages - Adjustment,0,0,2024-12-31

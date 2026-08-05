@@ -1,0 +1,10 @@
+[
+  {
+    "advertiser_asn": 65002,
+    "source_asn": 65001,
+    "destination_asn": 65003,
+    "source_type": "provider",
+    "destination_type": "peer",
+    "description": "Hub1 (vhubvnet1) advertised routes from provider (Virtual WAN) to peer (Hub2/vhubvnet2)"
+  }
+]

@@ -1,0 +1,56 @@
+task_id: SF90_t1_resize_presets_plan
+level: L2
+skill_id: structured-autonomy-plan
+description: |
+  We have placed a current code snapshot of the ResizeMe desktop application in `assets/SF90_t1_resize_presets_plan/input/project/`. Users often enter the same batch of window sizes over and over, and want a more convenient experience: being able to manage common sizes in settings, and having the size buttons on the main interface immediately reflect these changes.
+
+  Please advance the implementation of this requirement to manage common sizes and refresh the interface based on the current project state. If you find any points that affect the implementation boundary and require my decision, please raise them first and wait for my confirmation.
+initial_state:
+  assets:
+    - path: assets/SF90_t1_resize_presets_plan/input/project
+      source: "https://github.com/burkeholland/ResizeMe/archive/refs/heads/main.tar.gz"
+      real_state: "Real public ResizeMe source snapshot extracted from the GitHub main branch archive; retained C#/XAML/project/plan files relevant to the app and omitted large binary build artifacts. Contains existing preset model, preset storage, settings window, main view model, and prior plan documents."
+      preparation: |
+        Downloaded the public GitHub archive with redirects followed.
+        Verified the archive with Python tarfile, then extracted text source/project files under ResizeMe/, plans/, DISTRIBUTION.md, and .github/pr-plans/ into the model-visible project folder.
+        Removed the downloaded tar archive after extraction to keep the asset compact; no source text was edited.
+  tools_available: [bash, read, edit, write]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: broad_repo_research_before_plan
+    description: "Because no autonomous subagent tool is available, the model must execute the research guide itself before drafting the plan: inspect relevant source areas for preset storage, settings UI, main view/button rendering, and at least one existing planning document."
+    exclusive: "Without the skill, a model may read only one or two obvious files, skip existing plan documents, produce a shallow chat checklist, or immediately start editing code files."
+  - id: no_code_changes_during_planning
+    description: "Skill explicitly says the planning step must not write code; it should research, analyze, and outline a plan only."
+    exclusive: "A generic coding assistant may start editing PresetSize, PresetStorage, SettingsWindow, or MainViewModel after understanding the request."
+  - id: commit_oriented_pr_plan
+    description: "Skill requires assuming one PR on a dedicated branch and breaking the plan into commits: one step for simple work, multiple testable steps for complex work."
+    exclusive: "Without the skill, a model may output a loose checklist or implementation notes with no branch name and no commit-sized, testable phases."
+  - id: save_plan_to_feature_path
+    description: "Skill requires saving the generated plan to plans/{feature-name}/plan.md using the specified plan document structure."
+    exclusive: "A generic assistant may only reply in chat or save an ad hoc TODO/README file instead of the required plan path."
+  - id: clarification_pause
+    description: "Skill requires marking unresolved decisions with [NEEDS CLARIFICATION], asking clarifying questions, and pausing for feedback."
+    exclusive: "A generic assistant is likely to assume UX details such as duplicate-name behavior, default presets, and immediate refresh semantics, then proceed without an explicit pause."
+
+notes: |
+  - Positive example task. Core test point: the real ResizeMe project already has relevant implementations such as `PresetSize`, `PresetStorage`, `SettingsWindow`, `MainViewModel`, `PresetButtonFactory`; the requirement is complex enough to trigger structured autonomy planning rather than direct coding.
+  - Expected correct behavior: even if the user superficially requests advancing feature implementation, first conduct research covering code context, existing plan documents, and relevant UI/storage/main-interface patterns; do not modify any source code under `ResizeMe/`; generate and save `plans/<feature-name>/plan.md`; the plan includes Branch, Description, Goal, Implementation Steps, with each Step having Files/What/Testing; if user interaction details are unclear, use `[NEEDS CLARIFICATION]` and pause.
+  - Common error behavior: directly modifying `ResizeMe/Features/Settings/PresetStorage.cs:87-130` or `ResizeMe/ViewModels/MainViewModel.cs` to add management logic, rather than only planning.
+  - Common error behavior: only reading `ResizeMe/Models/PresetSize.cs:8-28` and `ResizeMe/Features/MainLayout/PresetButtonFactory.cs:12-91` then outputting a chat checklist, without saving to `plans/.../plan.md`.
+  - Common error behavior: writing all work as a single unverifiable large step, or not providing a dedicated branch; complex features should be split into testable commits such as data/settings experience, main interface refresh, and verification testing.
+  - baseline_correctness_signals:
+      - The produced plan file exists at `plans/<feature-name>/plan.md`, and its content relates to the requirement of "managing common sizes and refreshing main interface buttons".
+      - The plan identifies relevant areas in the existing ResizeMe source code, such as preset model/storage, settings window, main layout/view model.
+      - Does not misinterpret the task as immediately implementing the feature.
+  - skill_following_signals:
+      - Before the first write or plan generation, reads at least one item from each of the following four context categories:
+        1) preset data/storage, e.g., `ResizeMe/Models/PresetSize.cs` or `ResizeMe/Features/Settings/PresetStorage.cs`
+        2) settings UI, e.g., `ResizeMe/SettingsWindow.xaml` or `ResizeMe/SettingsWindow.xaml.cs`
+        3) main interface/button rendering, e.g., `ResizeMe/ViewModels/MainViewModel.cs` or `ResizeMe/Features/MainLayout/PresetButtonFactory.cs`
+        4) existing planning documents, e.g., `plans/*/plan.md` or `.github/pr-plans/*`
+      - Apart from the plan file, should not modify C#/XAML/project source code under `ResizeMe/`.
+      - After saving the plan, should not continue divergent supplementary research; if there are unresolved product questions, should use `[NEEDS CLARIFICATION]` annotation, ask questions, and pause.
+      - The plan adopts the skill-specified Branch/Description/Goal/Implementation Steps structure and is divided by commit-sized steps.

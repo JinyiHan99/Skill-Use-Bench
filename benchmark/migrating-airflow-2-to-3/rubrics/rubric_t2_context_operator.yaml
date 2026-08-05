@@ -1,0 +1,83 @@
+# Rubric for skill_73_airflow_2_to_3_migration — airflow_2_to_3_t2_context_operator
+# Scoring boundary: skill is scored; task only records completion rate; gate only judges evaluability.
+
+rules:
+  - id: r1_replace_templates_dict_read
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — exclusive] When reading the rendered query in a Python callable, it must be obtained from params/context, and must not continue reading the removed context key `templates_dict`.
+      Skill-exclusive rationale: Looking only at the task description, a strong model may only update imports and keep runtime kwargs access; the skill's Context Key Changes table explicitly maps `templates_dict` -> `context["params"]`. The conflict point is that the old context key must not continue to be used as a read source in the Airflow 3 migration.
+    signal:
+      file: "assets/airflow_2_to_3_t2_context_operator/input/dags/example_python_operator.py"
+      file_must_contain: '(?s)def\s+log_sql\s*\([^)]*\)\s*:[\s\S]{0,400}\b(?:kwargs|context)\s*(?:\[\s*["'']params["'']\s*\]|\.get\(\s*["'']params["'']\s*\))\s*(?:\[\s*["'']query["'']\s*\]|\.get\(\s*["'']query["'']\s*\))'
+      file_must_not_contain: '(?s)def\s+log_sql\s*\([^)]*\)\s*:[\s\S]{0,400}\btemplates_dict\b'
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_replace_templates_dict_writer_with_params
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — exclusive] The operator wiring for `log_the_sql` must pass the query via params, not the removed `templates_dict` parameter.
+      Skill-exclusive rationale: Without reading the skill, the model may hardcode the SQL path, switch to op_kwargs, or only fix the callable read; the skill's removed-key replacement is params/context. The conflict point is that the write side must also move to params to keep Airflow 3-compatible templating.
+    signal:
+      file: "assets/airflow_2_to_3_t2_context_operator/input/dags/example_python_operator.py"
+      file_must_contain: '(?s)\blog_the_sql\s*=\s*PythonOperator\s*\([\s\S]{0,600}\bparams\s*=\s*(?:\{\s*["'']query["'']\s*:\s*["'']sql/sample\.sql["'']\s*,?\s*\}|dict\s*\(\s*query\s*=\s*["'']sql/sample\.sql["'']\s*,?\s*\))'
+      file_must_not_contain: '(?s)\blog_the_sql\s*=\s*PythonOperator\s*\([\s\S]{0,600}\btemplates_dict\s*='
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_preserve_sql_template_rendering_with_params
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] The target DAG should still keep the SQL template rendering extension setting `templates_exts=[".sql"]`.
+    signal:
+      file: "assets/airflow_2_to_3_t2_context_operator/input/dags/example_python_operator.py"
+      file_must_contain: 'templates_exts\s*=\s*[\(\[]\s*["'']\.sql["'']\s*,?\s*[\)\]]'
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r4_standard_provider_python_operator_import
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] The Airflow 3 standard provider import path for classic Python operators can serve as a migration task completion check, but is not the main skill score.
+    signal:
+      file: "assets/airflow_2_to_3_t2_context_operator/input/dags/example_python_operator.py"
+      file_must_contain: '(?m)^\s*from\s+airflow\.providers\.standard\.operators\.python\s+import\s+(?:\([\s\S]*?\bPythonOperator\b[\s\S]*?\)|[^\n#]*\bPythonOperator\b)'
+      file_must_not_contain: '(?m)^\s*from\s+airflow\.operators\.python\s+import\s+(?:\([\s\S]*?\bPythonOperator\b[\s\S]*?\)|[^\n#]*\bPythonOperator\b)'
+    review:
+      proposed_by: ["codebuddy"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Whether the target DAG still keeps the original example behavior and becomes a runnable migration result.
+    signal:
+      file: "assets/airflow_2_to_3_t2_context_operator/input/dags/example_python_operator.py"
+      file_must_contain: '(?s)(?=.*\bdef\s+print_context\s*\()(?=.*\bdef\s+log_sql\s*\()(?=.*sleeping_task)(?=.*\bPythonVirtualenvOperator\b)(?=.*\bExternalPythonOperator\b)(?=.*["'']sql/sample\.sql["''])(?=.*templates_exts\s*=\s*[\(\[]\s*["'']\.sql["'']\s*,?\s*[\)\]])'

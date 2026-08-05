@@ -1,0 +1,142 @@
+task_id: SF49_t1_drone_planning_control
+level: L2
+skill_id: skill_49_position_controller_trajectory_planner
+description: >
+  Given the physical parameters of a quadrotor drone
+  (assets/SF49_t1_drone_planning_control/system_params.yaml) and a set of
+  natural-language flight commands
+  (assets/SF49_t1_drone_planning_control/commands/), build a simulation
+  that plans trajectories and controls the drone to execute each command
+  in 3D.
+
+  For each command file, produce simulation outputs—including planned and
+  actual trajectories, control performance metrics, tuned controller
+  parameters, and comparison plots—under a dedicated results directory.
+
+  The planned trajectory must respect the physical acceleration limits
+  defined in system_params.yaml. Successfully executed commands must
+  exhibit steady-state error < 0.05 m, overshoot < 5%, and per-timestep
+  position tracking error < 0.05 m.
+initial_state:
+  assets:
+  - path: assets/SF49_t1_drone_planning_control/system_params.yaml
+    source: skillsbench/tasks/drone-planning-control/environment/system_params.yaml
+    description: 'Data file: system_params.yaml'
+  - path: assets/SF49_t1_drone_planning_control/commands/014.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/014.txt
+    description: 'Data file: commands/014.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/027.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/027.txt
+    description: 'Data file: commands/027.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/002.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/002.txt
+    description: 'Data file: commands/002.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/009.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/009.txt
+    description: 'Data file: commands/009.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/005.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/005.txt
+    description: 'Data file: commands/005.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/017.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/017.txt
+    description: 'Data file: commands/017.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/007.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/007.txt
+    description: 'Data file: commands/007.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/022.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/022.txt
+    description: 'Data file: commands/022.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/020.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/020.txt
+    description: 'Data file: commands/020.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/015.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/015.txt
+    description: 'Data file: commands/015.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/008.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/008.txt
+    description: 'Data file: commands/008.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/021.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/021.txt
+    description: 'Data file: commands/021.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/011.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/011.txt
+    description: 'Data file: commands/011.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/025.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/025.txt
+    description: 'Data file: commands/025.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/006.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/006.txt
+    description: 'Data file: commands/006.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/026.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/026.txt
+    description: 'Data file: commands/026.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/001.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/001.txt
+    description: 'Data file: commands/001.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/029.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/029.txt
+    description: 'Data file: commands/029.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/004.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/004.txt
+    description: 'Data file: commands/004.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/028.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/028.txt
+    description: 'Data file: commands/028.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/018.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/018.txt
+    description: 'Data file: commands/018.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/019.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/019.txt
+    description: 'Data file: commands/019.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/024.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/024.txt
+    description: 'Data file: commands/024.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/003.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/003.txt
+    description: 'Data file: commands/003.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/012.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/012.txt
+    description: 'Data file: commands/012.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/016.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/016.txt
+    description: 'Data file: commands/016.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/010.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/010.txt
+    description: 'Data file: commands/010.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/030.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/030.txt
+    description: 'Data file: commands/030.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/023.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/023.txt
+    description: 'Data file: commands/023.txt'
+  - path: assets/SF49_t1_drone_planning_control/commands/013.txt
+    source: skillsbench/tasks/drone-planning-control/environment/commands/013.txt
+    description: 'Data file: commands/013.txt'
+  tools_available:
+  - bash
+  - read
+  - edit
+  - grep
+expected_trigger: true
+skill_constraints_tested:
+- id: c1
+  description: The output directory must be results/{label}/, containing a plots/ subdirectory, with filenames fixed as planned_trajectory.npy / metrics_3d.json / tuning_results.json
+  exclusive: After cleanup the description no longer specifies output paths and filenames. A model that does not read the skill will choose its own directories (e.g. ./output/, ./results/) and filenames (e.g. trajectory.npy, metrics.json, gains.json), which cannot match the evaluation script's expectations.
+- id: c2
+  description: The trajectory matrix must be of shape (15 x max_iter), with rows 0:3=pos, 3:6=vel, 6:9=orientation, 9:12=ang_vel, 12:15=acc
+  exclusive: After cleanup the description no longer gives the matrix dimensions and row layout. A model that does not read the skill typically uses a 6-13 row state representation (position/velocity only, or quaternion attitude), and will not spontaneously produce a 15-row layout with an acceleration row.
+- id: c3
+  description: The acceleration components of the planned trajectory (matrix rows 12:15) must not exceed the physical limits in system_params.yaml at any timestep
+  exclusive: After cleanup the description no longer indicates which rows are acceleration, nor gives field names. A model that does not read the skill may not include acceleration rows in the trajectory matrix, or may only apply the constraint as a post-simulation posterior check rather than during planning.
+- id: c4
+  description: The integral state of the position controller must be created via explicit initialization outside the control loop and accumulate continuously during simulation; mutable Python default arguments must not be used, and the integral state must not be re-initialized at each timestep
+  exclusive: "A model that does not read the skill typically writes integral = np.zeros(3) directly outside the loop and accumulates correctly, without using a dict-wrapping or factory-function pattern. A more common error is using a mutable default argument in the function signature def foo(integral={\"e\": zeros(3)})"
+notes: 'Source: skillsbench/drone-planning-control
+
+  Domain: control systems
+
+  Phase1 score: 0.41
+
+  Confidence: 0.85
+
+  Tuning-granularity note: each command directory must contain its own tuning_results.json, but all commands may share the same set of gains, or each may tune independently.'

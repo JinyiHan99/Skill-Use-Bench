@@ -1,0 +1,175 @@
+task_id: SF10_t2_write_queries
+level: L2
+skill_id: skill_10_drizzle_orm
+description: |
+  I need to write several database query functions:
+  1. Get the list of all agents for a given user (with pagination)
+  2. Get a single agent and all its associated knowledge bases
+  3. Count how many agents each user has, returning only users with more than 3
+
+  The project already has schema definitions under src/database/schemas/; please implement these query functions (output path is up to you, e.g. src/database/queries/agents.ts).
+
+initial_state:
+  assets:
+    - path: assets/SF10_t2_queries/
+      source: "Hand-crafted project scaffold based on real Drizzle+Neon agent platform schema"
+  files:
+    - path: src/database/schemas/_helpers.ts
+      content: |
+        import { timestamp } from "drizzle-orm/pg-core";
+
+        export const timestamps = {
+          createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+          updatedAt: timestamp("updated_at", { withTimezone: true })
+            .defaultNow()
+            .$onUpdate(() => new Date())
+            .notNull(),
+          accessedAt: timestamp("accessed_at", { withTimezone: true }).defaultNow().notNull(),
+        };
+
+        let counter = 0;
+        export function idGenerator(prefix: string): string {
+          const timestamp = Date.now().toString(36);
+          const random = Math.random().toString(36).substring(2, 8);
+          return `${prefix}_${timestamp}${random}${++counter}`;
+        }
+    - path: src/database/schemas/users.ts
+      content: |
+        import { pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
+        import { createInsertSchema } from "drizzle-zod";
+        import { timestamps, idGenerator } from "./_helpers";
+
+        export const users = pgTable(
+          "users",
+          {
+            id: text("id")
+              .primaryKey()
+              .$defaultFn(() => idGenerator("users"))
+              .notNull(),
+            email: text("email").notNull(),
+            name: text("name").notNull(),
+            avatarUrl: text("avatar_url"),
+            ...timestamps,
+          },
+          (t) => [uniqueIndex("users_email_unique").on(t.email)],
+        );
+
+        export const insertUserSchema = createInsertSchema(users);
+        export type NewUser = typeof users.$inferInsert;
+        export type UserItem = typeof users.$inferSelect;
+    - path: src/database/schemas/agents.ts
+      content: |
+        import { pgTable, text, boolean, uniqueIndex, index } from "drizzle-orm/pg-core";
+        import { createInsertSchema } from "drizzle-zod";
+        import { timestamps, idGenerator } from "./_helpers";
+        import { users } from "./users";
+
+        export const agents = pgTable(
+          "agents",
+          {
+            id: text("id")
+              .primaryKey()
+              .$defaultFn(() => idGenerator("agents"))
+              .notNull(),
+            userId: text("user_id")
+              .references(() => users.id, { onDelete: "cascade" })
+              .notNull(),
+            name: text("name").notNull(),
+            slug: text("slug").notNull(),
+            description: text("description"),
+            systemPrompt: text("system_prompt"),
+            isPublic: boolean("is_public").default(false),
+            ...timestamps,
+          },
+          (t) => [
+            uniqueIndex("agents_user_id_slug_unique").on(t.userId, t.slug),
+            index("agents_user_id_idx").on(t.userId),
+          ],
+        );
+
+        export const insertAgentSchema = createInsertSchema(agents);
+        export type NewAgent = typeof agents.$inferInsert;
+        export type AgentItem = typeof agents.$inferSelect;
+    - path: src/database/schemas/knowledge-bases.ts
+      content: |
+        import { pgTable, text, boolean, primaryKey } from "drizzle-orm/pg-core";
+        import { createInsertSchema } from "drizzle-zod";
+        import { timestamps, idGenerator } from "./_helpers";
+        import { agents } from "./agents";
+        import { users } from "./users";
+
+        export const knowledgeBases = pgTable(
+          "knowledge_bases",
+          {
+            id: text("id")
+              .primaryKey()
+              .$defaultFn(() => idGenerator("knowledge_bases"))
+              .notNull(),
+            userId: text("user_id")
+              .references(() => users.id, { onDelete: "cascade" })
+              .notNull(),
+            name: text("name").notNull(),
+            description: text("description"),
+            type: text("type").notNull().default("file"),
+            ...timestamps,
+          },
+        );
+
+        export const agentsKnowledgeBases = pgTable(
+          "agents_knowledge_bases",
+          {
+            agentId: text("agent_id")
+              .references(() => agents.id, { onDelete: "cascade" })
+              .notNull(),
+            knowledgeBaseId: text("knowledge_base_id")
+              .references(() => knowledgeBases.id, { onDelete: "cascade" })
+              .notNull(),
+            userId: text("user_id")
+              .references(() => users.id, { onDelete: "cascade" })
+              .notNull(),
+            enabled: boolean("enabled").default(true),
+            ...timestamps,
+          },
+          (t) => [primaryKey({ columns: [t.agentId, t.knowledgeBaseId] })],
+        );
+
+        export const insertKnowledgeBaseSchema = createInsertSchema(knowledgeBases);
+        export type NewKnowledgeBase = typeof knowledgeBases.$inferInsert;
+        export type KnowledgeBaseItem = typeof knowledgeBases.$inferSelect;
+    - path: src/database/index.ts
+      content: |
+        import { drizzle } from "drizzle-orm/neon-http";
+        import { neon } from "@neondatabase/serverless";
+
+        const sql = neon(process.env.DATABASE_URL!);
+        export const db = drizzle(sql);
+  tools_available: [bash, read, edit, grep]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: no_relational_api
+    description: "Queries must be constructed with the SQL-builder style API; the relational query API (the db.query.* namespace, including findMany/findFirst and the with: option) is disallowed"
+    exclusive: "Model uses db.query.agents.findMany({ where: ..., with: { knowledgeBases: true } }) because the relational API is more concise and widely shown in Drizzle tutorials"
+  - id: one_to_many_two_queries
+    description: "Fetching an entity together with its one-to-many related collection must not be done via a single combined query (no JOIN, no relational with:); the related collection must be obtained separately and merged in application code"
+    exclusive: "Model uses a single LEFT JOIN or the relational 'with' syntax to fetch agent and its knowledge bases in one query"
+  - id: explicit_select_fields
+    description: "Projection in .select() must explicitly enumerate fields; bare .select() (equivalent to SELECT *) is disallowed"
+    exclusive: "Model uses .select() without field specification (SELECT *) for simpler code"
+  - id: aggregation_with_builder
+    description: "Aggregation/count queries must be written via the query builder using the count aggregator and grouping/filtering helpers; raw SQL string aggregation or relational API are disallowed"
+    exclusive: "Model uses db.query relational API, or raw SQL string for aggregation queries"
+  - id: count_helper_required
+    description: "The count aggregator helper imported from the ORM package must be used; raw SQL count expressions are disallowed"
+    exclusive: "Model writes sql`count(*)` instead of using the count() helper"
+  - id: nested_having_expression
+    description: "Having clauses on aggregates must be expressed by composing comparison operators around the aggregate helper, not as raw SQL strings"
+    exclusive: "Model writes having(sql`count(*) > 3`) instead of composing helpers like having(gt(count(agents.id), 3))"
+
+notes: |
+  Evaluation points (for evaluator use only; must not be exposed to the model under test):
+  - Check whether the implementation follows the skill's constraints on query construction style, related-data fetching strategy, and aggregation writing
+  - Check whether the where/having condition construction conforms to skill requirements
+  - Check whether field selection satisfies the skill's projection-explicitness requirement
+  The description does not mention the ORM name; the model needs to infer the ORM type from the project code.

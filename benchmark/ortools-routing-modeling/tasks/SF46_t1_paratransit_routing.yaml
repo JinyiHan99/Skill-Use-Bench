@@ -1,0 +1,56 @@
+task_id: SF46_t1_paratransit_routing
+level: L2
+skill_id: skill_46_ortools_routing_modeling
+description: 'You are a paratransit planner preparing the operating plan for a day
+  of door-to-door ride requests. Produce vehicle routes and shift starts that serve
+  as many trips as possible while respecting the operating rules.
+
+
+  Please refer to `assets/SF46_t1_paratransit_routing/model-and-data.md` for the
+  data conventions, feasibility rules, and output format. Write the final plan to
+  `report.json` in the working directory.
+
+
+  The instance has 40 passengers, 84 trips, and 8 vehicles. Keep the optimization
+  search bounded so there is still time for data loading, route extraction,
+  independent auditing, and report writing.'
+initial_state:
+  assets:
+  - path: assets/SF46_t1_paratransit_routing/t_matrix.csv
+    source: ./assets/SF46_t1_paratransit_routing/t_matrix.csv
+    description: 'Data file: t_matrix.csv'
+  - path: assets/SF46_t1_paratransit_routing/requests.json
+    source: ./assets/SF46_t1_paratransit_routing/requests.json
+    description: 'Data file: requests.json'
+  - path: assets/SF46_t1_paratransit_routing/model-and-data.md
+    source: ./assets/SF46_t1_paratransit_routing/model-and-data.md
+    description: 'Data file: model-and-data.md'
+  - path: assets/SF46_t1_paratransit_routing/instance_config.json
+    source: ./assets/SF46_t1_paratransit_routing/instance_config.json
+    description: 'Data file: instance_config.json'
+  tools_available:
+  - bash
+  - read
+  - edit
+  - grep
+expected_trigger: true
+skill_constraints_tested:
+- id: c1
+  description: When modeling shared external depots as per-vehicle starts and ends in a matrix-based RoutingModel, create explicit per-vehicle internal start and end depot copies, build the expanded internal travel-time matrix, and map depot copies back to the shared external depot IDs when reporting.
+  exclusive: Without the skill, a model is more likely to reuse the shared depot node IDs directly in the RoutingIndexManager starts/ends arrays, often relying on Python callbacks or implicit node mapping instead of reconstructing a cloned-depot internal matrix.
+- id: c2
+  description: Prefer precomputed RegisterTransitMatrix and RegisterUnaryTransitVector over Python callbacks for static integer
+    data. Routing callbacks are called very often during local search and can consume substantial solve time on large instances.
+  exclusive: Without the skill, a model commonly follows OR-Tools tutorial-style Python transit and demand callbacks, rather than precomputing static integer matrices/vectors and registering them directly.
+- id: c3
+  description: Deliberately set fix_start_cumul_to_zero=False in AddDimension call. Use vehicle start time windows or allowed
+    start values instead, especially when vehicle start times or shifts may vary.
+  exclusive: Model would use the OR-Tools default fix_start_cumul_to_zero=True (shortest-path behavior) without considering
+    the implications for shift-based or variable-start-time routing problems.
+notes: 'Source: skillsbench/paratransit-routing
+
+  Domain: Other
+
+  Phase1 score: 0.42
+
+  Confidence: 0.82'

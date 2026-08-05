@@ -1,0 +1,105 @@
+rules:
+  - id: g1_observable_attempt
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains an observable write/edit attempt on the demurrage dispute task input directory or notes file."
+    signal:
+      pattern: >-
+        (?s)(?:^|\n)(?:(?:Write|Edit):\{[\s\S]{0,4000}?"file_path"\s*:\s*"[^"]*(?:assets/clean-ddd-hexagonal_t2_split_library_aggregate/input|output/demurrage-dispute-notes\.md)[^"]*"|\{[\s\S]{0,1000}?"(?:tool|toolName|tool_name|name)"\s*:\s*"(?:Write|Edit)"[\s\S]{0,4000}?"file_path"\s*:\s*"[^"]*(?:assets/clean-ddd-hexagonal_t2_split_library_aggregate/input|output/demurrage-dispute-notes\.md)[^"]*")
+
+  - id: r1_demurrage_is_separate_aggregate_referenced_by_tracking_id
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    locus: trace
+    judge_context_window: [serialized_steps, final_answer]
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The demurrage dispute should be modeled as an independent aggregate root, associated with Cargo via IDs/value objects such as TrackingId; the dispute aggregate must not directly hold a Cargo entity reference.
+      Skill-exclusive rationale: looking only at the task description, "integrate into the existing booking, voyage-change, and handling-registration flows" will induce the model to follow object-graph/JPA intuition and directly associate the dispute with the Cargo entity; the skill requires aggregate boundaries and cross-aggregate ID references, and the conflict point is object reference vs independent aggregate + ID reference.
+    signal:
+      query: >
+        Based on the Java demurrage domain model file content written by actual Write/Edit tool calls, not the agent's self-description: is the demurrage dispute implemented as an independent aggregate root, referencing Cargo only via TrackingId, String id, or an equivalent ID/value object, rather than directly holding a Cargo entity or JPA entity relationship inside DemurrageDispute? Answer YES if DemurrageDispute has its own aggregate identity and stores only a Cargo tracking/id value. Answer NO if DemurrageDispute has a Cargo field, @ManyToOne Cargo, or equivalent direct entity reference. Do not use this rule to judge whether Cargo owns a dispute collection; that is covered by r2.
+      acceptable: "domain/model/demurrage/DemurrageDispute has its own id plus TrackingId trackingId and no Cargo cargo field."
+      unacceptable: "DemurrageDispute has @ManyToOne Cargo cargo or stores a Cargo entity reference."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_cargo_not_expanded_into_dispute_god_aggregate
+    type: forbidden-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The Cargo aggregate must not be expanded into a God Aggregate containing demurrage dispute collections/direct references or dispute lifecycle methods.
+      Skill-exclusive rationale: the task requires the dispute to be integrated into the transport flow, and the default approach may directly modify Cargo.java and add a dispute collection or lifecycle methods; the skill's aggregate-boundary rule requires that eventually-consistent concepts be split into independent aggregates, and the conflict point is aggregating all related concepts inside Cargo vs keeping the Cargo boundary.
+    signal:
+      file: "assets/clean-ddd-hexagonal_t2_split_library_aggregate/input/src/main/java/se/citerus/dddsample/domain/model/cargo/Cargo.java"
+      file_must_not_contain: >-
+        (?im)^\s*(?:private|protected|public)\s+[^;]*(?:Demurrage|Dispute)[^;]*;|^\s*(?:private|protected|public)?\s*(?:List|Set|Collection)\s*<\s*[^>]*(?:Demurrage|Dispute)[^>]*>\s+\w+\s*(?:=|;)|^\s*(?:public|private|protected)\s+\w[^\n;]*\b(?:add|register|resolve|close|process)\w*(?:Demurrage|Dispute)\w*\s*\(
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_register_use_case_writes_only_dispute_aggregate
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    locus: trace
+    judge_context_window: [serialized_steps, final_answer]
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The application entry/use case that registers a demurrage dispute should only persist the dispute aggregate; it must not directly save Cargo, HandlingEvent, or any other aggregate in the same registration use case, and cross-flow collaboration should be expressed via past-tense fact-semantic domain/application events.
+      Skill-exclusive rationale: without reading the skill, a model may implement "integrate into booking, voyage-change, handling-registration flows" as a cross-aggregate transaction script that simultaneously saves Cargo, HandlingEvent, and the dispute; the skill requires one transaction to modify one aggregate, and the conflict point is synchronous cross-aggregate writes vs event-driven/eventual consistency.
+    signal:
+      query: >
+        Looking only at the actually written/modified demurrage dispute application service, controller/facade, repository calls, and event-publishing code, not the agent's self-description: does the register-dispute use case only persist DemurrageDispute/DemurrageDisputeRepository, without saving, storing, or mutating Cargo, HandlingEvent, or any other aggregate via dirty checking in the same use case? Reading Cargo/HandlingEvent for validation or query is allowed. Answer YES if only the dispute aggregate is written and other workflows are read-only or notified asynchronously. Answer NO if the registration method directly persists or mutates any other aggregate in the same transaction. If cross-flow notification/event is introduced, it must be a past-tense fact such as DemurrageDisputeRegistered; Answer NO if event-like types are command semantics such as CreateDemurrageDisputeEvent or ProcessDemurrageDisputeEvent.
+      acceptable: "DemurrageDisputeService.register(...) reads Cargo if needed, calls demurrageDisputeRepository.store(dispute), and publishes DemurrageDisputeRegistered."
+      unacceptable: "register(...) calls demurrageDisputeRepository.store(dispute), cargoRepository.store(cargo), and handlingEventRepository.store(event), or publishes CreateDemurrageDisputeEvent as a command."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_repository_port_separated_from_infrastructure_adapter
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    locus: trace
+    judge_context_window: [serialized_steps, final_answer]
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Dispute-related Repository/Port should be defined at the domain or application boundary, with infrastructure implementations in infrastructure; new/modified demurrage domain/application code must not depend on infrastructure packages, Spring/JPA/Hibernate/EntityManager, or other persistence implementation details.
+      Skill-exclusive rationale: looking only at the task description, a model easily puts @Repository, EntityManager, Spring Data, or Hibernate details directly into the domain/application model; the skill's Clean/Hexagonal dependency direction requires ports in the inner layer and adapters in the outer layer, and the conflict point is the inner layer depending on infrastructure vs infrastructure implementing inner-layer ports.
+    signal:
+      query: >
+        Auditing only actually new/modified demurrage-related domain/application/infrastructure code, not penalizing for the baseline project's existing persistence style: is DemurrageDisputeRepository/Port defined in the domain or application inner layer, with JPA/Spring/Hibernate/EntityManager implementations in infrastructure, and do new/modified demurrage domain/application code not import se.citerus.dddsample.infrastructure, javax.persistence, jakarta.persistence, org.springframework.data, EntityManager, or Hibernate implementation types? Answer YES if dependency direction is inward. Answer NO if domain/application demurrage code depends on infrastructure classes or framework persistence APIs.
+      acceptable: "domain/model/demurrage/DemurrageDisputeRepository is an interface; infrastructure/persistence/jpa/JpaDemurrageDisputeRepository implements it."
+      unacceptable: "domain/model/demurrage/DemurrageDispute imports EntityManager or application service imports infrastructure.persistence.jpa.JpaDemurrageDisputeRepository."
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    locus: trace
+    judge_context_window: [serialized_steps, final_answer]
+    weight: 0
+    spec: "[TASK — not counted toward SF] Non-placeholder demurrage dispute core code has been implemented in the input project, and output/demurrage-dispute-notes.md explaining modeling choices is produced."
+    signal:
+      query: >
+        Based on the file content and final diffs written by actual Write/Edit tool calls, not the agent's self-description: is the task complete, i.e., non-placeholder demurrage-dispute-related domain types and an application entry exist, the dispute model records at least TrackingId/cargo identifier, and includes several basic business fields such as reason, amount, and status, and output/demurrage-dispute-notes.md exists and explains the relationship between the dispute and the cargo model and the modeling choices? Answer YES only if implementation and notes are both present. Answer NO if only notes are written, only an empty class/DTO is added, or no application entry exists.
+      acceptable: "DemurrageDispute domain/application code exists with tracking id, reason/amount/status, and notes explain aggregate relationship."
+      unacceptable: "Only demurrage-dispute-notes.md is written, or only an empty DemurrageDispute class with no application entry."

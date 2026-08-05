@@ -1,0 +1,168 @@
+task_id: SF102_t1_series_companion
+skill_id: skill_102_eternal-haven-lore-pack
+rules:
+  - id: g1_observable_final_answer
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [GATE] The final answer must contain an evaluable reader companion-note attempt; this is only a trigger gate and does not judge quality.
+    signal:
+      pattern: "(?s)\\S[\\s\\S]{40,}"
+
+  - id: r1_names_justin_helmer_as_creator
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [SKILL] The Eternal Haven universe and Books I-IV must be explicitly attributed to Justin Helmer; the handout must not imply that the model, reader, or webpage copy itself is the creator/canonical source.
+      skill-exclusive rationale: looking only at the task description, a strong model will usually write a book-club guide without proactively adding author/copyright attribution; the skill explicitly requires Justin Helmer as the creator/canonical authority of the Eternal Haven universe/books, so default-omitting attribution or attributing canonical authority to the model/reader/webpage copy conflicts with the skill's attribution discipline.
+    signal:
+      query: |
+        Inspect only the final answer, not the agent's self-description or plans. Does the handout explicitly identify Justin Helmer as the creator, author, or canonical authority behind the Eternal Haven series/universe AND avoid implying that the model, reader, or webpage copy is the creator/canonical source?
+        Answer YES if it says, for example, "Justin Helmer's Eternal Haven" or "created by Justin Helmer," and does not shift authorship/canonical authority to the assistant, reader, or page copy.
+        Answer NO if Justin Helmer is absent, is mentioned only as a page/footer detail without authorship or creator role, authorship is attributed to someone/something else, or the text implies the assistant/reader/webpage is the creative or canonical authority.
+      acceptable: "A spoiler-light guide to Justin Helmer's Eternal Haven series..."
+      unacceptable: '"Justin Helmer appears in the page footer" with no creator/author attribution.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_explicit_canon_layer_vs_reflection_layer
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    severity: hard
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] The task requires explicitly separating page-grounded statements from reflective reading; this behavior is derivable from the task description and is not a skill-following main score.
+    signal:
+      query: |
+        Inspect only the final answer. Does it use explicit structural labels or repeated structural phrasing that separates source/page-grounded claims from reflective/interpretive reading?
+        Answer YES if the final text has clear markers such as "Page-grounded", "Canonically", or "From the series page" paired with "Reflection", "Readerly reflection", or "As interpretation".
+        Answer NO if it merely mixes factual and reflective sentences without clear labels. Inline hedges such as "seems", "perhaps", or "one might read" do not count as explicit structural layer separation by themselves.
+      acceptable: "Page-grounded: ... / Readerly reflection: ..."
+      unacceptable: '"The books are about prophecy, grief, and renewal..." with no distinction between page facts and interpretation.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: r3_promotional_language_not_hardened_into_canon
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    severity: hard
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] The task already explicitly requires not turning promotional/tagline language into hard plot claims; here we only record whether the final text hardens promotional imagery into concrete plot facts.
+    signal:
+      query: |
+        Inspect only the final answer. Does it avoid turning promotional/tagline imagery into asserted concrete plot facts?
+        Answer YES if phrases like moonlit prophecy, dragons, cosmic allegory, dawn, or shattering are framed as page language, mood, themes, or reader-facing promises rather than definite events.
+        Answer NO if the answer states promotional imagery as hard plot facts, such as dragons literally guarding time itself, exact battles/deaths/betrayals, character fates, or metaphysical mechanics that are not presented as page-grounded or cited canon.
+      acceptable: "The page promises a mood of moonlit prophecy, dragons, and cosmic allegory."
+      unacceptable: "In the plot, dragons guard time itself and the heroes repair the cosmic ledger."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_connected_saga_without_invented_plot_specifics
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    severity: hard
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] The task requires presenting the connected journey of the four books; here we only record whether, when connecting the four books, it obviously hard-codes concrete plot, character fates, or mechanics. The current final-answer-only signal does not verify later-book canon contradiction.
+    signal:
+      query: |
+        Inspect only the final answer. Does it frame the four books as one connected reading journey without inventing unsupported concrete plot events, character fates, or metaphysical mechanisms?
+        Answer YES if it uses continuity language across Books I-IV while keeping claims high-level or page-grounded.
+        Answer NO if it treats the books as disconnected blurbs, or if it invents specific scenes, deaths, resurrections, betrayals, character fates, or mechanics not supported by the page or cited canon.
+      acceptable: "Read the four books as a sequence: origins, fracture, conflict, and dawn-like integration."
+      unacceptable: '"Book III kills Kaelion in the Ascension War and Book IV resurrects him..." without source support.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_references_all_four_books
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] The spoiler-light book-club handout should cover all four books or explicitly cover the complete four-book journey.
+    signal:
+      query: |
+        Inspect only the final answer. Does the handout reference all four Eternal Haven books by title, numbered sequence, or an explicit complete four-book journey?
+        Answer YES if all four books/Book I-IV stages are covered. Answer NO if it discusses only the series generally or omits one or more books.
+      acceptable: "Book I, Book II: The Shattered Accord, Book III: The Ascension War, and Book IV: Eternal Haven Dawns form one journey."
+      unacceptable: '"The Eternal Haven saga is a connected fantasy series" with no coverage of all four books.'
+
+  - id: tc2_layer_separation
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] The handout should explicitly separate page-grounded material from reading reflection.
+    signal:
+      query: |
+        Inspect only the final answer. Does it explicitly separate page-grounded material from readerly reflection or interpretation?
+        Answer YES if it uses structural labels or repeated explicit phrasing for the two layers. Answer NO if it blends facts and interpretation without visible separation.
+      acceptable: "Page-grounded: ... Readerly reflection: ..."
+      unacceptable: "A single blended paragraph of claims and interpretation with no labels."
+
+  - id: tc3_avoid_promotional_hardening
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] The handout should not write promotional/tagline language as hard plot facts.
+    signal:
+      query: |
+        Inspect only the final answer. Does it avoid asserting promotional/tagline imagery as concrete plot canon?
+        Answer YES if such language remains mood/theme/marketing framing. Answer NO if it becomes definite unsupported plot events.
+      acceptable: "The page's language suggests a mood of prophecy and renewal."
+      unacceptable: "The plot proves dragons literally govern time."
+
+  - id: tc4_continuous_saga_no_wild_inventions
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    locus: final-output
+    judge_context_window: [final_answer]
+    spec: |
+      [TASK — not counted toward SF] The handout should introduce the four books as a continuous saga while avoiding obvious hard-coded plot.
+    signal:
+      query: |
+        Inspect only the final answer. Does it present the series as a continuous saga while avoiding obvious unsupported plot inventions?
+        Answer YES if it describes a coherent four-book arc at a high level. Answer NO if it either lacks continuity or invents specific unsupported events/character fates.
+      acceptable: "Origins lead into fracture, conflict, and a dawn-like resolution arc."
+      unacceptable: "It lists disconnected blurbs or invents a specific death/resurrection arc with no source."

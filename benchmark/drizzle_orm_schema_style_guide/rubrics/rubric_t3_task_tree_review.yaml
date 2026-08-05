@@ -1,0 +1,88 @@
+# Rubric for skill_72_drizzle_orm_schema_style_guide — drizzle_t3_task_tree_review
+# Scoring boundary: skill is scored; task only records completion rate; gate only judges evaluability.
+
+task_id: drizzle_t3_task_tree_review
+skill_id: drizzle
+rules:
+  - id: g1_task_tree_review_attempted
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain actual tool-call evidence reading or editing the target task tree repository.
+    signal:
+      pattern: '(?is)\b(?:Read|Write|Edit)\b[\s\S]{0,1000}?\bfile_path\b["''\s:]*[^"''\n]*packages/database/src/repositories/taskTreeRepository\.ts\b'
+
+  - id: r1_keep_recursive_cte_raw_single_roundtrip
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — exclusive] Recursive task-tree reads should preserve the WITH RECURSIVE raw SQL single-round-trip form; they should not be split into multi-round depth-based queries or faked builder recursion just to remove execute/sql.
+      skill-exclusive rationale: looking only at the task description and general "Drizzle style", a strong model may treat raw SQL as a convention issue and rewrite it as a multi-select loop;
+      the skill explicitly states that recursive CTE is a canonical keep-raw case, because Drizzle has no clean WITH RECURSIVE builder. The conflict point is "eliminate raw SQL" vs "preserve recursive CTE".
+    signal:
+      file: "assets/drizzle_t3_task_tree_review/input/packages/database/src/repositories/taskTreeRepository.ts"
+      file_must_contain: '(?i)WITH\s+RECURSIVE\s+\w+\s+AS'
+      file_must_not_contain: '(?i)\b(?:maxDepth|currentDepth|depthLimit)\b|\bwhile\s*\([^)]*depth|\bfor\s*\([^)]*depth'
+
+  - id: r2_raw_sql_uses_schema_interpolations
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — exclusive] When keeping raw SQL, table and key column references should be interpolated via Drizzle schema objects (e.g. ${tasks.id}, ${tasks.parentTaskId}, ${tasks.createdByUserId}, ${tasks}),
+      rather than hard-coding SELECT id, parent_task_id FROM tasks.
+      skill-exclusive rationale: looking only at the task description, a strong model may only add safety filters and continue to keep hand-written table/column names; the skill explicitly requires raw SQL to use schema refs in interpolations.
+      The conflict point is "string hard-coded SQL identifiers" vs "schema-bound interpolations so renames surface as type errors".
+    signal:
+      file: "assets/drizzle_t3_task_tree_review/input/packages/database/src/repositories/taskTreeRepository.ts"
+      file_must_contain: '(?s)(?=.*\$\{\s*tasks\s*\})(?=.*\$\{\s*tasks\.id\s*\})(?=.*\$\{\s*tasks\.parentTaskId\s*\})(?=.*\$\{\s*tasks\.createdByUserId\s*\})'
+
+  - id: r3_execute_has_narrow_row_interface
+    type: required-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — exclusive] When keeping execute(raw SQL), a narrow row interface/type should be provided and a generic like execute<TaskTreeRow> should be called, rather than untyped, any, or broad unknown rows.
+      skill-exclusive rationale: looking only at the task description, a strong model may keep const { rows } = await db.execute(sql`...`); the skill explicitly states that if a PostgreSQL feature can only use raw,
+      tighten it: narrow row interface. The conflict point is "execute with no row contract" vs "use a narrow interface to limit returned columns".
+    signal:
+      file: "assets/drizzle_t3_task_tree_review/input/packages/database/src/repositories/taskTreeRepository.ts"
+      file_must_contain: '(?s)(?=.*(?:interface\s+\w*(?:TaskTree|TreeTask|Subtree)\w*Row\w*\s*\{(?=[^}]*\bid\s*:\s*string)(?=[^}]*\b(?:parentTaskId|parent_task_id)\s*:\s*string\s*\|\s*null)[^}]*\}|type\s+\w*(?:TaskTree|TreeTask|Subtree)\w*Row\w*\s*=\s*\{(?=[^}]*\bid\s*:\s*string)(?=[^}]*\b(?:parentTaskId|parent_task_id)\s*:\s*string\s*\|\s*null)[^}]*\}))(?=.*execute\s*<\s*\w*(?:TaskTree|TreeTask|Subtree)\w*Row\w*\s*>)'
+
+  - id: r4_scope_every_recursive_leg_to_user
+    type: lesson
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL — exclusive] Both the root SELECT and recursive SELECT branches of the recursive CTE must be explicitly scoped by userId/createdByUserId; filtering only the root node is not enough.
+      skill-exclusive rationale: looking only at the task description, a model may only fix the root WHERE or only focus on SQL injection; the skill's raw SQL tightening example explicitly states that every CTE leg must have
+      WHERE ${tasks.createdByUserId} = ${userId}. The conflict point is "root scoped but recursion unscoped" vs "every recursion segment explicitly user-scoped".
+    signal:
+      file: "assets/drizzle_t3_task_tree_review/input/packages/database/src/repositories/taskTreeRepository.ts"
+      file_must_contain: '(?is)WITH\s+RECURSIVE[\s\S]{0,2500}?\bWHERE\b[\s\S]{0,800}?(?:\$\{\s*tasks\.createdByUserId\s*\}|created_by_user_id|createdByUserId)[\s\S]{0,400}?(?:\$\{\s*userId\s*\}|\buserId\b)[\s\S]{0,2500}?UNION\s+ALL[\s\S]{0,2500}?\bWHERE\b[\s\S]{0,1200}?(?:\$\{\s*tasks\.createdByUserId\s*\}|created_by_user_id|createdByUserId)[\s\S]{0,400}?(?:\$\{\s*userId\s*\}|\buserId\b)'
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Setting aside whether the skill was followed, whether the main security/convention issues in the task-tree recursive read implementation were fixed or explicitly handled.
+    signal:
+      judge_question: |
+        Based on the final contents of assets/drizzle_t3_task_tree_review/input/packages/database/src/repositories/taskTreeRepository.ts and final response, answer YES iff the implementation or review addresses the task tree recursive query's main issues: descendant rows remain user-scoped, the query still returns id and parent task id for the subtree, and the method remains usable for getSubtree(rootTaskId, userId).
+        Answer NO if the final code still allows unscoped descendants, removes the recursive subtree behavior, or only gives a vague review without fixing/explaining the issue.
+        Acceptable: a fixed recursive CTE that scopes both base and recursive branches to userId and returns subtree rows.
+        Unacceptable: deleting the query, returning only the root task, or leaving recursive descendants unfiltered.
+      judge_expected: "YES"

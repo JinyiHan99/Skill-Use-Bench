@@ -1,0 +1,159 @@
+# Rubric for skill_77 mcp-create-adaptive-cards — t2_transaction_events_dynamic
+
+rubric_id: skill_77_mcp_create_adaptive_cards_t2_transaction_events_dynamic
+task_id: mcp_adaptive_cards_t2_transaction_events_dynamic
+skill_id: mcp-create-adaptive-cards
+rules:
+  - id: g1_plugin_package_evaluable
+    type: required-tool
+    provenance: gate
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    weight: 0
+    spec: |
+      [GATE] The payments plugin manifest must remain present so dynamic response-template changes are evaluable.
+    signal:
+      file: "assets/mcp_adaptive_cards_t2_transaction_events_dynamic/input/payments-events-plugin/ai-plugin.json"
+      file_must_contain: '"name"\s*:\s*"ListBalanceTransactions"'
+
+  - id: r1_manifest_uses_item_template_selector
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Mixed item types should be wired through response_semantics.properties.template_selector
+      with an item-relative selector path such as $.displayTemplate or $.cardTemplate.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to make a static_template and distinguish types inside the card with if/color; the skill
+      requires Y to configure template_selector in response_semantics.properties; the conflict point Z is "in-card conditional rendering" vs
+      "Copilot dynamic template selector."
+    signal:
+      file: "assets/mcp_adaptive_cards_t2_transaction_events_dynamic/input/payments-events-plugin/ai-plugin.json"
+      file_must_contain: '"name"\s*:\s*"ListBalanceTransactions"[\s\S]{0,5000}"response_semantics"\s*:\s*\{[\s\S]{0,3000}"properties"\s*:\s*\{[\s\S]{0,1500}"template_selector"\s*:\s*"\$\.[A-Za-z0-9_]+"'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_response_contains_embedded_template_library
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: hard
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Dynamic templates require templates embedded in the API response/sample contract, not just
+      a manifest selector.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to only edit ai-plugin.json; the skill requires Y to have the response data carry a
+      templates object for the selector to parse; the conflict point Z is "manifest-only configuration" vs "response-embedded template library."
+    signal:
+      file: "assets/mcp_adaptive_cards_t2_transaction_events_dynamic/input/payments-events-plugin/sample-response.json"
+      file_must_contain: '"templates"\s*:\s*\{[\s\S]{0,8000}"type"\s*:\s*"AdaptiveCard"'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_each_transaction_selector_resolves_to_templates
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Each transaction item should carry a selector value that resolves to one of the response-
+      embedded templates.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to only create template objects or only add display hints without resolution; the skill
+      requires Y to have item selector values like $.templates.credit/debit that resolve to actual response templates; the conflict point Z is
+      "isolated templates / isolated hints" vs "per-item resolvable dynamic template reference chain."
+    signal:
+      judge_context_window:
+        - serialized_steps
+      query: >
+        In the final payments sample-response.json written or edited in the trace, does EVERY transaction item under data/results contain a selector field whose value resolves to an existing AdaptiveCard template embedded in the same response's templates object?
+        Judge only final file content from Write/Edit tool calls, not the agent's narrative. Answer YES only if every transaction item has a selector such as displayTemplate/cardTemplate and each selector points to an existing template object with type "AdaptiveCard".
+        Answer NO if any transaction item lacks a selector, if any selector points to a missing template, or if templates exist but are not AdaptiveCard objects.
+      acceptable: 'Every item has displayTemplate/cardTemplate values such as "$.templates.credit" or "$.templates.debit", and each referenced templates key is an AdaptiveCard.'
+      unacceptable: 'Only data[0] has a selector, one item lacks displayTemplate/cardTemplate, or an item references $.templates.credit but templates.credit is missing.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_separate_visual_templates_for_money_directions
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: llm-judge
+    severity: hard
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Mixed financial states should have separate Adaptive Card template variants for incoming
+      and outgoing/refund-like activity.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to use conditional wording/color in one template; the skill requires Y to
+      have different dynamic templates for different item types; the conflict point Z is "single-template conditional styling" vs "multi-template dynamic dispatch."
+    signal:
+      judge_context_window:
+        - serialized_steps
+      query: >
+        Does the final sample-response.json written or edited in the trace define at least two distinct Adaptive Card templates that separately represent money coming in versus money leaving/refund-like transactions?
+        Judge only final file contents from Write/Edit tool calls, not narrative. Answer YES only if the templates are separate AdaptiveCard objects and visibly differ in label/text, color, or layout for the different money directions.
+        Answer NO if there is only one AdaptiveCard template, or if two template keys exist but their visible card content is identical copies.
+      acceptable: 'templates.credit and templates.debit are separate AdaptiveCard objects with visible labels/colors such as Credit/good and Debit/attention.'
+      unacceptable: 'Only templates.transaction exists, or templates.credit and templates.debit have identical visible content with different keys only.'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_templates_format_money_and_fallback_nullable_text
+    type: lesson
+    provenance: skill
+    locus: file-state
+    verifier: state-diff
+    severity: soft
+    exclusive: true
+    weight: 0.25
+    spec: |
+      [SKILL — soft] Dynamic card templates should use template-language helpers for currency-like numbers and
+      nullable descriptions rather than raw ${amount}/${description} text. This is a weak auxiliary signal.
+      Skill-exclusive rationale: Without reading the skill, the default behavior X is to directly bind raw integers/null descriptions; the skill requires Y to
+      use formatNumber(...) and if(description, ..., fallback); the conflict point Z is "raw field binding" vs "Adaptive Card template-language formatting/fallback."
+    signal:
+      file: "assets/mcp_adaptive_cards_t2_transaction_events_dynamic/input/payments-events-plugin/sample-response.json"
+      file_must_contain:
+        - 'formatNumber\s*\('
+        - 'if\s*\(\s*description(?:\s*!=\s*null)?\s*,\s*description\s*,\s*[^)]+\)'
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: medium
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: file-state
+    verifier: llm-judge
+    severity: info
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The payments plugin visually distinguishes charges from payouts/refunds while
+      keeping ListBalanceTransactions and the original data source intact.
+    signal:
+      judge_context_window:
+        - serialized_steps
+      query: >
+        Based only on the final payments plugin files written or edited in the trace, does the package keep ListBalanceTransactions and the Stripe balance transaction data shape while adding a visual presentation that distinguishes incoming charge-like activity from payout/refund-like activity? This is task completion only.
+        Answer YES if the operation/data shape is preserved and the final files visually distinguish charge-like activity from payout/refund-like activity.
+        Answer NO otherwise. Do not rely on narrative or failed attempts.
+      acceptable: "Existing operation remains, sample data remains balance transactions, and cards/visual labels distinguish charge versus payout/refund."
+      unacceptable: "Operation is changed, data source is replaced, or all items still render identically."

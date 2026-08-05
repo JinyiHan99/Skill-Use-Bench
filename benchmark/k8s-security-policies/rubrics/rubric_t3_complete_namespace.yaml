@@ -1,0 +1,152 @@
+rubric_id: skill_54_k8s_security_t3_complete_namespace
+objective: Evaluate whether the model follows the k8s-security-policies skill, rather than counting ordinary task completion toward the SF score.
+rules:
+  - id: r1_namespace_has_all_restricted_admission_labels
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The new Namespace must simultaneously set enforce/audit/warn Pod Security Admission labels, all to restricted.
+      Skill-exclusive rationale: Without reading the skill, the model may create an ordinary Namespace or only add enforce; the skill explicitly requires all three labels to be present and all restricted. The conflict point is "ordinary or partially labeled namespace" vs "complete restricted admission label set."
+    signal:
+      file: output/team-service-environment.yaml
+      file_must_contain: >-
+        (?s)kind:\s*Namespace\b(?=(?:(?!---)[\s\S])*?metadata:)(?=(?:(?!---)[\s\S])*?labels:)(?=(?:(?!---)[\s\S])*?pod-security\.kubernetes\.io/enforce:\s*restricted)(?=(?:(?!---)[\s\S])*?pod-security\.kubernetes\.io/audit:\s*restricted)(?=(?:(?!---)[\s\S])*?pod-security\.kubernetes\.io/warn:\s*restricted)
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_default_deny_both_ingress_and_egress
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The default-deny NetworkPolicy must cover both Ingress and Egress, and must not reuse the ingress-only fragment from the input.
+      Skill-exclusive rationale: Without reading the skill, the most natural model behavior is to keep the input's default-deny-ingress or only add ingress allow rules; the skill requires the default deny to cover both ingress and egress. The conflict point is "one-direction isolation from the input fragment" vs "namespace-level bidirectional default deny."
+    signal:
+      query: |
+        Based only on the final contents of output/team-service-environment.yaml, does the manifest include a true namespace default-deny NetworkPolicy covering both Ingress and Egress?
+        Answer YES only if a NetworkPolicy has an empty podSelector, policyTypes includes both Ingress and Egress, and it does not contain allow-all rule bodies such as ingress: [{}] or egress: [{}]. Do not require any specific policy name.
+        Answer NO if it only denies ingress, relies on a name like default-deny without deny semantics, or includes allow-all rules.
+      acceptable: |
+        A NetworkPolicy with podSelector: {}, policyTypes containing Ingress and Egress, and no broad ingress/egress allow bodies.
+      unacceptable: |
+        name: default-deny with only policyTypes: [Ingress], or ingress: [{}] / egress: [{}].
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_specific_allow_policy_after_default_deny
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] In addition to the default deny, a specific allow NetworkPolicy targeting that workload should be added; having only a default deny or a full allow-all is not acceptable.
+      Skill-exclusive rationale: Without reading the skill, the model may only complete the input fragment or write a broad allow-all to make the service usable; the skill requires adding specific allow rules after default-deny. The conflict point is "only blocking / allow-all" vs "minimal-scope explicit allow."
+    signal:
+      query: |
+        Based only on the final contents actually written to output/team-service-environment.yaml, not the agent's self-description: does a default-deny NetworkPolicy exist alongside another specific allow NetworkPolicy targeting the new workload's labels/ports, and is that allow policy not a full allow-all of all ingress/egress? Answer YES if a separate allow policy selects or references the service workload and restricts traffic by podSelector/namespaceSelector and/or ports. Answer NO if there is only default-deny, if no default-deny exists, or if the allow rule is egress: [{}]/ingress: [{}] or equivalent allow-all.
+      acceptable: |
+        A default-deny policy plus a second NetworkPolicy selecting app labels and allowing only TCP 8080 from selected pods, or similarly specific traffic.
+      unacceptable: |
+        Only default-deny-all exists; or a second policy uses ingress: [{}] with no selectors/ports.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_workload_pod_restricted_context
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Every new workload's pod template/pod spec must explicitly configure runAsNonRoot:true, non-zero user/group/fsGroup, and seccompProfile.type: RuntimeDefault.
+      Skill-exclusive rationale: Without reading the skill, generating a simple service environment usually focuses only on image, ports, and Service; the skill requires all Pod templates to have a complete restricted pod security context. The conflict point is "functional workload" vs "restricted identity and seccomp required."
+    signal:
+      query: |
+        Based only on the final contents of output/team-service-environment.yaml, does every added workload Pod spec or pod template set pod-level securityContext with runAsNonRoot: true, non-zero runAsUser, runAsGroup, fsGroup, and seccompProfile.type: RuntimeDefault?
+        Answer YES only if these fields are present at the pod spec/template spec level for every workload, not merely under one container.
+        Answer NO if any workload is missing the pod-level securityContext, has root/zero IDs, or uses Unconfined/missing seccomp.
+      acceptable: |
+        Each Deployment/Pod/Job template has spec.securityContext with runAsNonRoot true, non-zero IDs, fsGroup, and RuntimeDefault seccomp.
+      unacceptable: |
+        One Deployment has the fields but another workload omits them, or fields appear only in container securityContext.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_container_hardening_and_resource_limits
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] Every container must drop ALL capabilities, set allowPrivilegeEscalation:false, readOnlyRootFilesystem:true, and set CPU/memory requests and limits.
+      Skill-exclusive rationale: Without reading the skill, the model often only adds a basic Deployment and does not treat all container-level restricted fields and resource governance as a required subset; the skill requires every container to be fully hardened. The conflict point is "ordinary service container default permissions" vs "restricted container configuration."
+    signal:
+      query: |
+        Based only on the final contents of output/team-service-environment.yaml, does every container in every added workload set restricted container hardening and resource governance: allowPrivilegeEscalation: false, capabilities.drop including ALL, readOnlyRootFilesystem: true, and CPU/memory requests and limits?
+        Answer YES only if every container satisfies all listed fields and no container sets privileged: true, readOnlyRootFilesystem: false, allowPrivilegeEscalation: true, or adds ALL/SYS_ADMIN capabilities.
+        Answer NO if only one container is compliant, if resources are missing, or if any prohibited field/capability appears.
+      acceptable: |
+        Each container has securityContext with drop: [ALL], allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, plus resources.requests/limits for cpu and memory.
+      unacceptable: |
+        A sidecar or second container omits resources or securityContext, or any add: [SYS_ADMIN] appears.
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r6_dedicated_service_account_and_non_wildcard_rbac
+    type: lesson
+    provenance: skill
+    locus: output-file
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The new workload must use a dedicated ServiceAccount with token auto-mounting disabled, bound through a non-wildcard least-privilege Role/RoleBinding.
+      Skill-exclusive rationale: Without reading the skill, the model often uses the default SA or writes a broad Role for the sake of a "complete environment"; the skill requires every workload to have explicit least-privilege RBAC. The conflict point is "default identity / wildcard permissions" vs "dedicated SA + automount false + non-wildcard RoleBinding."
+    signal:
+      query: |
+        Based only on the final contents of output/team-service-environment.yaml, does each added workload use a dedicated non-default ServiceAccount that has automountServiceAccountToken: false and is coherently bound by RoleBinding to a Role with no wildcard verbs/resources?
+        Answer YES only if workload serviceAccountName, ServiceAccount metadata.name, RoleBinding subjects, RoleBinding roleRef, and Role metadata.name form a consistent binding chain, and the Role has no * verbs/resources.
+        Answer NO if any workload uses default/omits serviceAccountName, the binding chain is inconsistent, token automount is not false, or wildcard permissions appear.
+      acceptable: |
+        Deployment serviceAccountName: app-sa; ServiceAccount app-sa automountServiceAccountToken: false; RoleBinding subject app-sa roleRef app-role; Role app-role has exact verbs/resources only.
+      unacceptable: |
+        ServiceAccount exists but the workload does not use it, RoleBinding refers to another Role, or Role has verbs: ["*"] / resources: ["*"].
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_minimum_artifacts_present
+    type: task-completion
+    provenance: task
+    locus: output-file
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] The task requires completing the network-isolation fragment into a full manifest containing namespace, workload, service identity, access control, and network rules.
+    signal:
+      file: output/team-service-environment.yaml
+      file_must_contain: >-
+        (?s)^(?=[\s\S]*kind:\s*Namespace\b)(?=[\s\S]*kind:\s*(Deployment|Pod|StatefulSet|DaemonSet|Job|CronJob)\b)(?=[\s\S]*kind:\s*ServiceAccount\b)(?=[\s\S]*kind:\s*Role\b)(?=[\s\S]*kind:\s*RoleBinding\b)(?=[\s\S]*kind:\s*NetworkPolicy\b)

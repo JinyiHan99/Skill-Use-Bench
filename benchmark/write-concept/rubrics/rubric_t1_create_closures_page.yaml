@@ -1,0 +1,229 @@
+# Rubric for skill_78_write_javascript_concept_documentation — t1_create_closures_page
+# Objective: evaluate whether the model writes a 33 JavaScript Concepts concept page per the write-concept skill; task completion is recorded separately with weight=0.
+rules:
+  - id: g1_observable_page_write
+    type: required-tool
+    provenance: gate
+    locus: tool-call
+    verifier: regex
+    weight: 0
+    spec: |
+      [GATE] The trace must contain an observable write or edit attempt to output/closures.mdx.
+      The gate only judges whether there is an attempt, not content quality or skill-following.
+    signal:
+      pattern: '(?s)(Write|Edit).{0,800}(file_path|path).{0,300}output/closures\.mdx|Bash.{0,800}(>|tee|cat\s+>|python).{0,500}output/closures\.mdx'
+
+  - id: r1a_opening_template_structure
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] New concept pages must open with a fixed template: frontmatter followed by a question-style opening hook, an immediate simple JavaScript code example, and a "What you'll learn in this guide" Info component.
+      skill-exclusive reason: without reading the skill, a strong model typically gives definitions and background first, then gradually gives examples; the skill requires the project-specific "question hook → immediate code → Info" opening order.
+    signal:
+      file: output/closures.mdx
+      file_must_contain: '(?sm)\A---\s*\n.{0,1200}^---\s*$\s*(?:[^#`\n]*\?[^\n]*\n){1,5}.{0,1600}```(?:javascript|js)\n.{0,2500}```.{0,1200}<Info>\s*\*\*What you[''’]ll learn in this guide:\*\*'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r1b_body_template_structure
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The concept page body should contain question-style body explanations, real-world analogy with ASCII diagram, core/API/usage explanation, Common Mistakes, Advanced Patterns, and other template sections.
+      skill-exclusive reason: without reading the skill, a closures tutorial may only contain definitions, examples, use cases, and summary; the skill requires analogy, ASCII visualization, and error/advanced pattern as project-fixed sections.
+    signal:
+      file: output/closures.mdx
+      file_must_contain: '(?sm)^##\s+.*(?:What|Why|How|Closure|Closures).{0,2500}^##\s+.*(?:Analogy|Mental Model|Think|Picture|Imagine).{0,4000}[┌+].{0,2500}[└+].{0,4000}^##\s+.*(?:Core|How|API|Usage|Use).{0,5000}^##\s+.*(?:Common Mistakes|#1|Mistake).{0,4000}^##\s+.*(?:Advanced|Patterns)'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r1c_closing_resource_structure
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The page ending must include Key Takeaways, Test Your Knowledge, Related Concepts, Reference, Articles, Videos, and the resource sections must appear in this order.
+      skill-exclusive reason: without reading the skill, the model may only write a summary or reference links; the skill requires the project-specific knowledge quiz and three-category resource ending structure.
+    signal:
+      file: output/closures.mdx
+      file_must_contain: '(?sm)^##\s+Key Takeaways.{0,4000}^##\s+Test Your Knowledge.{0,5000}^##\s+Related Concepts.{0,3000}^##\s+Reference.{0,3000}^##\s+Articles.{0,3000}^##\s+Videos'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_seo_frontmatter_two_title_pattern
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Frontmatter must use the two-title SEO pattern: title starts with Closures/Closure, includes a hook, and ends with "in JavaScript"; sidebarTitle corresponds to title but without "in JavaScript"; description starts with an action word such as Learn/Understand/Discover, is about 150-160 characters, and includes specific learning value.
+      skill-exclusive reason: without reading the skill, a strong model often writes `title: "Closures"` or a generic short description; the skill requires SEO length, concept-first, title/sidebarTitle separation, and action-oriented meta description.
+    signal:
+      file: output/closures.mdx
+      file_must_contain: '(?sm)\A---\s*\n(?=.{0,1200}^title:\s*[''\"]Closures?:\s+[^\n''\"]+\s+in JavaScript[''\"]\s*$)(?=.{0,1200}^sidebarTitle:\s*[''"](?![^\n''\"]*in JavaScript)[^\n''\"]+[''\"]\s*$)(?=.{0,1200}^description:\s*[''"](Learn|Understand|Discover)\s+[^''\"]{120,170}[''\"]\s*$).{0,1200}^---\s*$'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_opening_hook_immediate_code_info
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The page opening must first use a question the reader would ask as a hook, then immediately give a minimal JavaScript closure code example, and place the "What you'll learn in this guide" Info component after the example.
+      skill-exclusive reason: without reading the skill, a strong model may first give multiple paragraphs of definitions, historical background, or terminology explanations; the skill requires "question hook → immediate code → Info learning objectives".
+    signal:
+      file: output/closures.mdx
+      file_must_contain: '(?sm)\A---\s*\n.{0,1200}^---\s*$\s*(?:[^#\n]*\?[^\n]*\n){1,5}.{0,1200}```(?:javascript|js)\n.{0,1800}(function|=>|const\s+\w+\s*=).{0,1200}console\.log\([^\n]+\)\s*(//|/\*)\s*.{1,100}.{0,300}```.{0,1000}<Info>\s*\*\*What you[''’]ll learn in this guide:\*\*'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4a_mdn_inline_links
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.4
+    spec: |
+      [SKILL] When introducing key JavaScript concepts, objects, or APIs for the first time, MDN inline links should be provided.
+      skill-exclusive reason: without reading the skill, a strong model may only explain closure terminology; the skill explicitly requires linking key terms/APIs to MDN immediately.
+    signal:
+      file: output/closures.mdx
+      file_must_contain: '(?si)\[[^\]]*(lexical scope|scope|function|closure|JavaScript|Object|API)[^\]]*\]\(https://developer\.mozilla\.org/[^)]+\)'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r4b_internal_concept_links
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.35
+    spec: |
+      [SKILL] When mentioning prerequisite or related concepts, `/concepts/...` internal links should be used to build learning paths.
+      skill-exclusive reason: without reading the skill, even if the model explains prerequisites, it may not use the project's internal concept page links; the skill explicitly requires linking related concept pages.
+    signal:
+      file: output/closures.mdx
+      file_must_contain: '(?si)\[[^\]]*(scope|function|execution context|call stack|promise|event loop)[^\]]*\]\(/concepts/[a-z0-9-]+\)|href="/concepts/[a-z0-9-]+"'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r5_code_examples_follow_project_style
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] Code examples should show expected output next to console.log, and at common mistake points use WRONG / CORRECT format to contrast wrong and correct approaches.
+      skill-exclusive reason: without reading the skill, a strong model typically gives technically correct closure examples, but may not add output comments or WRONG/CORRECT contrasts; the skill requires the project's fixed teaching example format.
+    signal:
+      file: output/closures.mdx
+      file_must_contain: '(?si)(?=.{0,20000}```(?:javascript|js)\n.{0,3000}console\.log\([^\n]+\)\s*//\s*.{1,100}\n.{0,500}```)(?=.{0,20000}(❌\s*)?WRONG)(?=.{0,20000}(✓|✔|✅)\s*CORRECT)'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r6a_resource_card_structure
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The Reference, Articles, and Videos resource sections should use CardGroup/Card, with book, newspaper, and video icons respectively.
+      skill-exclusive reason: without reading the skill, a strong model may only list plain links; the skill explicitly requires Mintlify resource cards and content-type icons.
+    signal:
+      file: output/closures.mdx
+      file_must_contain: '(?sm)^##\s+Reference.{0,2500}<CardGroup\b.{0,2500}<Card\b[^>]*icon="book".{0,3000}^##\s+Articles.{0,2500}<CardGroup\b.{0,2500}<Card\b[^>]*icon="newspaper".{0,3000}^##\s+Videos.{0,2500}<CardGroup\b.{0,2500}<Card\b[^>]*icon="video"'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r6b_resource_descriptions_specific
+    type: lesson
+    provenance: skill
+    locus: final-state
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.35
+    spec: |
+      [SKILL] Articles/Videos card descriptions should specifically state the resource's unique value, not generic descriptions like "comprehensive guide / learn all about".
+      skill-exclusive reason: without reading the skill, the model may write generic resource descriptions; the skill explicitly requires two sentences specifically describing the resource's unique value.
+    signal:
+      query: |
+        Based only on the final file output/closures.mdx: do the Articles and Videos resource card descriptions specifically state each resource's unique value, rather than generic "Learn all about..." or "Comprehensive guide..."? Answer only YES or NO.
+        Answer YES if article/video Card descriptions mention concrete formats, examples, exercises, visualizations, audience fit, or specific takeaways.
+        Answer NO if descriptions are mostly generic phrases such as “learn all about closures”, “comprehensive guide”, or “great tutorial”.
+      acceptable: '<Card title="JavaScript Visualized: Closures" icon="newspaper" href="...">Animated diagrams show closures retaining outer variables after a function returns. Good for readers who need the memory model to click.</Card>'
+      unacceptable: '<Card title="Closure Tutorial" icon="newspaper" href="...">Learn all about closures.</Card>'
+      judge_context_window: [final_file:output/closures.mdx]
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: r7_avoids_skill_listed_ai_phrases
+    type: forbidden-arg
+    provenance: skill
+    locus: final-state
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The body text and self-written descriptions should avoid AI-sounding, filler, and stiff phrases listed in the skill, such as "To truly understand", "This is crucial", "It's worth noting that", "In order to", "one of the most important concepts", "essential points", "dramatically/fundamentally/incredibly/extremely". Common words in resource card titles are not evaluated as body-text banned words.
+      skill-exclusive reason: without reading the skill, a strong model writing tutorials often naturally uses these emphasis sentences; the skill explicitly requires changing them to more natural human expression.
+    signal:
+      file: output/closures.mdx
+      file_must_not_contain: '(?i)\b(dramatically|fundamentally|incredibly|extremely|essentially|basically)\b|one of the most important concepts|essential points|To truly understand|This is crucial|It[''’]s worth noting that|It[''’]s important to remember|In order to|Due to the fact that|At the end of the day|When it comes to'
+    review:
+      proposed_by: [drafter]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    locus: final-state
+    verifier: state-diff
+    weight: 0
+    spec: |
+      [TASK — not counted toward SF] output/closures.mdx exists and is a readable MDX/Markdown page about JavaScript closures, containing a closure definition and at least one JavaScript example.
+    signal:
+      file: output/closures.mdx
+      file_must_contain: '(?si)(?=.{0,20000}closures?)(?=.{0,20000}```(?:javascript|js))'

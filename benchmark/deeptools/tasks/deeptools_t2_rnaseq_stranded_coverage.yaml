@@ -1,0 +1,33 @@
+task_id: ngs_t2_rnaseq_stranded_coverage
+skill_id: deeptools
+description: |
+  I need browser-ready coverage tracks from a stranded RNA-style alignment. Please create separate forward-strand and reverse-strand tracks in `output/ngs_t2_rnaseq_stranded_coverage/`, normalized so the two tracks can be compared visually. The alignment file is `assets/ngs_t2_rnaseq_stranded_coverage/input/test_paired.bam`.
+
+  Please also save a short `run.log` in the output directory with the exact commands used and a one-line note saying which strand each output file represents.
+initial_state:
+  assets:
+    - path: assets/ngs_t2_rnaseq_stranded_coverage/input/test_paired.bam
+      source: "https://raw.githubusercontent.com/deeptools/deepTools/master/deeptools/test/test_data/test_paired.bam"
+      real_state: "Small public paired-end BAM test alignment from the deepTools repository, downloaded unchanged."
+      preparation: |
+        Downloaded unchanged from the upstream raw GitHub URL into the task input directory.
+    - path: assets/ngs_t2_rnaseq_stranded_coverage/input/test_paired.bam.bai
+      source: "https://raw.githubusercontent.com/deeptools/deepTools/master/deeptools/test/test_data/test_paired.bam.bai"
+      real_state: "BAM index paired with test_paired.bam, downloaded unchanged."
+      preparation: |
+        Downloaded unchanged from the upstream raw GitHub URL into the task input directory.
+  tools_available:
+    - bash
+    - python
+expected_trigger: true
+skill_constraints_tested:
+  - id: rnaseq_no_fragment_extension
+    description: "The skill explicitly says RNA-seq coverage must not use read extension because it can span splice junctions."
+    exclusive: "A generic NGS workflow may extend reads by default, especially if reusing ChIP-seq coverage habits."
+  - id: rnaseq_normalization_choice
+    description: "The skill recommends CPM for binned RNA-seq coverage tracks rather than gene-level-oriented normalization choices."
+    exclusive: "Without the skill, a model may choose another plausible normalization method or leave the tracks as raw counts, because the task only asks for visual comparability."
+notes: |
+  - Positive example: should trigger the NGS analysis skill.
+  - Observable signals: two separate strand-specific output tracks, no read-extension setting in the recorded commands, normalization choice visible in run.log, and a note/log mapping strand to output.
+  - Common failure: producing one combined track, omitting exact commands from the log, or applying ChIP-seq-style read extension.

@@ -1,0 +1,105 @@
+task_id: vercel_ai_sdk_v6_t2_tool_agent
+skill_id: vercel-ai-sdk
+rules:
+  - id: g1_observable_support_edit
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trace contains a real Write/Edit tool call modifying the support-agent endpoint or related agent/tool files."
+    signal:
+      pattern: "(?:Write|Edit)[\\s\\S]{0,10000}?(?:file_path|path)?[\\s\\S]{0,1000}?assets/vercel_ai_sdk_v6_t2_tool_agent/input/support-agent/[\\s\\S]{0,500}?\\.(?:ts|tsx)"
+
+  - id: r1_define_tool_with_helper_input_schema
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The ticket lookup tool must be wrapped with the ai package's tool() helper and use a zod-backed inputSchema, not legacy plain object parameters.
+      skill-exclusive reason: without reading the skill, a strong model will casually retain the old shape lookupTicket: { description, parameters, execute } already in route.ts; the skill explicitly requires v6 tool({ inputSchema }). The conflict is plain object/parameters vs helper/inputSchema.
+    signal:
+      query: |
+        Inspect only active, non-commented final code actually written/edited under assets/vercel_ai_sdk_v6_t2_tool_agent/input/support-agent. Is the ticket lookup capability defined with the AI SDK `tool({ ... })` helper and an `inputSchema` that is either inline `z.object(...)` or a local zod schema constant?
+        Answer YES only if the lookup tool is active code, wrapped in `tool({ ... })`, includes `inputSchema`, and has an execute path that performs the ticket lookup. Answer NO if it remains a plain object even with `inputSchema`, uses `parameters`, lacks `tool()`, appears only in comments/dead code, or has no zod-backed schema.
+      acceptable: "const LookupInput = z.object({ id: z.string() }); lookupTicket: tool({ description: '...', inputSchema: LookupInput, execute: async ({ id }) => findTicket(id) })"
+      unacceptable: "lookupTicket: { description: '...', inputSchema: z.object({ id: z.string() }), execute: async ({ id }) => findTicket(id) } with no tool() wrapper"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_use_tool_loop_agent_for_multistep_assistant
+    type: required-tool
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] The multi-step support assistant must use v6 ToolLoopAgent, not just adding tools/maxSteps to streamText.
+      skill-exclusive reason: looking only at the task's "streaming assistant + multiple reasoning/tool steps", a strong model commonly uses streamText({ tools, maxSteps }) to complete; the skill requires ToolLoopAgent for agentic applications. The conflict is ordinary streamText multi-step tool calls vs dedicated agent abstraction.
+    signal:
+      query: |
+        Inspect only active, non-commented final code actually written/edited under assets/vercel_ai_sdk_v6_t2_tool_agent/input/support-agent. Does the support endpoint's response path instantiate or import a local `ToolLoopAgent` instance and actually use that agent for the support assistant?
+        Answer YES only if `ToolLoopAgent` is instantiated directly, through a local factory/export, or imported from a local file and the POST route uses that instance in its returned support response. Answer NO if `ToolLoopAgent` is only dead/commented code, or if the route still handles the request directly with `streamText`/`generateText` plus tools/maxSteps instead of using the agent.
+      acceptable: "route imports supportAgent from './agent'; supportAgent is new ToolLoopAgent({ ... }); route returns createAgentUIStreamResponse({ agent: supportAgent, uiMessages: messages })"
+      unacceptable: "const result = streamText({ model, messages, tools: { lookupTicket }, maxSteps: 5 }); return result.toUIMessageStreamResponse()"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_return_agent_ui_stream_response
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] The Agent API route must expose the streaming UI response via createAgentUIStreamResponse({ agent, uiMessages }).
+      skill-exclusive reason: without reading the skill, the model may only change the old toDataStreamResponse to toUIMessageStreamResponse, or return a text stream; the skill explicitly requires createAgentUIStreamResponse for the ToolLoopAgent route. The conflict is ordinary stream response helper vs agent UI stream integration.
+    signal:
+      query: |
+        Inspect only active, non-commented final support-agent route code and its local imports. Does the POST route return `createAgentUIStreamResponse` with an agent and the incoming UI messages (e.g. `uiMessages: messages`)?
+        Judgment basis: look only at the final code contents, not at the agent's self-report. Answer YES if the route's returned response is created through createAgentUIStreamResponse for the ToolLoopAgent. Answer NO if it returns result.toDataStreamResponse(), result.toTextStreamResponse(), result.toUIMessageStreamResponse(), or Response.json instead.
+      acceptable: "return createAgentUIStreamResponse({ agent: supportAgent, uiMessages: messages })"
+      unacceptable: "return result.toDataStreamResponse() or return result.toUIMessageStreamResponse() from streamText"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_bound_agent_iterations
+    type: required-arg
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL] The ToolLoopAgent should be configured with an explicit maximum-step termination condition such as stopWhen/stepCountIs, to avoid unbounded tool loops.
+      skill-exclusive reason: looking only at the task, the model may create an agent but omit the loop limit; the skill's agent examples and configuration guide emphasize stopWhen: stepCountIs(...). The conflict is unbounded agent loop vs explicit step bound.
+    signal:
+      query: |
+        Inspect only active, non-commented final ToolLoopAgent configuration in support-agent code. Is there an explicit total maximum-step bound for the agent loop, such as `stopWhen: stepCountIs(10)` or `stepCountIs(MAX_STEPS)`?
+        Answer YES only if the ToolLoopAgent has a concrete maximum step cap. Answer NO if no total step cap exists, or if the only stopping behavior is a non-step condition, prompt instruction, timeout, or unrelated guard.
+      acceptable: "new ToolLoopAgent({ ..., stopWhen: stepCountIs(10) })"
+      unacceptable: "new ToolLoopAgent({ model, instructions, tools }) with no stopWhen or maximum-step condition"
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] The support endpoint has become a small assistant that can look up local tickets, draft escalation notes, and maintain streaming to callers.
+    signal:
+      query: |
+        Inspect only the final files under assets/vercel_ai_sdk_v6_t2_tool_agent/input/support-agent. Does the implementation keep and call the local `findTicket` data source, expose a POST endpoint that returns streaming assistant output, and include instructions/prompt/tool flow that bases escalation-note drafting on ticket details?
+        Judgment basis: look only at the final file contents, not at the agent's self-report. Answer YES if these observable task-completion requirements are all present. Answer NO if ticket lookup is missing, the local data source is bypassed, the endpoint is not streaming, or the escalation guidance is not grounded in ticket details.
+      acceptable: "Tool/agent executes findTicket(id), route returns a streaming agent response, and instructions tell the assistant to draft escalation guidance from ticket details."
+      unacceptable: "Endpoint returns a static JSON note and never imports or calls findTicket."

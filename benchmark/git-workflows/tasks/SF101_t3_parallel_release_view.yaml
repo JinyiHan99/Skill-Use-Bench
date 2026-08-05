@@ -1,0 +1,49 @@
+task_id: SF101_t3_parallel_release_view
+level: L2
+skill_id: skill_101_git-workflows
+description: |
+  I still have an unpolished README draft in the main working tree; do not commit, stash, or discard it first. Now I need to view the `release-candidate` branch at the same time, and I need to keep a separate parallel working copy on disk for subsequent continued inspection. The on-site note is at `assets/SF101_t3_parallel_release_view/input/request_note.txt`; the repository is at `assets/SF101_t3_parallel_release_view/input/repo/`.
+
+  Please first preserve the parallel working copy of `release-candidate` to `output/release_candidate_view/`, then without changing the draft state in the main working tree, compare the README contents on both sides, and write a brief conclusion to `output/release_compare.md`.
+
+initial_state:
+  assets:
+    - path: assets/SF101_t3_parallel_release_view/input/repo/
+      source: "https://github.com/octocat/Hello-World.git"
+      real_state: "A real public Git repository cloned locally; master has an uncommitted README edit, and release-candidate is a local branch with a committed README note."
+      preparation: |
+        Clone octocat/Hello-World without tags; configure local author; create release-candidate with commit "Prepare release candidate wording"; return to master; append an uncommitted local workspace note to README.
+    - path: assets/SF101_t3_parallel_release_view/input/request_note.txt
+      source: "Prepared request note based on the local repository state derived from https://github.com/octocat/Hello-World.git"
+      real_state: "Text note describing the need for a side-by-side comparison while preserving current uncommitted work; the task description adds the explicit requirement to leave a persistent parallel working copy on disk."
+      preparation: |
+        Written after preparing the branch and dirty working tree.
+  tools_available: [bash, read, edit, grep, git]
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: parallel_branch_checkout
+    description: "Use a side-by-side checkout pattern for the release branch so the dirty main checkout is not overwritten, stashed, committed, or otherwise parked elsewhere."
+    exclusive: "Without the skill, a model may use read-only branch inspection such as viewing a branch file or branch diff, or may attempt a direct checkout/stash workflow. Those approaches can compare README content but do not satisfy the explicit requirement to leave a persistent side-by-side working copy of release-candidate on disk."
+
+notes: |
+  Core test point: multi-branch parallel viewing. The task requires keeping a parallel working copy of release-candidate on disk while keeping the README draft in the main working tree as an uncommitted change.
+
+  Common error behaviors:
+    - Directly switching to release-candidate in the main working tree, causing the current README draft to be unable to switch or to be overwritten;
+    - Temporarily committing, stashing, or discarding the "Local workspace note", changing the user's original working-tree state;
+    - Only viewing the current master, not actually inspecting release-candidate;
+    - Completing the comparison only via read-only branch content viewing or branch diff, but not creating and keeping the output/release_candidate_view/ parallel working copy as required;
+    - Copying the entire repo and then switching branches, producing a full .git directory copy, rather than a lightweight parallel working-copy pattern.
+
+  baseline_correctness_signals:
+    - output/release_compare.md exists, mentioning the differences between the master draft and the release-candidate branch README.
+    - The Local workspace note in the original repo README still exists as an uncommitted change.
+    - The original repo is still on master, with no new temporary commits and no lost uncommitted changes.
+
+  skill_following_signals:
+    - output/release_candidate_view/ exists and is an independent parallel working copy of release-candidate.
+    - output/release_candidate_view/README exists and contains the Release candidate note from the release-candidate branch.
+    - output/release_candidate_view/.git is a text pointer file pointing to the main repo gitdir, not a fully copied .git directory.
+    - The main working tree did not change the original draft state via stash/commit/discard/checkout.

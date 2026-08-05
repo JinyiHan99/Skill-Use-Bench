@@ -1,0 +1,85 @@
+task_id: SF03_t5_form_fill_flatten
+level: L2
+skill_id: skill_03_pdf
+description: |
+  I need to prepare a filled W-9 form (forms/fw9.pdf) for a vendor.
+  The data file is already prepared: vendor_w9.fdf.
+
+  Please fill the form and produce a version for financial archiving.
+
+initial_state:
+  files:
+    - path: vendor_w9.fdf
+      content: |
+        %FDF-1.2
+        1 0 obj
+        <<
+        /FDF <<
+          /Fields [
+            << /T (topmostSubform[0].Page1[0].f1_01[0]) /V (Acme Technologies Inc.) >>
+            << /T (topmostSubform[0].Page1[0].f1_02[0]) /V (Acme Tech) >>
+            << /T (topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].f1_03[0]) /V (Software Development and Cloud Services) >>
+            << /T (topmostSubform[0].Page1[0].f1_05[0]) /V (12-3456789) >>
+            << /T (topmostSubform[0].Page1[0].f1_06[0]) /V (1600 Amphitheatre Parkway) >>
+            << /T (topmostSubform[0].Page1[0].Address_ReadOrder[0].f1_07[0]) /V (Mountain View, CA 94043) >>
+            << /T (topmostSubform[0].Page1[0].Address_ReadOrder[0].f1_08[0]) /V (United States) >>
+            << /T (topmostSubform[0].Page1[0].f1_09[0]) /V (John Smith, CFO) >>
+            << /T (topmostSubform[0].Page1[0].f1_10[0]) /V (john.smith@acmetech.com) >>
+          ]
+        >>
+        >>
+        endobj
+        trailer
+        << /Root 1 0 R >>
+        %%EOF
+    - path: forms/README.txt
+      content: |
+        IRS Form W-9 (Rev. March 2024) - Request for Taxpayer ID Number
+        Downloaded from: https://www.irs.gov/pub/irs-pdf/fw9.pdf
+        Pages: 6 (page 1 is the form, pages 2-6 are instructions)
+        This is the official IRS fillable PDF form.
+  tools_available: [bash, read, edit, grep]
+  binary_assets:
+    - path: forms/fw9.pdf
+      source_url: "https://www.irs.gov/pub/irs-pdf/fw9.pdf"
+      pages: 6
+      size_mb: 0.1
+      description: "Official IRS Form W-9 — real fillable PDF form"
+
+expected_trigger: true
+
+skill_constraints_tested:
+  - id: tool_restriction
+    description: "Must use pdftk fill_form + flatten in a single command (not split: fill then flatten separately, not pypdf+pdftk hybrid, not qpdf for flatten)"
+    exclusive: "Model might split into two pdftk calls (fill then flatten), or use pypdf/pdfrw to fill + qpdf/pdftk to flatten"
+  - id: flatten_when_requested
+    description: "User said 'formal archive', 'no further editing needed', 'archival version' → must add flatten"
+    exclusive: "Model might miss the flatten trigger signals"
+  - id: output_naming_final
+    description: "With flatten → fw9_filled_final.pdf (not fw9_filled.pdf)"
+    exclusive: "Model uses fw9_filled.pdf (wrong naming for flattened)"
+  - id: inspect_fields_first
+    description: "Must run 'pdftk forms/fw9.pdf dump_data_fields' before fill_form (FDF already has field names, but skill requires explicit inspection)"
+    exclusive: "Model skips inspection"
+  - id: input_validation
+    description: "Must run 'test -f forms/fw9.pdf && test -f vendor_w9.fdf' and 'pdftk forms/fw9.pdf dump_data | grep NumberOfPages' before fill_form"
+    exclusive: "Model skips file existence check and page count validation, jumps straight to fill_form"
+  - id: single_command_flatten
+    description: "Must combine fill_form and flatten in one pdftk invocation, not produce intermediate fw9_filled.pdf"
+    exclusive: "Model fills first, then runs a second pdftk/qpdf command to flatten, leaving an unflattened copy on disk"
+
+notes: |
+  Core test points (real IRS W-9 form):
+  This is the control group for T4 — same type of operation but the opposite flatten decision.
+  
+  1. Flatten trigger signal: the user said "archival version"
+     (this is the implicit trigger semantics for flatten in the skill; the description no longer directly contains the English keyword finalize)
+  2. Fully contrasted with T4:
+     T4: "the employee still needs to supplement signature" → do not add flatten
+     T5: "financial archive" → add flatten
+  
+  Expected correct behavior (high-level judgment, specific commands not written):
+    - Complete input existence and page-count pre-check before filling, and explicitly inspect fields
+    - Use a single tool invocation to complete both fill and flatten (no unflattened intermediate copy left)
+    - The output file uses the skill-specified "flattened" naming suffix
+    - After filling, re-verify the page count is still the original count

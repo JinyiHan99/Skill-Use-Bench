@@ -1,0 +1,58 @@
+{
+  "items": [
+    {
+      "id": 2288418121,
+      "number": 33581,
+      "title": "Link copied anchor is hidden under sticky header",
+      "state": "open",
+      "html_url": "https://github.com/microsoft/vscode/issues/33581",
+      "body": "When opening a copied heading link, the target heading is covered by the sticky title bar.",
+      "draft": null,
+      "pull_request": null,
+      "user": {
+        "login": "octocat",
+        "avatar_url": "https://avatars.githubusercontent.com/u/583231?v=4"
+      },
+      "labels": [
+        { "name": "bug", "color": "d73a4a" }
+      ],
+      "cardTemplate": "$.templates.issue"
+    },
+    {
+      "id": 2291308500,
+      "number": 33582,
+      "title": "Adopt updated terminal profile defaults",
+      "state": "open",
+      "html_url": "https://github.com/microsoft/vscode/pull/33582",
+      "body": null,
+      "draft": false,
+      "pull_request": {
+        "url": "https://api.github.com/repos/microsoft/vscode/pulls/33582",
+        "html_url": "https://github.com/microsoft/vscode/pull/33582",
+        "diff_url": "https://github.com/microsoft/vscode/pull/33582.diff",
+        "patch_url": "https://github.com/microsoft/vscode/pull/33582.patch"
+      },
+      "user": {
+        "login": "microsoft-github-policy-service",
+        "avatar_url": "https://avatars.githubusercontent.com/u/6154722?v=4"
+      },
+      "labels": [],
+      "cardTemplate": "$.templates.pullRequest"
+    },
+    {
+      "id": 2291400150,
+      "number": 33583,
+      "title": "Tracking item imported from older planning board",
+      "state": "open",
+      "html_url": "https://github.com/microsoft/vscode/issues/33583",
+      "body": null,
+      "draft": null,
+      "pull_request": null,
+      "user": {
+        "login": "release-bot",
+        "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4"
+      },
+      "labels": []
+    }
+  ]
+}

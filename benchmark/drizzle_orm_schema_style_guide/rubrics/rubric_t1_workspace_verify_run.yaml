@@ -1,0 +1,101 @@
+# Rubric for skill_72_drizzle_orm_schema_style_guide — drizzle_t1_workspace_verify_run
+# Scoring boundary: skill is scored; task only records completion rate; gate only judges evaluability.
+
+task_id: drizzle_t1_workspace_verify_run
+skill_id: drizzle
+rules:
+  - id: r1_final_result_absent_without_sentinel
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — exclusive] In the newly added workspace-level verification request record, the "later-written final processing result/reason/decision" must remain nullable or optional,
+      and must not use artificial placeholder values such as unknown, pending, none, default('unknown'), default('pending'), default('none') to disguise a missing result.
+      skill-exclusive rationale: looking only at the task description, a strong model will likely model both "current lifecycle state" and "final result" as notNull + default state,
+      e.g. default('pending'); the skill explicitly requires that missing values not introduce sentinels, and that lifecycle state and not-yet-produced final result be expressed separately. The conflict point is
+      "using default placeholder strings to represent not-yet-produced final processing result" vs "final result remains absent/null at creation time".
+    signal:
+      judge_question: |
+        Based strictly on the final contents of assets/drizzle_t1_workspace_verify_run/input/packages/database/src/schemas/verify.ts,
+        not on agent self-claims, answer YES iff the newly added workspace-level verification request table keeps final outcome/result/reason/decision fields nullable or optional when the request is first created, and does not assign artificial sentinel defaults such as unknown, pending, none, n/a, or empty string to those final-result fields.
+        If the new table lacks any field representing a later-written final outcome/result/reason/decision, answer NO.
+        Answer YES if lifecycle/status is a separate field while finalDecision/finalResult/finalReason-like fields have no notNull default sentinel.
+        Answer NO if a final-result field is notNull with default('unknown'), default('pending'), default('none'), default(''), or an equivalent placeholder.
+        Acceptable: finalDecision: varchar('final_decision', { length: 32 }).$type<...>() with no default sentinel.
+        Unacceptable: finalDecision: varchar('final_decision', { length: 32 }).$type<...>().notNull().default('pending').
+      judge_expected: "YES"
+
+  - id: r2_structured_jsonb_has_concrete_contract
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL — exclusive] Newly added JSONB fields such as stage details, request context, and metadata must use a named interface/type describing the expected shape,
+      and must not use Record<string, unknown>, unknown[], any, or untyped loose JSONB as the new structured contract.
+      skill-exclusive rationale: looking only at the task description, a strong model will often write jsonb(...).$type<Record<string, unknown>>()
+      or unknown[] directly for "per-stage processing details"; the skill explicitly requires JSONB columns to define concrete interfaces, even if most fields are optional. The conflict point is "quick loose JSON bag" vs "named structured data contract".
+    signal:
+      judge_question: |
+        Based strictly on the final contents of assets/drizzle_t1_workspace_verify_run/input/packages/database/src/schemas/verify.ts,
+        not on agent self-claims, answer YES iff every newly added structured JSONB field for the workspace verification request model uses a concrete named TypeScript interface or type describing the expected shape.
+        Answer YES if stageResults/requestContext/metadata-like new JSONB fields use $type<Workspace...StageResults>, $type<Workspace...Metadata>, or equivalent named contracts with explicit properties.
+        Answer NO if any newly added structured JSONB field uses $type<Record<string, unknown>>, unknown[], any, object, or has no meaningful typed contract.
+        Answer NO if the named type/interface is merely a loose wrapper around Record<string, unknown>, object, any, unknown[], or only an index signature such as [key: string]: unknown.
+        Acceptable: interface WorkspaceVerifyRequestStageResult { stage: string; status?: string; reason?: string } and stageResults: jsonb('stage_results').$type<WorkspaceVerifyRequestStageResult[]>().
+        Unacceptable: type WorkspaceMetadata = Record<string, unknown>; metadata: jsonb('metadata').$type<WorkspaceMetadata>().
+      judge_expected: "YES"
+
+  - id: r3_no_autoincrement_primary_key
+    type: forbidden-arg
+    provenance: skill
+    verifier: state-diff
+    exclusive: true
+    weight: 0.5
+    spec: |
+      [SKILL — exclusive] The newly added table primary key must not use auto-increment sequences such as serial, bigserial, smallserial, or generated identity; uuid or application-generated text id should be used.
+      skill-exclusive rationale: looking only at the task description, a strong model may use the common PostgreSQL/Drizzle serial('id').primaryKey() to quickly create a table;
+      the skill explicitly forbids auto-increment primary keys to avoid sequence state issues during cross-database migration/recovery. The conflict point is "database sequence generates id" vs "uuid/app-generated id".
+    signal:
+      file: "assets/drizzle_t1_workspace_verify_run/input/packages/database/src/schemas/verify.ts"
+      file_must_not_contain: '(?i)\b(?:serial|bigserial|smallserial)\s*\(|\bgenerated(?:Always|ByDefault)AsIdentity\s*\(|generated\s+(?:always|by\s+default)\s+as\s+identity'
+
+  - id: r4_non_obvious_fields_have_business_jsdoc
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: false
+    weight: 0.25
+    spec: |
+      [SKILL — weak signal] In the newly added model, non-obvious fields such as external flow request identifier, lifecycle state, final result, and stage details should have JSDoc explaining the business source, write timing, or concrete examples,
+      rather than only restating the field name.
+      skill-exclusive rationale: this requirement comes from the skill's field-description convention, but a strong model may also add comments based on general code-quality habits, so it is only a weak auxiliary signal.
+    signal:
+      judge_question: |
+        Based strictly on the final contents of assets/drizzle_t1_workspace_verify_run/input/packages/database/src/schemas/verify.ts,
+        answer YES iff at least two non-obvious fields in the newly added workspace verification request table have JSDoc that explicitly explains a business source, lifecycle/write timing, or concrete example value.
+        Do not count comments that only restate the column name or generic type.
+        Answer YES if at least two fields such as external request id, lifecycle status, final result/reason/decision, or stage details have comments explaining source, timing, or example values.
+        Answer NO if comments are absent, only one non-obvious field is meaningfully documented, or comments merely say things like "External request id" / "Stage results" without source, timing, or examples.
+        Acceptable: "/** External workflow request id supplied before verify execution starts. */" and "/** Stage-level decisions appended as each pre-run check completes. */".
+        Unacceptable: "/** request id */" or "/** stage results */" only.
+      judge_expected: "YES"
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: |
+      [TASK — not counted toward skill-following] Setting aside whether the skill was followed, whether a Drizzle schema model expressing the workspace-level verification request lifecycle was added to verify.ts.
+    signal:
+      judge_question: |
+        Based strictly on the final contents of assets/drizzle_t1_workspace_verify_run/input/packages/database/src/schemas/verify.ts,
+        answer YES iff a new Drizzle pgTable was added for workspace-level verification request records and it can express ownership by workspace, an external workflow/request identifier, current lifecycle status, a final result written later, and stage-level details.
+        Answer NO if no new table exists, if it only modifies verify_runs, or if the added table cannot represent the requested lifecycle data.
+        Acceptable: a new pgTable separate from verifyRuns with workspaceId, externalRequestId, status, finalResult/finalReason, and stageResults-like fields.
+        Unacceptable: only adding a column to verifyRuns or adding an empty table with no request lifecycle fields.
+      judge_expected: "YES"

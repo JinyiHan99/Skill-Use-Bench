@@ -1,0 +1,61 @@
+task_id: SF29_t1_bugfix_calculator
+level: L2
+skill_id: SF29
+description: |
+  You have a Python calculator library at `./assets/SF29_t1_bugfix_calculator/`.
+  A user reported that `divide(10, 0)` crashes their app instead of returning
+  a meaningful error. Please fix the bug so that dividing by zero returns
+  `{"error": "division by zero"}` instead of crashing, while keeping the
+  library's existing behavior intact.
+initial_state:
+  assets:
+    - path: ./assets/SF29_t1_bugfix_calculator/
+      source: "Hand-crafted minimal Python project embodying real-world division-by-zero bug pattern; pytest-convention project structure; intentionally small to isolate TDD process compliance from code comprehension difficulty"
+      description: "Python calculator project. Contains: src/calculator.py, tests/test_calculator.py, conftest.py, pyproject.toml"
+      real_state: "The divide method raises ZeroDivisionError when b=0; existing tests pass; no cache artifacts present"
+  tools_available: [bash, read, edit]
+  pip_packages: [pytest]
+expected_trigger: true
+skill_constraints_tested:
+  - id: red_before_green
+    description: "Skill requires writing a failing test BEFORE writing any fix code"
+    exclusive: "Without the TDD skill, most models will directly patch src/calculator.py first and only add or run tests afterward, rather than demonstrating a failing test before any production code change"
+  - id: pytest_at_each_transition
+    description: "Skill requires running pytest at the RED transition (after writing the failing test) and at the GREEN transition (after applying the fix); a third run is required only if a refactor step is performed"
+    exclusive: "Without the TDD skill, most models run pytest only once after applying the fix, rather than running it at both the RED checkpoint (to prove test failure) and the GREEN checkpoint (to prove test passes)"
+  - id: test_naming_convention
+    description: "Skill requires test names follow test_<behavior>_<condition>_<expected> pattern"
+    exclusive: "Without skill, model would use arbitrary test names like test_divide_zero or test_bug_fix"
+  - id: minimal_implementation
+    description: "Skill requires writing the simplest code to pass the failing test"
+    exclusive: "Without skill, model might add extra error handling, type checking, or logging beyond what the test requires"
+notes: |
+  Core test: Does the model follow the strict RED→GREEN→REFACTOR cycle for a bug fix?
+  Key signals:
+  - pytest must be run BEFORE any change to calculator.py (to show test fails)
+  - Test must be written BEFORE the fix
+  - pytest must be run AFTER the fix (to show test passes)
+  - Test name should match the naming convention
+  Naming convention check applies ONLY to newly added tests; pre-existing tests
+  in test_calculator.py are out of scope.
+  Scoring MUST rely on tool-call trace ordering: edits to tests/ must precede
+  edits to src/calculator.py; first pytest must run before any production code
+  edit; RED failure must demonstrate the bug exists via test failure. For crash-type
+  bugs, an unhandled exception (e.g., ZeroDivisionError) in the test IS a valid
+  RED state. Import errors or syntax errors indicate a broken test and are NOT valid.
+  Common model mistakes:
+  - Fix the code first, then write tests
+  - Run pytest only once at the end
+  - Write multiple test cases in a single test function
+  For this task's scoring, a bug-fix cycle with no refactor step is complete
+  after exactly two pytest checkpoints: one RED run (after writing the new test,
+  before any production code edit) and one GREEN run (after applying the fix).
+  A third pytest run is required only if the model performs an explicit refactor
+  edit after reaching green. This is a task-local clarification of the skill's
+  general "minimum three invocations" rule, which assumes a refactor phase.
+  minimal_implementation boundary:
+  - Acceptable: if/return guard for b==0, or try/except ZeroDivisionError
+  - Acceptable: updating divide's return type annotation if one exists
+  - Unacceptable: modifying other methods, adding logging, custom exception
+    classes, input type validation, or unrelated refactoring
+  pytest should be run from the project root directory.

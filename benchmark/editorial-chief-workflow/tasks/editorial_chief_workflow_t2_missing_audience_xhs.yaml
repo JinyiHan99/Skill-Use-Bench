@@ -1,0 +1,34 @@
+task_id: editorial_chief_workflow_t2_missing_audience_xhs
+skill_id: editorial-chief-workflow
+description: |
+  This material is intended for Xiaohongshu (RED) content, on the topic of "why semantic search can help a team find problems in user feedback faster". The material is at `assets/editorial_chief_workflow_t2_missing_audience_xhs/input/source_notes_embeddings.md`. Please, like a content lead, set the direction first; do not write it as a paper; later I will take it to show business colleagues.
+initial_state:
+  assets:
+    - path: assets/editorial_chief_workflow_t2_missing_audience_xhs/input/source_notes_embeddings.md
+      source: "https://raw.githubusercontent.com/openai/openai-cookbook/main/examples/Semantic_text_search_using_embeddings.ipynb"
+      real_state: "Semantic search and embeddings example material extracted from the real OpenAI Cookbook notebook, with fact descriptions and non-negotiable facts."
+      preparation: |
+        On 2026-07-02 used WebFetch to obtain the public GitHub raw notebook content, extracting facts related to semantic search, cosine similarity, example queries, and business value; no standard answer was added.
+  tools_available:
+    - filesystem
+    - multi_agent_orchestration
+    - file_editing
+expected_trigger: true
+skill_constraints_tested:
+  - id: ask_when_audience_missing
+    description: "The skill requires that when the target audience is missing, you must ask first; you must not decompose, write, or assign when the parameter is missing."
+    exclusive: "A strong model will usually guess the audience from 'business colleagues' or 'Xiaohongshu' and start writing content directly."
+  - id: do_not_silently_guess_execution_parameters
+    description: "The skill explicitly forbids silently guessing audience and channel; in this task only the channel is relatively clear, and the audience is still unlocked."
+    exclusive: "A generic content model will treat 'business colleagues' as a sufficiently clear audience persona and proceed to generate an outline or body text."
+notes: |
+  - Core test point: this is a positive missing-parameter example. It is superficially a Xiaohongshu content-coordination request, but lacks the explicit audience parameter required by the skill.
+  - Expected correct behavior: the model should first ask the user to supplement who the readers are; it must not first decompose titles, structure, assignment, body text, or output Xiaohongshu notes.
+  - Common model error behaviors: directly writing "I will target non-technical business colleagues with viral Xiaohongshu notes" in the first paragraph of the reply, then giving titles, cover copy, and body text; this violates the skill's ask-first rules in 2.3 and 3.2.
+  - baseline_correctness_signals:
+      - Can recognize the material's topic and Xiaohongshu direction, and does not misinterpret embeddings as traditional keyword search.
+      - If the user later supplements the audience, the final content should preserve facts such as semantic search, embeddings, similarity ranking, and locating user-feedback problems.
+  - skill_following_signals:
+      - The first round only asks for the missing audience, and does not perform task decomposition, role assignment, or body generation.
+      - Does not unilaterally upgrade "business colleagues" to a locked target-audience strategy.
+      - Does not read / pretend to read channel strategy and enter orchestration while parameters are missing.

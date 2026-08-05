@@ -1,0 +1,36 @@
+task_id: football_data_t4_saka_market_profile
+skill_id: football-data
+description: |
+  I am updating Bukayo Saka's player card. `assets/football_data_t4_saka_market_profile/input/wikidata_Q59306386_bukayo_saka.json` is the public entity material I saved, but it is not suitable for direct display. Please supplement a fan-facing material update, focusing on his current market value, market value change trajectory, and important transfer records, and in the same short profile supplement his recent Premier League player status this season.
+initial_state:
+  assets:
+    - path: assets/football_data_t4_saka_market_profile/input/wikidata_Q59306386_bukayo_saka.json
+      source: "https://www.wikidata.org/wiki/Special:EntityData/Q59306386.json"
+      real_state: "Wikidata Q59306386's real entity JSON, describing Bukayo Saka and containing multiple types of public external identifiers; downloaded and verified size 68003 bytes."
+      preparation: |
+        mkdir -p assets/football_data_t4_saka_market_profile/input
+        curl -L --fail https://www.wikidata.org/wiki/Special:EntityData/Q59306386.json -o assets/football_data_t4_saka_market_profile/input/wikidata_Q59306386_bukayo_saka.json
+  tools_available:
+    - shell
+    - python
+    - internet
+expected_trigger: true
+skill_constraints_tested:
+  - id: transfermarkt_player_profile_path
+    description: "Player market value and transfer history should be obtained via the skill's player-profile capability; when using a Transfermarkt identifier, it can cover players from any league."
+    exclusive: "The Wikidata asset contains the P2446 Transfermarkt ID; a model that does not read the skill may use that ID to get similar market-value information via generic web search or scraping, but will not know to prioritize the sports-skills / sports_skills player-profile interface to obtain structured market_value, market_value_history, and transfer_history. This constraint is mainly distinguished by call trace, not just by final copy."
+  - id: required_pl_fpl_enrichment
+    description: "Saka is a PL player; when supplementing recent Premier League status, the model should discover the FPL identifier via a skill-supported PL path such as season leaders before merging player profile, rather than guessing the ID."
+    exclusive: "This branch is used to observe whether the model knows football-data's dedicated entry for PL/FPL data. A model that does not read the skill may supplement status via news, web summaries, or public fantasy pages, but will not naturally discover the FPL identifier via get_season_leaders and merge data via the player-profile capability; therefore this constraint should be judged mainly by call trace."
+notes: |
+  - Core test point: the real entity asset provides identity background and public external identifiers; completing the task requires knowing the skill's different entries for Transfermarkt/FPL, and generating player-card content via the skill's structured player-profile capability.
+  - Expected correct behavior: read the material file and extract the Transfermarkt ID from Wikidata P2446; then query market value, market-value history, and transfer history via the skill's player-profile capability. When supplementing recent Premier League status, first discover the FPL identifier via a skill-supported PL path, then merge the player profile, rather than guessing the identifier.
+  - Common model error behaviors: only extracting date of birth/nationality from `wikidata_Q59306386_bukayo_saka.json` and then being unable to give market-value history; without reading the JSON asset, parsing the Wikidata P2446 property, or other observable retrieval trace, directly hard-writing `433177`; treating `get_player_season_stats` as a market-value source; fabricating transfer fee or market value dates.
+  - baseline_correctness_signals:
+      - The output includes current market value, at least one market-value change trajectory, and at least one transfer history or an explicit statement of no transfer-fee record.
+      - The output includes Saka's recent Premier League player status information this season.
+      - The text suits a fan card, not raw JSON.
+  - skill_following_signals:
+      - Must be judged based on call trace: use the sports-skills CLI or sports_skills Python module to call the player-profile capability, and obtain Transfermarkt market_value / market_value_history / transfer_history structure.
+      - When supplementing recent Premier League status, the process of discovering the FPL identifier via a PL path must be visible, e.g. first using skill-supported paths such as get_current_season / get_season_leaders, rather than hard-writing an FPL ID out of thin air.
+      - Explicit exclusions: only using generic web search, web scraping, or news summaries, or mistaking ESPN player season statistics as a market-value source, does not count as full skill-following.

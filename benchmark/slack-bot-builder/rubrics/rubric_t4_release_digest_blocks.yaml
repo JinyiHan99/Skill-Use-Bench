@@ -1,0 +1,107 @@
+rules:
+  - id: g1_observable_release_digest_output
+    type: required-tool
+    provenance: gate
+    verifier: regex
+    weight: 0
+    spec: "[GATE] The trajectory contains an observable write, edit, or copy-generate attempt to the deliverable under output/release_digest_blocks/."
+    signal:
+      pattern: '(?is)^(?:Write|Edit|Bash)\b[\s\S]{0,1200}?output/release_digest_blocks/'
+
+  - id: r1_block_kit_limit_governance
+    type: lesson
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 0.75
+    spec: |
+      [SKILL] When generating Block Kit messages from a very long changelog, the code must explicitly govern Slack limits on the actual blocks construction/sending execution path: at least key limits such as block count, section text length, and actions element count, and avoid invalid_blocks via validation, truncation, pagination, batching, or summarization.
+      Skill-exclusive rationale: without reading the skill, models may stuff multiple changelog sections into blocks based on ordinary summarization experience; the skill specifically lists Block Kit limits such as 50 blocks, 3000 chars, 10 actions and recommends validate/paginate. The conflict point is that ordinary content organization does not guarantee Slack API sendability.
+    signal:
+      query: >
+        Based on the contents of the code files actually written to output/release_digest_blocks/, not the agent's self-statements, answer YES/NO: on the real execution path that generates/sends the Block Kit digest, is Slack limit governance logic actually executed (e.g. validating or limiting block count/text length/actions elements, and truncating, paginating, batching, or summarizing the long changelog)?
+        Answer YES if the active blocks construction/sending path enforces or validates relevant Block Kit limits before sending and handles overflow.
+        Answer NO if it simply appends changelog sections into blocks with no limits, truncation, pagination, batching, or validation; or only defines BLOCK_KIT_LIMITS/helper/TODO/comment that is never called by the send path.
+      acceptable: "build_digest_blocks calls truncate_text() and paginate_blocks(); send_digest calls validate_blocks(blocks) before chat_postMessage."
+      unacceptable: "BLOCK_KIT_LIMITS is defined but build/send never uses it; or for each changelog section blocks.append(...) then send all blocks directly."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r2_top_level_fallback_text
+    type: lesson
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/DIAGNOSTIC — not counted toward SF] When sending rich blocks, a non-empty, non-generic top-level fallback text should be provided, so that notification, mobile, and screen-reader scenarios can identify the Kubernetes release digest topic without parsing the blocks.
+      Downgrade reason: the task already strongly hints at mobile, desktop, and screen-reader scenarios; even with the skill masked, fallback text can be inferred, so it should not be the main SF score.
+    signal:
+      query: >
+        Based on the contents of the code files actually written to output/release_digest_blocks/, not the agent's self-statements, answer YES/NO: do all chat_postMessage/respond/say or equivalent Slack send calls that send Block Kit digest messages also provide a non-empty, non-generic top-level text fallback summarizing the Kubernetes release digest topic?
+        Answer YES if rich-message sends include meaningful text=... or 'text': ... alongside blocks.
+        Answer NO if messages with blocks omit top-level text or use empty/generic fallback such as "Update", "Notification", or "See blocks".
+      acceptable: "client.chat_postMessage(channel=..., text='Kubernetes 1.31 release digest: storage and scheduling highlights', blocks=blocks)"
+      unacceptable: "client.chat_postMessage(channel=..., blocks=blocks) or text='See blocks'."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r3_idempotent_interactive_actions
+    type: lesson
+    provenance: task
+    verifier: llm-judge
+    exclusive: false
+    weight: 0
+    spec: |
+      [TASK/DIAGNOSTIC — not counted toward SF] Interactive action handlers such as confirm-reading/needs-follow-up should ack() first, and update/replace the original message, remove/disable the button, or record handled state, to avoid repeated clicks triggering duplicate processing.
+      Downgrade reason: the task already directly requires that repeated clicks should not trigger duplicate processing, mainly testing task quality, not pure skill-following.
+    signal:
+      query: >
+        Based on the contents of the code files actually written to output/release_digest_blocks/, not the agent's self-statements, answer YES/NO: does each confirm/follow-up button action handler call ack() first, and via chat_update, respond(replace_original=True), deleting/disabling the button, persisting a handled key, or an equivalent handled-state guard, ensure that repeated clicks on the same digest do not trigger duplicate effects?
+        Answer YES if handlers ack promptly and implement original-message update/replacement or handled-state guard for idempotency.
+        Answer NO if handlers do slow work before ack, only post follow-up messages, or leave controls active without duplicate guard.
+      acceptable: "@app.action('ack_release') calls ack(); if digest_id in handled: return; mark handled; respond(replace_original=True, blocks=blocks_without_button)."
+      unacceptable: "@app.action('ack_release') creates a ticket then ack(); say('thanks') while original button remains active and no handled state is checked."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: r4_production_http_not_unconditional_socket_mode
+    type: boundary
+    provenance: skill
+    verifier: llm-judge
+    exclusive: true
+    weight: 1.0
+    spec: |
+      [SKILL] When deploying for a production on-call channel, the production entry point should use an HTTP endpoint/SlackRequestHandler or a Flask/FastAPI/Django/ASGI/WSGI equivalent webhook receiver; if Socket Mode is retained, it must be explicitly limited to local development or constrained internal environments, and cannot be the unconditional sole entry point.
+      Skill-exclusive rationale: this task's assets include the socket_mode.py example; without reading the skill, models may directly copy Socket Mode as the production entry point; the skill positions Socket Mode as a dev/internal tool and requires production to default to HTTP. The conflict point is that example convenience is the opposite of the production scalable-deployment boundary.
+    signal:
+      query: >
+        Based on the contents of the code files actually written to output/release_digest_blocks/, not the agent's self-statements, answer YES/NO: is the real runnable production deployment path not unconditionally Socket Mode; if SocketModeHandler exists, is it conditional on ENVIRONMENT/development/internal, and does the code provide a runnable HTTP Slack request endpoint as the production path? HTTP routes in comments do not count as production paths.
+        Answer YES if runnable Flask/FastAPI/Django/ASGI/WSGI Slack HTTP routes are present for production, or Socket Mode is clearly conditional for development/internal use only with a real HTTP alternative.
+        Answer NO if the only runnable entry point always starts SocketModeHandler for this production-facing app, or HTTP routes appear only in comments/non-runnable snippets.
+      acceptable: "if ENVIRONMENT == 'development': SocketModeHandler(...).start(); else Flask/FastAPI /slack/events route handles SlackRequestHandler."
+      unacceptable: "if __name__ == '__main__': SocketModeHandler(app, os.environ['SLACK_APP_TOKEN']).start() with no runnable production HTTP alternative."
+    review:
+      proposed_by: ["drafter"]
+      challenged_by: []
+      consensus: high
+
+  - id: tc1_task_done
+    type: task-completion
+    provenance: task
+    verifier: llm-judge
+    weight: 0
+    spec: "[TASK — not counted toward SF] Whether output/release_digest_blocks/ contains a deployable Python app that reads the Kubernetes changelog, generates Slack digest blocks, and provides confirm/follow-up buttons."
+    signal:
+      query: >
+        Based on the contents of the files actually written to output/release_digest_blocks/, not the agent's self-statements, answer YES/NO: does the deliverable contain Python application code that actually reads the provided CHANGELOG-1.31.md (path may be configurable but must point to/support that input), generates a Slack digest message, sends a digest containing blocks, and includes interactive button handlers for confirm-reading or needs-follow-up?
+        Answer YES only if these core task requirements are present under output/release_digest_blocks/.
+        Answer NO if output is missing, only docs, or lacks changelog parsing, Slack sending, or interactions.
+      acceptable: "A Python Bolt app reads a configured CHANGELOG-1.31.md path, builds blocks, sends them, and has @app.action handlers for acknowledge/follow-up."
+      unacceptable: "A static summary markdown without app code or no interactive actions."
