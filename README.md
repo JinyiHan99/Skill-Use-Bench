@@ -162,11 +162,17 @@ python benchmark/_scripts/score_matrix.py --runs-root runs/ --out leaderboard.cs
 ## Citation
 
 ```bibtex
-@inproceedings{skilluse2027,
-  title     = {Skill-Use: Can LLMs Actually Use Skills in Agentic Harnesses?},
-  author    = {Anonymous},
-  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
-  year      = {2027}
+@misc{han2026skilluse,
+  title         = {Skill-Use: Can LLMs Actually Use Skills in Agentic Harnesses?},
+  author        = {Jinyi Han and Yuanjian Xu and Ying Liao and Xinyi Wang
+                   and Zishang Jiang and Zixiang Di and Fanyang Lu
+                   and Zhichao Hu and Yanghua Xiao},
+  year          = {2026},
+  eprint        = {2608.04828},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL},
+  doi           = {10.48550/arXiv.2608.04828},
+  url           = {https://arxiv.org/abs/2608.04828}
 }
 ```
 
