@@ -1,10 +1,9 @@
 <div align="center">
 
-# Skill-Use: Can LLMs Actually Use Skills in Agentic Harnesses?
+# <img src="assets/logo.png" alt="Skill-Use logo" height="42" valign="middle"/>&nbsp;Skill-Use: Can LLMs Actually Use Skills in Agentic Harnesses?
 
 <p>
-  <a href="https://arxiv.org/abs/XXXX.XXXXX"><img alt="Paper" src="https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv&logoColor=white"></a>
-  <a href="https://huggingface.co/datasets/skill-use/skill-use-bench"><img alt="Data" src="https://img.shields.io/badge/Data-%F0%9F%A4%97%20HuggingFace-yellow"></a>
+  <a href="https://arxiv.org/pdf/2608.04828v1"><img alt="Paper" src="https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv&logoColor=white"></a>
   <a href="./LICENSE"><img alt="Code License" src="https://img.shields.io/badge/Code-MIT-blue"></a>
   <a href="./LICENSE"><img alt="Data License" src="https://img.shields.io/badge/Data-CC%20BY%204.0-lightgrey"></a>
 </p>
@@ -27,17 +26,6 @@
   <br/><em>Data construction pipeline: 79 real skills paired with 177 executable tasks and 177 trajectory rubrics across 9 domains.</em>
 </div>
 
-## Contents
-
-- [News](#news)
-- [Highlights](#highlights)
-- [Benchmark](#benchmark)
-- [Main Results](#main-results)
-- [Repository Layout](#repository-layout)
-- [Setup](#setup)
-- [Run](#run)
-- [Score](#score)
-- [Citation](#citation)
 
 
 ## Benchmark
