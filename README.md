@@ -3,7 +3,7 @@
 # <img src="assets/logo.png" alt="Skill-Use logo" height="42" valign="middle"/>&nbsp;Skill-Use: Can LLMs Actually Use Skills in Agentic Harnesses?
 
 <p>
-  <a href="https://arxiv.org/pdf/2608.04828v1"><img alt="Paper" src="https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv&logoColor=white"></a>
+  <!-- <a href="https://arxiv.org/pdf/2608.04828v1"><img alt="Paper" src="https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv&logoColor=white"></a> -->
   <a href="./LICENSE"><img alt="Code License" src="https://img.shields.io/badge/Code-MIT-blue"></a>
   <a href="./LICENSE"><img alt="Data License" src="https://img.shields.io/badge/Data-CC%20BY%204.0-lightgrey"></a>
 </p>
@@ -143,7 +143,7 @@ Outputs land in `runs/<harness>/<model>/<task_id>/` as `trace.jsonl`, `answer.tx
 | :---            | :---                                                           |
 | `cc`            | Claude Code, native progressive disclosure                |
 | `codex`         | Codex, skill body preloaded into `.codex/instructions.md`      |
-| `codex-native`  | Codex, skill installed under `$CODEX_HOME/skills/` with metadata only |
+
 
 ## Score
 
@@ -159,20 +159,5 @@ python benchmark/_scripts/score_matrix.py --runs-root runs/ --out leaderboard.cs
 
 `score_matrix.py` emits per-model Trigger, Compliance, Boundary, gated SU, plus the triggered-only variants `Comp.†`, `Bound.†`, and `SU⁺`.
 
-## Citation
 
-```bibtex
-@misc{han2026skilluse,
-  title         = {Skill-Use: Can LLMs Actually Use Skills in Agentic Harnesses?},
-  author        = {Jinyi Han and Yuanjian Xu and Ying Liao and Xinyi Wang
-                   and Zishang Jiang and Zixiang Di and Fanyang Lu
-                   and Zhichao Hu and Yanghua Xiao},
-  year          = {2026},
-  eprint        = {2608.04828},
-  archivePrefix = {arXiv},
-  primaryClass  = {cs.CL},
-  doi           = {10.48550/arXiv.2608.04828},
-  url           = {https://arxiv.org/abs/2608.04828}
-}
-```
 
